@@ -2,49 +2,50 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel = DashboardViewModel()
+    @State private var section: DashboardSection = .runs
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    statusGrid
-                    CommandPanel(runner: viewModel.commandRunner)
-                    RunsPanel(runs: viewModel.snapshot.runs)
-                    HStack(alignment: .top, spacing: 16) {
-                        LogsPanel(viewModel: viewModel)
-                        StagesPanel(stages: viewModel.snapshot.stages)
-                    }
-                }
-                .padding(18)
+            Divider()
+            VStack(spacing: 12) {
+                statusGrid
+                CommandStrip(runner: viewModel.commandRunner)
+                sectionPicker
+                contentPanel
             }
+            .padding(14)
         }
-        .frame(minWidth: 1120, minHeight: 780)
+        .frame(minWidth: 587, idealWidth: 587, minHeight: 624, idealHeight: 624)
+        .background(Color(nsColor: .windowBackgroundColor))
         .task {
             viewModel.refresh()
         }
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "waveform.path.ecg.rectangle")
-                .font(.title2)
-                .foregroundStyle(.blue)
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(Color.accentColor.opacity(0.16))
+                Image(systemName: "waveform.path.ecg")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .frame(width: 34, height: 34)
+
+            VStack(alignment: .leading, spacing: 1) {
                 Text("CI Scope")
-                    .font(.title3.weight(.semibold))
+                    .font(.system(size: 16, weight: .semibold))
                 Text(viewModel.config.repositorySlug)
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            if viewModel.isRefreshing {
-                ProgressView()
-                    .controlSize(.small)
-            }
-
+            StatusDot(state: viewModel.snapshot.runner.state)
             Text(viewModel.snapshot.refreshedAt.formatted(date: .omitted, time: .standard))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
@@ -52,368 +53,354 @@ struct ContentView: View {
             Button {
                 viewModel.refresh()
             } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 28, height: 28)
             }
-            .keyboardShortcut("r", modifiers: [.command])
+            .buttonStyle(.plain)
             .disabled(viewModel.isRefreshing)
+            .overlay {
+                if viewModel.isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .help("Refresh")
+            .keyboardShortcut("r", modifiers: [.command])
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .background(.regularMaterial)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.thinMaterial)
     }
 
     private var statusGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
-            RunnerCard(status: viewModel.snapshot.runner)
-            OllamaCard(status: viewModel.snapshot.ollama)
-            NexusUnityCard(snapshot: viewModel.snapshot.nexusUnity)
-            LatestRunCard(run: viewModel.snapshot.runs.first)
+        LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: 10),
+            GridItem(.flexible(), spacing: 10)
+        ], spacing: 10) {
+            StatusTile(
+                title: "Runner",
+                value: viewModel.snapshot.runner.launchctlState.capitalized,
+                detail: runnerDetail,
+                icon: "server.rack",
+                state: viewModel.snapshot.runner.state
+            )
+            StatusTile(
+                title: "Ollama",
+                value: viewModel.snapshot.ollama.loadedModels.first?.name ?? "Idle",
+                detail: ollamaDetail,
+                icon: "cpu",
+                state: viewModel.snapshot.ollama.state
+            )
+            StatusTile(
+                title: "Unity",
+                value: viewModel.snapshot.nexusUnity.status?.state ?? "Unknown",
+                detail: unityDetail,
+                icon: "cube.transparent",
+                state: viewModel.snapshot.nexusUnity.state
+            )
+            StatusTile(
+                title: "GitHub",
+                value: viewModel.snapshot.runs.first?.compactConclusion.capitalized ?? "No runs",
+                detail: viewModel.snapshot.runs.first?.headBranch ?? "Refresh to load",
+                icon: "checkmark.seal",
+                state: latestRunState
+            )
         }
     }
-}
 
-private struct RunnerCard: View {
-    let status: RunnerStatus
-
-    var body: some View {
-        MetricCard(title: "Runner", state: status.state, systemImage: "server.rack") {
-            metric("Service", status.launchctlState)
-            metric("PID", pidPair)
-            metric("Uptime", status.uptime)
-            Text(status.lastLine)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var pidPair: String {
-        let service = status.servicePID.map(String.init) ?? "-"
-        let listener = status.listenerPID.map(String.init) ?? "-"
-        return "\(service) / \(listener)"
-    }
-}
-
-private struct OllamaCard: View {
-    let status: OllamaStatus
-
-    var body: some View {
-        MetricCard(title: "Ollama", state: status.state, systemImage: "cpu") {
-            metric("Loaded", "\(status.loadedModels.count)")
-            metric("Available", "\(status.availableModels.count)")
-            if let model = status.loadedModels.first {
-                metric("VRAM", ByteCountFormatter.string(fromByteCount: model.sizeVRAM ?? model.size ?? 0, countStyle: .memory))
-                Text(model.name)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                Text(status.error ?? status.loadedSummary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+    private var sectionPicker: some View {
+        HStack(spacing: 6) {
+            ForEach(DashboardSection.allCases) { item in
+                Button {
+                    section = item
+                } label: {
+                    Label(item.title, systemImage: item.icon)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(section == item ? Color.accentColor.opacity(0.16) : Color.clear)
+                        .foregroundStyle(section == item ? Color.accentColor : Color.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
             }
         }
+        .padding(4)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.14))
+        )
     }
-}
 
-private struct NexusUnityCard: View {
-    let snapshot: NexusUnitySnapshot
-
-    var body: some View {
-        MetricCard(title: "Nexus Unity", state: snapshot.state, systemImage: "cube.transparent") {
-            metric("State", snapshot.status?.state ?? "-")
-            metric("PID", snapshot.status?.processId.map(String.init) ?? "-")
-            metric("Unity", snapshot.status?.unityVersion ?? "-")
-            Text(snapshot.status?.projectPath ?? snapshot.error ?? "No status.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
-private struct LatestRunCard: View {
-    let run: GitHubRun?
-
-    var body: some View {
-        MetricCard(title: "Latest Run", state: runState, systemImage: "checkmark.seal") {
-            metric("Result", run?.compactConclusion ?? "-")
-            metric("Branch", run?.headBranch ?? "-")
-            metric("Event", run?.event ?? "-")
-            Text(run?.displayTitle ?? "No GitHub runs loaded.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
+    @ViewBuilder
+    private var contentPanel: some View {
+        switch section {
+        case .runs:
+            CompactRunsPanel(runs: viewModel.snapshot.runs)
+        case .logs:
+            CompactLogsPanel(viewModel: viewModel)
+        case .scripts:
+            CompactStagesPanel(stages: viewModel.snapshot.stages)
+        case .console:
+            CompactConsolePanel(runner: viewModel.commandRunner)
         }
     }
 
-    private var runState: ServiceState {
-        guard let run else { return .unknown }
+    private var runnerDetail: String {
+        let pid = viewModel.snapshot.runner.listenerPID ?? viewModel.snapshot.runner.servicePID
+        return "PID \(pid.map(String.init) ?? "-") · \(viewModel.snapshot.runner.uptime)"
+    }
+
+    private var ollamaDetail: String {
+        guard let model = viewModel.snapshot.ollama.loadedModels.first else {
+            return "\(viewModel.snapshot.ollama.availableModels.count) models"
+        }
+
+        let bytes = model.sizeVRAM ?? model.size ?? 0
+        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory)
+    }
+
+    private var unityDetail: String {
+        let pid = viewModel.snapshot.nexusUnity.status?.processId.map(String.init) ?? "-"
+        let version = viewModel.snapshot.nexusUnity.status?.unityVersion ?? "-"
+        return "PID \(pid) · \(version)"
+    }
+
+    private var latestRunState: ServiceState {
+        guard let run = viewModel.snapshot.runs.first else { return .unknown }
         if run.conclusion == "success" { return .online }
         if run.status != "completed" { return .warning }
         return .offline
     }
 }
 
-private struct CommandPanel: View {
+private enum DashboardSection: String, CaseIterable, Identifiable {
+    case runs
+    case logs
+    case scripts
+    case console
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .runs: "Runs"
+        case .logs: "Logs"
+        case .scripts: "Scripts"
+        case .console: "Console"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .runs: "point.3.connected.trianglepath.dotted"
+        case .logs: "doc.text.magnifyingglass"
+        case .scripts: "curlybraces.square"
+        case .console: "terminal"
+        }
+    }
+}
+
+private struct StatusTile: View {
+    let title: String
+    let value: String
+    let detail: String
+    let icon: String
+    let state: ServiceState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(stateColor.opacity(0.12))
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(stateColor)
+            }
+            .frame(width: 32, height: 32)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
+                    Text(title)
+                        .font(.caption.weight(.semibold))
+                    StatusDot(state: state)
+                }
+                Text(value)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(height: 70)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.13))
+        )
+    }
+
+    private var stateColor: Color {
+        switch state {
+        case .online: .green
+        case .warning: .orange
+        case .offline: .red
+        case .unknown: .secondary
+        }
+    }
+}
+
+private struct CommandStrip: View {
     @ObservedObject var runner: LocalCommandRunner
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(spacing: 9) {
             HStack {
-                Label("Local Commands", systemImage: "terminal")
-                    .font(.headline)
+                Label("Commands", systemImage: "bolt.horizontal")
+                    .font(.caption.weight(.semibold))
                 Spacer()
                 if runner.isRunning {
                     ProgressView()
                         .controlSize(.small)
                     Text(runner.activeTitle ?? "Running")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                     Button(role: .destructive) {
                         runner.stop()
                     } label: {
-                        Label("Stop", systemImage: "stop.fill")
+                        Image(systemName: "stop.fill")
+                            .frame(width: 22, height: 22)
                     }
+                    .buttonStyle(.plain)
+                    .help("Stop")
                 } else if let code = runner.lastExitCode {
                     Text("Exit \(code)")
-                        .font(.caption.monospacedDigit())
+                        .font(.caption2.monospacedDigit())
                         .foregroundStyle(code == 0 ? .green : .red)
                 }
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 7) {
                 ForEach(LocalCommandPreset.allCases) { preset in
-                    Button {
-                        runner.run(preset)
-                    } label: {
-                        Label(preset.title, systemImage: preset.systemImage)
-                            .frame(minWidth: 112)
-                    }
-                    .disabled(runner.isRunning)
+                    CommandButton(preset: preset, runner: runner)
                 }
             }
-
-            ScrollView {
-                Text(runner.output.isEmpty ? "No command output." : runner.output)
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-            }
-            .frame(height: 170)
-            .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.secondary.opacity(0.18))
-            )
         }
-        .panelStyle()
+        .padding(10)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.13))
+        )
     }
 }
 
-private struct RunsPanel: View {
+private struct CommandButton: View {
+    let preset: LocalCommandPreset
+    @ObservedObject var runner: LocalCommandRunner
+
+    var body: some View {
+        Button {
+            runner.run(preset)
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: preset.systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(preset.title)
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 45)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color.secondary.opacity(0.12))
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(runner.isRunning)
+        .opacity(runner.isRunning ? 0.48 : 1)
+        .help(preset.title)
+    }
+}
+
+private struct CompactRunsPanel: View {
     let runs: [GitHubRun]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("GitHub Runs", systemImage: "point.3.connected.trianglepath.dotted")
-                .font(.headline)
-
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                GridRow {
-                    header("Result")
-                    header("Workflow")
-                    header("Branch")
-                    header("Event")
-                    header("Created")
-                    header("Title")
-                }
-                Divider()
-                    .gridCellColumns(6)
-                ForEach(runs.prefix(10)) { run in
-                    GridRow {
-                        runBadge(run.compactConclusion)
-                        Text(run.workflowName)
-                        Text(run.headBranch)
-                        Text(run.event)
-                        Text(shortDate(run.createdAt))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                        Link(run.displayTitle, destination: URL(string: run.url)!)
-                            .lineLimit(1)
-                    }
-                    .font(.caption)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .panelStyle()
-    }
-
-    private func header(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-    }
-
-    private func runBadge(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(text == "success" ? .green : .orange)
-            .frame(minWidth: 68, alignment: .leading)
-    }
-
-    private func shortDate(_ value: String) -> String {
-        value.replacingOccurrences(of: "T", with: " ").replacingOccurrences(of: "Z", with: "")
-    }
-}
-
-private struct LogsPanel: View {
-    @ObservedObject var viewModel: DashboardViewModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("Runner Logs", systemImage: "doc.text.magnifyingglass")
-                    .font(.headline)
-                Spacer()
-                Picker("Log", selection: $viewModel.selectedLog) {
-                    ForEach(LogKind.allCases) { kind in
-                        Text(kind.rawValue).tag(kind)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 430)
-            }
-
-            Text(logTitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
+        PanelShell(title: "GitHub Runs", icon: "point.3.connected.trianglepath.dotted") {
             ScrollView {
-                Text(logText)
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-            }
-            .frame(minHeight: 330)
-            .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.secondary.opacity(0.18))
-            )
-        }
-        .panelStyle()
-        .frame(maxWidth: .infinity)
-    }
-
-    private var logText: String {
-        let text = viewModel.selectedLogText()
-        return text.isEmpty ? "No log output." : text
-    }
-
-    private var logTitle: String {
-        switch viewModel.selectedLog {
-        case .stdout:
-            "service stdout"
-        case .stderr:
-            "service stderr"
-        case .runnerDiag:
-            viewModel.snapshot.logs.latestRunnerDiagName
-        case .workerDiag:
-            viewModel.snapshot.logs.latestWorkerDiagName
-        }
-    }
-}
-
-private struct StagesPanel: View {
-    let stages: [ScriptStage]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Scripts Registry", systemImage: "curlybraces.square")
-                .font(.headline)
-
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(stages) { stage in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(stage.title)
-                                    .font(.caption.weight(.semibold))
-                                Spacer()
-                                Text(stage.source)
-                                    .font(.caption2.monospaced())
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text(stage.detail)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            if let command = stage.command {
-                                Text(command)
-                                    .font(.caption2.monospaced())
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
+                LazyVStack(spacing: 7) {
+                    ForEach(runs.prefix(12)) { run in
+                        Link(destination: URL(string: run.url)!) {
+                            RunRow(run: run)
                         }
-                        .padding(8)
-                        .background(Color.secondary.opacity(0.06))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .buttonStyle(.plain)
+                    }
+                    if runs.isEmpty {
+                        EmptyState(icon: "icloud.slash", text: "No runs loaded")
                     }
                 }
+                .padding(10)
             }
-            .frame(minHeight: 330)
         }
-        .panelStyle()
-        .frame(width: 360)
     }
 }
 
-private struct MetricCard<Content: View>: View {
-    let title: String
-    let state: ServiceState
-    let systemImage: String
-    @ViewBuilder let content: Content
+private struct RunRow: View {
+    let run: GitHubRun
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: systemImage)
-                    .foregroundStyle(.secondary)
-                Text(title)
-                    .font(.headline)
-                Spacer()
-                StatusBadge(state: state)
+        HStack(spacing: 9) {
+            StatusDot(state: state)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(run.displayTitle)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 6)
+                    Text(run.compactConclusion)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(color)
+                        .lineLimit(1)
+                }
+                HStack(spacing: 6) {
+                    Text(run.workflowName)
+                    Text("·")
+                    Text(run.headBranch)
+                    Text("·")
+                    Text(shortDate(run.createdAt))
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
-            content
-            Spacer(minLength: 0)
         }
-        .panelStyle()
-        .frame(minHeight: 168)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(Color.secondary.opacity(0.055))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
     }
-}
 
-private struct StatusBadge: View {
-    let state: ServiceState
-
-    var body: some View {
-        Text(state.rawValue)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(color.opacity(0.12))
-            .clipShape(Capsule())
+    private var state: ServiceState {
+        if run.conclusion == "success" { return .online }
+        if run.status != "completed" { return .warning }
+        return .offline
     }
 
     private var color: Color {
@@ -424,31 +411,217 @@ private struct StatusBadge: View {
         case .unknown: .secondary
         }
     }
-}
 
-@ViewBuilder
-private func metric(_ title: String, _ value: String) -> some View {
-    HStack {
-        Text(title)
-            .foregroundStyle(.secondary)
-        Spacer()
-        Text(value)
-            .font(.caption.monospacedDigit())
-            .lineLimit(1)
+    private func shortDate(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "T", with: " ")
+            .replacingOccurrences(of: "Z", with: "")
     }
-    .font(.caption)
 }
 
-private extension View {
-    func panelStyle() -> some View {
-        self
-            .padding(14)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.secondary.opacity(0.14))
-            )
+private struct CompactLogsPanel: View {
+    @ObservedObject var viewModel: DashboardViewModel
+
+    var body: some View {
+        PanelShell(title: "Runner Logs", icon: "doc.text.magnifyingglass") {
+            VStack(spacing: 8) {
+                Picker("Log", selection: $viewModel.selectedLog) {
+                    ForEach(LogKind.allCases) { kind in
+                        Text(kind.rawValue).tag(kind)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                Text(logTitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                LogScroll(text: logText)
+            }
+            .padding(10)
+        }
+    }
+
+    private var logText: String {
+        let text = viewModel.selectedLogText()
+        return text.isEmpty ? "No log output." : text
+    }
+
+    private var logTitle: String {
+        switch viewModel.selectedLog {
+        case .stdout: "service stdout"
+        case .stderr: "service stderr"
+        case .runnerDiag: viewModel.snapshot.logs.latestRunnerDiagName
+        case .workerDiag: viewModel.snapshot.logs.latestWorkerDiagName
+        }
+    }
+}
+
+private struct CompactStagesPanel: View {
+    let stages: [ScriptStage]
+
+    var body: some View {
+        PanelShell(title: "Scripts Registry", icon: "curlybraces.square") {
+            ScrollView {
+                LazyVStack(spacing: 7) {
+                    ForEach(stages) { stage in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Text(stage.title)
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(stage.source)
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Text(stage.detail)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            if let command = stage.command {
+                                Text(command)
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                        }
+                        .padding(9)
+                        .background(Color.secondary.opacity(0.055))
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                    }
+                    if stages.isEmpty {
+                        EmptyState(icon: "curlybraces.square", text: "No stages parsed")
+                    }
+                }
+                .padding(10)
+            }
+        }
+    }
+}
+
+private struct CompactConsolePanel: View {
+    @ObservedObject var runner: LocalCommandRunner
+
+    var body: some View {
+        PanelShell(title: "Command Output", icon: "terminal") {
+            VStack(spacing: 8) {
+                HStack {
+                    if runner.isRunning {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(runner.activeTitle ?? "Running")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else if let code = runner.lastExitCode {
+                        Text("Process exited with code \(code)")
+                            .font(.caption)
+                            .foregroundStyle(code == 0 ? .green : .red)
+                    } else {
+                        Text("Ready")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                LogScroll(text: runner.output.isEmpty ? "No command output." : runner.output)
+            }
+            .padding(10)
+        }
+    }
+}
+
+private struct PanelShell<Content: View>: View {
+    let title: String
+    let icon: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Label(title, systemImage: icon)
+                    .font(.caption.weight(.semibold))
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.secondary.opacity(0.055))
+            Divider()
+            content
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.13))
+        )
+    }
+}
+
+private struct LogScroll: View {
+    let text: String
+
+    var body: some View {
+        ScrollView {
+            Text(text)
+                .font(.system(size: 10, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(9)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.secondary.opacity(0.12))
+        )
+    }
+}
+
+private struct EmptyState: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 120)
+    }
+}
+
+private struct StatusDot: View {
+    let state: ServiceState
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 8, height: 8)
+            .overlay {
+                Circle()
+                    .stroke(color.opacity(0.35), lineWidth: 3)
+            }
+            .help(state.rawValue)
+    }
+
+    private var color: Color {
+        switch state {
+        case .online: .green
+        case .warning: .orange
+        case .offline: .red
+        case .unknown: .secondary
+        }
     }
 }
 
