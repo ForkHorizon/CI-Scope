@@ -3,15 +3,25 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel = DashboardViewModel()
     @State private var section: DashboardSection = .runs
+    @State private var isProjectMenuOpen = true
 
     var body: some View {
         HStack(spacing: 0) {
+            if isProjectMenuOpen {
+                ProjectMenuPanel(projects: projectMenuItems)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                Divider()
+            }
             dashboardSurface
-            Divider()
-            ProjectMenuPanel(projects: projectMenuItems)
         }
-        .frame(minWidth: 792, idealWidth: 792, minHeight: 624, idealHeight: 624)
+        .frame(
+            minWidth: isProjectMenuOpen ? 792 : 587,
+            idealWidth: isProjectMenuOpen ? 792 : 587,
+            minHeight: 624,
+            idealHeight: 624
+        )
         .background(Color(nsColor: .windowBackgroundColor))
+        .animation(.easeInOut(duration: 0.18), value: isProjectMenuOpen)
         .task {
             viewModel.refresh()
         }
@@ -29,11 +39,25 @@ struct ContentView: View {
             }
             .padding(14)
         }
-        .frame(minWidth: 587, idealWidth: 587)
+        .frame(minWidth: 587, maxWidth: .infinity)
     }
 
     private var header: some View {
         HStack(spacing: 10) {
+            Button {
+                isProjectMenuOpen.toggle()
+            } label: {
+                Image(systemName: "sidebar.leading")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(isProjectMenuOpen ? Color.accentColor : Color.primary)
+                    .frame(width: 28, height: 28)
+                    .background(isProjectMenuOpen ? Color.accentColor.opacity(0.13) : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .help(isProjectMenuOpen ? "Hide projects" : "Show projects")
+            .keyboardShortcut("b", modifiers: [.command])
+
             ZStack {
                 RoundedRectangle(cornerRadius: 7)
                     .fill(Color.accentColor.opacity(0.16))
