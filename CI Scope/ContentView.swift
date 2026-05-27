@@ -555,7 +555,7 @@ private struct ProjectWorkflowList: View {
 
             ForEach(workflows) { workflow in
                 HStack(spacing: 8) {
-                    StatusDot(state: workflow.state == "active" ? .online : .warning)
+                    StatusDot(state: workflow.state.lowercased().contains("disabled") ? .warning : .online)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(workflow.name)
                             .font(.caption.weight(.semibold))
