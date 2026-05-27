@@ -36,6 +36,22 @@ struct GitHubRun: Identifiable, Decodable {
     }
 }
 
+struct GitHubWorkflow: Identifiable, Decodable {
+    let id: Int
+    let name: String
+    let path: String?
+    let state: String
+}
+
+struct ProjectCISnapshot {
+    let projectID: CIProject.ID
+    var state: ServiceState = .unknown
+    var workflows: [GitHubWorkflow] = []
+    var runs: [GitHubRun] = []
+    var error: String?
+    var refreshedAt = Date()
+}
+
 struct OllamaLoadedModel: Identifiable, Decodable {
     let name: String
     let model: String

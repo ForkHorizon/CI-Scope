@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel = DashboardViewModel()
     @StateObject private var projectStore = ProjectStore()
+    @StateObject private var projectCIViewModel = ProjectCIViewModel()
     @State private var section: DashboardSection = .runs
     @State private var isProjectMenuOpen = true
     @State private var isAddingProject = false
@@ -35,6 +36,11 @@ struct ContentView: View {
         .task {
             viewModel.refresh()
         }
+        .task(id: selectedProject.id) {
+            if !selectedProject.isPrimary {
+                await projectCIViewModel.load(selectedProject)
+            }
+        }
         .sheet(isPresented: $isAddingProject) {
             AddProjectSheet { input in
                 try projectStore.addProject(from: input)
@@ -55,7 +61,11 @@ struct ContentView: View {
                 }
                 .padding(14)
             } else {
-                LimitedProjectPanel(project: selectedProject)
+                ProjectCIPanel(
+                    project: selectedProject,
+                    snapshot: projectCIViewModel.snapshot(for: selectedProject.id),
+                    isLoading: projectCIViewModel.loadingProjectID == selectedProject.id
+                )
                     .padding(14)
             }
         }
@@ -99,21 +109,21 @@ struct ContentView: View {
             Spacer(minLength: 8)
 
             StatusDot(state: state(for: selectedProject))
-            Text(viewModel.snapshot.refreshedAt.formatted(date: .omitted, time: .standard))
+            Text(refreshedAt.formatted(date: .omitted, time: .standard))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
 
             Button {
-                viewModel.refresh()
+                refreshSelectedProject()
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 13, weight: .semibold))
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
-            .disabled(viewModel.isRefreshing || !selectedProject.isPrimary)
+            .disabled(isRefreshing)
             .overlay {
-                if viewModel.isRefreshing {
+                if isRefreshing {
                     ProgressView()
                         .controlSize(.small)
                 }
@@ -234,6 +244,19 @@ struct ContentView: View {
         projectStore.selectedProject
     }
 
+    private var isRefreshing: Bool {
+        selectedProject.isPrimary
+            ? viewModel.isRefreshing
+            : projectCIViewModel.loadingProjectID == selectedProject.id
+    }
+
+    private var refreshedAt: Date {
+        if selectedProject.isPrimary {
+            return viewModel.snapshot.refreshedAt
+        }
+        return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt ?? Date()
+    }
+
     private var projectState: ServiceState {
         let states = [
             viewModel.snapshot.runner.state,
@@ -249,13 +272,23 @@ struct ContentView: View {
     }
 
     private func state(for project: CIProject) -> ServiceState {
-        project.isPrimary ? projectState : .unknown
+        project.isPrimary ? projectState : projectCIViewModel.snapshot(for: project.id)?.state ?? .unknown
     }
 
     private func selectProject(_ project: CIProject) {
         projectStore.select(project)
         if project.isPrimary {
             viewModel.refresh()
+        }
+    }
+
+    private func refreshSelectedProject() {
+        if selectedProject.isPrimary {
+            viewModel.refresh()
+        } else {
+            Task {
+                await projectCIViewModel.load(selectedProject)
+            }
         }
     }
 }
@@ -435,46 +468,155 @@ private struct ProjectMenuRow: View {
     }
 }
 
-private struct LimitedProjectPanel: View {
+private struct ProjectCIPanel: View {
     let project: CIProject
+    let snapshot: ProjectCISnapshot?
+    let isLoading: Bool
 
     var body: some View {
-        PanelShell(title: "Project", icon: "folder") {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 7)
-                            .fill(Color.accentColor.opacity(0.14))
-                        Image(systemName: "folder.badge.gearshape")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.accentColor)
-                    }
-                    .frame(width: 36, height: 36)
+        PanelShell(title: "GitHub CI", icon: "point.3.connected.trianglepath.dotted") {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(Color.accentColor.opacity(0.14))
+                            Image(systemName: "folder.badge.gearshape")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                        }
+                        .frame(width: 36, height: 36)
 
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(project.title)
+                                .font(.system(size: 16, weight: .semibold))
+                                .lineLimit(1)
+                            Text(project.repositorySlug)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+
+                        Spacer()
+
+                        if isLoading {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            StatusDot(state: snapshot?.state ?? .unknown)
+                        }
+                    }
+
+                    LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
+                    LimitedStatusRow(title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
+                    LimitedStatusRow(title: "Local runner", value: "Not configured", icon: "server.rack", state: .unknown)
+
+                    if let error = snapshot?.error {
+                        ErrorBox(text: error)
+                    }
+
+                    if let snapshot, !snapshot.workflows.isEmpty {
+                        ProjectWorkflowList(workflows: snapshot.workflows)
+                    }
+
+                    if let snapshot, !snapshot.runs.isEmpty {
+                        ProjectRunList(runs: snapshot.runs)
+                    }
+
+                    if snapshot?.error == nil, snapshot?.workflows.isEmpty != false, snapshot?.runs.isEmpty != false, !isLoading {
+                        EmptyState(icon: "icloud.slash", text: "No GitHub CI detected")
+                    }
+                }
+                .padding(12)
+            }
+        }
+    }
+
+    private var ciSummary: String {
+        guard let snapshot else {
+            return isLoading ? "Loading" : "Not loaded"
+        }
+        if let error = snapshot.error, !error.isEmpty {
+            return "Error"
+        }
+        return "\(snapshot.workflows.count) workflows · \(snapshot.runs.count) runs"
+    }
+}
+
+private struct ProjectWorkflowList: View {
+    let workflows: [GitHubWorkflow]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Workflows")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(workflows) { workflow in
+                HStack(spacing: 8) {
+                    StatusDot(state: workflow.state == "active" ? .online : .warning)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(project.title)
-                            .font(.system(size: 16, weight: .semibold))
+                        Text(workflow.name)
+                            .font(.caption.weight(.semibold))
                             .lineLimit(1)
-                        Text(project.repositorySlug)
+                        Text(workflow.path ?? workflow.state)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
-
                     Spacer()
+                    Text(workflow.state)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-
-                LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
-                LimitedStatusRow(title: "Local runner", value: "Not configured", icon: "server.rack", state: .unknown)
-                LimitedStatusRow(title: "Unity", value: "Not configured", icon: "cube.transparent", state: .unknown)
-                LimitedStatusRow(title: "Scripts", value: "Not configured", icon: "curlybraces.square", state: .unknown)
-
-                Spacer(minLength: 0)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 7)
+                .background(Color.secondary.opacity(0.055))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
             }
-            .padding(12)
         }
     }
+}
+
+private struct ProjectRunList: View {
+    let runs: [GitHubRun]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Recent Runs")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(runs.prefix(8)) { run in
+                Link(destination: URL(string: run.url)!) {
+                    RunRow(run: run)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+private struct ErrorBox: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.monospaced())
+            .foregroundStyle(.red)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(9)
+            .background(Color.red.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color.red.opacity(0.18))
+            )
+        }
 }
 
 private struct LimitedStatusRow: View {
