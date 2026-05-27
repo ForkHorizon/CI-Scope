@@ -510,10 +510,12 @@ private struct ProjectCIPanel: View {
                         }
                     }
 
-                    LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
-                    LimitedStatusRow(title: "GitHub CLI", value: githubAuthSummary, icon: "person.crop.circle.badge.checkmark", state: snapshot?.auth.state ?? .unknown)
-                    LimitedStatusRow(title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
-                    LimitedStatusRow(title: "Local runner", value: "Not configured", icon: "server.rack", state: .unknown)
+                    LazyVGrid(columns: projectInfoColumns, spacing: 8) {
+                        LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
+                        LimitedStatusRow(title: "GitHub CLI", value: githubAuthSummary, icon: "person.crop.circle.badge.checkmark", state: snapshot?.auth.state ?? .unknown)
+                        LimitedStatusRow(title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
+                        LimitedStatusRow(title: "Local runner", value: "Not configured", icon: "server.rack", state: .unknown)
+                    }
 
                     if let error = snapshot?.error {
                         ErrorBox(text: error)
@@ -558,6 +560,13 @@ private struct ProjectCIPanel: View {
             return isLoading ? "Checking" : "Not checked"
         }
         return auth.summary
+    }
+
+    private var projectInfoColumns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 8),
+            GridItem(.flexible(), spacing: 8)
+        ]
     }
 }
 
@@ -643,11 +652,11 @@ private struct LimitedStatusRow: View {
     let state: ServiceState
 
     var body: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
-                .frame(width: 20)
+                .frame(width: 18)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -663,8 +672,9 @@ private struct LimitedStatusRow: View {
             Spacer()
             StatusDot(state: state)
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .background(Color.secondary.opacity(0.055))
         .clipShape(RoundedRectangle(cornerRadius: 7))
     }
