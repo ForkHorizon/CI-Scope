@@ -67,6 +67,10 @@ struct ProjectCIService {
             )
         }
 
+        if result.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return LoadResponse(value: [])
+        }
+
         guard let data = result.output.data(using: .utf8) else {
             return LoadResponse(error: "Failed to read workflow response.")
         }

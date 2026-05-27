@@ -526,7 +526,7 @@ private struct ProjectCIPanel: View {
                     }
 
                     if snapshot?.error == nil, snapshot?.workflows.isEmpty != false, snapshot?.runs.isEmpty != false, !isLoading {
-                        EmptyState(icon: "icloud.slash", text: "No GitHub CI detected")
+                        EmptyState(icon: "icloud.slash", text: "No actions available")
                     }
                 }
                 .padding(12)
@@ -544,6 +544,9 @@ private struct ProjectCIPanel: View {
             }
             let runs = snapshot.runs.isEmpty ? "runs unavailable" : "\(snapshot.runs.count) runs"
             return "\(snapshot.workflows.count) workflows · \(runs)"
+        }
+        if snapshot.workflows.isEmpty && snapshot.runs.isEmpty {
+            return "No actions available"
         }
         return "\(snapshot.workflows.count) workflows · \(snapshot.runs.count) runs"
     }
