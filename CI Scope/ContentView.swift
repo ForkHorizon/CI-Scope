@@ -2,13 +2,23 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel = DashboardViewModel()
+    @StateObject private var projectStore = ProjectStore()
     @State private var section: DashboardSection = .runs
     @State private var isProjectMenuOpen = true
+    @State private var isAddingProject = false
 
     var body: some View {
         HStack(spacing: 0) {
             if isProjectMenuOpen {
-                ProjectMenuPanel(projects: projectMenuItems)
+                ProjectMenuPanel(
+                    projects: projectStore.projects,
+                    selectedProjectID: projectStore.selectedProjectID,
+                    stateForProject: state(for:),
+                    onSelect: selectProject,
+                    onAddProject: {
+                        isAddingProject = true
+                    }
+                )
                     .transition(.move(edge: .leading).combined(with: .opacity))
                 Divider()
             }
@@ -25,19 +35,29 @@ struct ContentView: View {
         .task {
             viewModel.refresh()
         }
+        .sheet(isPresented: $isAddingProject) {
+            AddProjectSheet { input in
+                try projectStore.addProject(from: input)
+            }
+        }
     }
 
     private var dashboardSurface: some View {
         VStack(spacing: 0) {
             header
             Divider()
-            VStack(spacing: 12) {
-                statusGrid
-                CommandStrip(runner: viewModel.commandRunner)
-                sectionPicker
-                contentPanel
+            if selectedProject.isPrimary {
+                VStack(spacing: 12) {
+                    statusGrid
+                    CommandStrip(runner: viewModel.commandRunner)
+                    sectionPicker
+                    contentPanel
+                }
+                .padding(14)
+            } else {
+                LimitedProjectPanel(project: selectedProject)
+                    .padding(14)
             }
-            .padding(14)
         }
         .frame(minWidth: 587, maxWidth: .infinity)
     }
@@ -70,7 +90,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("CI Scope")
                     .font(.system(size: 16, weight: .semibold))
-                Text(viewModel.config.repositorySlug)
+                Text(selectedProject.repositorySlug)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -78,7 +98,7 @@ struct ContentView: View {
 
             Spacer(minLength: 8)
 
-            StatusDot(state: viewModel.snapshot.runner.state)
+            StatusDot(state: state(for: selectedProject))
             Text(viewModel.snapshot.refreshedAt.formatted(date: .omitted, time: .standard))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
@@ -91,7 +111,7 @@ struct ContentView: View {
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
-            .disabled(viewModel.isRefreshing)
+            .disabled(viewModel.isRefreshing || !selectedProject.isPrimary)
             .overlay {
                 if viewModel.isRefreshing {
                     ProgressView()
@@ -210,45 +230,8 @@ struct ContentView: View {
         return .offline
     }
 
-    private var projectMenuItems: [ProjectMenuItem] {
-        [
-            ProjectMenuItem(
-                id: "nexusunity",
-                title: "NexusUnity",
-                subtitle: viewModel.config.repositorySlug,
-                badge: "Active",
-                icon: "cube.transparent",
-                state: projectState,
-                isActive: true
-            ),
-            ProjectMenuItem(
-                id: "ci-scope",
-                title: "CI Scope",
-                subtitle: "ForkHorizon/CI-Scope",
-                badge: "App",
-                icon: "macwindow",
-                state: .online,
-                isActive: false
-            ),
-            ProjectMenuItem(
-                id: "unity-smoke",
-                title: "Unity Smoke",
-                subtitle: "UnityTestForNexus",
-                badge: "Smoke",
-                icon: "play.square.stack",
-                state: viewModel.snapshot.nexusUnity.state,
-                isActive: false
-            ),
-            ProjectMenuItem(
-                id: "docs-runner",
-                title: "Docs Runner",
-                subtitle: "nexus-doc-ai",
-                badge: "Local",
-                icon: "server.rack",
-                state: viewModel.snapshot.runner.state,
-                isActive: false
-            )
-        ]
+    private var selectedProject: CIProject {
+        projectStore.selectedProject
     }
 
     private var projectState: ServiceState {
@@ -263,6 +246,17 @@ struct ContentView: View {
         if states.contains(.warning) { return .warning }
         if states.allSatisfy({ $0 == .online }) { return .online }
         return .unknown
+    }
+
+    private func state(for project: CIProject) -> ServiceState {
+        project.isPrimary ? projectState : .unknown
+    }
+
+    private func selectProject(_ project: CIProject) {
+        projectStore.select(project)
+        if project.isPrimary {
+            viewModel.refresh()
+        }
     }
 }
 
@@ -293,18 +287,12 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
     }
 }
 
-private struct ProjectMenuItem: Identifiable {
-    let id: String
-    let title: String
-    let subtitle: String
-    let badge: String
-    let icon: String
-    let state: ServiceState
-    let isActive: Bool
-}
-
 private struct ProjectMenuPanel: View {
-    let projects: [ProjectMenuItem]
+    let projects: [CIProject]
+    let selectedProjectID: CIProject.ID
+    let stateForProject: (CIProject) -> ServiceState
+    let onSelect: (CIProject) -> Void
+    let onAddProject: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -321,8 +309,31 @@ private struct ProjectMenuPanel: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(projects) { project in
-                        ProjectMenuRow(project: project)
+                        ProjectMenuRow(
+                            project: project,
+                            state: stateForProject(project),
+                            isActive: project.id == selectedProjectID
+                        ) {
+                            onSelect(project)
+                        }
                     }
+
+                    Button {
+                        onAddProject()
+                    } label: {
+                        Label("Add Project", systemImage: "plus")
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color(nsColor: .windowBackgroundColor))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.secondary.opacity(0.12))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Add Project")
                 }
                 .padding(10)
             }
@@ -348,7 +359,7 @@ private struct ProjectMenuPanel: View {
     }
 
     private var aggregateState: ServiceState {
-        let states = projects.map(\.state)
+        let states = projects.map(stateForProject)
         if states.contains(.offline) { return .offline }
         if states.contains(.warning) { return .warning }
         if states.contains(.unknown) { return .unknown }
@@ -357,56 +368,203 @@ private struct ProjectMenuPanel: View {
 }
 
 private struct ProjectMenuRow: View {
-    let project: ProjectMenuItem
+    let project: CIProject
+    let state: ServiceState
+    let isActive: Bool
+    let onSelect: () -> Void
 
     var body: some View {
-        HStack(spacing: 9) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(stateColor.opacity(project.isActive ? 0.15 : 0.08))
-                Image(systemName: project.icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(project.isActive ? stateColor : .secondary)
-            }
-            .frame(width: 31, height: 31)
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 5) {
-                    Text(project.title)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                    StatusDot(state: project.state)
+        Button {
+            onSelect()
+        } label: {
+            HStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(stateColor.opacity(isActive ? 0.15 : 0.08))
+                    Image(systemName: project.isPrimary ? "cube.transparent" : "folder")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(isActive ? stateColor : .secondary)
                 }
+                .frame(width: 31, height: 31)
 
-                Text(project.subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 5) {
+                        Text(project.title)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        StatusDot(state: state)
+                    }
 
-                Text(project.badge)
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(project.isActive ? Color.accentColor : .secondary)
-                    .lineLimit(1)
+                    Text(project.repositorySlug)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text(badge)
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                        .lineLimit(1)
+                }
             }
         }
+        .buttonStyle(.plain)
         .padding(9)
         .frame(height: 66)
-        .background(project.isActive ? Color.accentColor.opacity(0.11) : Color(nsColor: .windowBackgroundColor))
+        .background(isActive ? Color.accentColor.opacity(0.11) : Color(nsColor: .windowBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(project.isActive ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12))
+                .stroke(isActive ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12))
         )
     }
 
+    private var badge: String {
+        if isActive { return "Active" }
+        return project.isPrimary ? "Primary" : "Saved"
+    }
+
     private var stateColor: Color {
-        switch project.state {
+        switch state {
         case .online: .green
         case .warning: .orange
         case .offline: .red
         case .unknown: .secondary
+        }
+    }
+}
+
+private struct LimitedProjectPanel: View {
+    let project: CIProject
+
+    var body: some View {
+        PanelShell(title: "Project", icon: "folder") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(Color.accentColor.opacity(0.14))
+                        Image(systemName: "folder.badge.gearshape")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    .frame(width: 36, height: 36)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(project.title)
+                            .font(.system(size: 16, weight: .semibold))
+                            .lineLimit(1)
+                        Text(project.repositorySlug)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+
+                    Spacer()
+                }
+
+                LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
+                LimitedStatusRow(title: "Local runner", value: "Not configured", icon: "server.rack", state: .unknown)
+                LimitedStatusRow(title: "Unity", value: "Not configured", icon: "cube.transparent", state: .unknown)
+                LimitedStatusRow(title: "Scripts", value: "Not configured", icon: "curlybraces.square", state: .unknown)
+
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+        }
+    }
+}
+
+private struct LimitedStatusRow: View {
+    let title: String
+    let value: String
+    let icon: String
+    let state: ServiceState
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                Text(value)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Spacer()
+            StatusDot(state: state)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.055))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+    }
+}
+
+private struct AddProjectSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var input = ""
+    @State private var errorMessage: String?
+
+    let onAdd: (String) throws -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("Add Project", systemImage: "plus")
+                    .font(.headline)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Git repository URL")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                TextField("git@github.com:owner/repo.git", text: $input)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(submit)
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Add Project") {
+                    submit()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(18)
+        .frame(width: 420)
+    }
+
+    private func submit() {
+        do {
+            try onAdd(input)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }
