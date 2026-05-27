@@ -5,6 +5,19 @@ struct ContentView: View {
     @State private var section: DashboardSection = .runs
 
     var body: some View {
+        HStack(spacing: 0) {
+            dashboardSurface
+            Divider()
+            ProjectMenuPanel(projects: projectMenuItems)
+        }
+        .frame(minWidth: 792, idealWidth: 792, minHeight: 624, idealHeight: 624)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .task {
+            viewModel.refresh()
+        }
+    }
+
+    private var dashboardSurface: some View {
         VStack(spacing: 0) {
             header
             Divider()
@@ -16,11 +29,7 @@ struct ContentView: View {
             }
             .padding(14)
         }
-        .frame(minWidth: 587, idealWidth: 587, minHeight: 624, idealHeight: 624)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .task {
-            viewModel.refresh()
-        }
+        .frame(minWidth: 587, idealWidth: 587)
     }
 
     private var header: some View {
@@ -176,6 +185,61 @@ struct ContentView: View {
         if run.status != "completed" { return .warning }
         return .offline
     }
+
+    private var projectMenuItems: [ProjectMenuItem] {
+        [
+            ProjectMenuItem(
+                id: "nexusunity",
+                title: "NexusUnity",
+                subtitle: viewModel.config.repositorySlug,
+                badge: "Active",
+                icon: "cube.transparent",
+                state: projectState,
+                isActive: true
+            ),
+            ProjectMenuItem(
+                id: "ci-scope",
+                title: "CI Scope",
+                subtitle: "ForkHorizon/CI-Scope",
+                badge: "App",
+                icon: "macwindow",
+                state: .online,
+                isActive: false
+            ),
+            ProjectMenuItem(
+                id: "unity-smoke",
+                title: "Unity Smoke",
+                subtitle: "UnityTestForNexus",
+                badge: "Smoke",
+                icon: "play.square.stack",
+                state: viewModel.snapshot.nexusUnity.state,
+                isActive: false
+            ),
+            ProjectMenuItem(
+                id: "docs-runner",
+                title: "Docs Runner",
+                subtitle: "nexus-doc-ai",
+                badge: "Local",
+                icon: "server.rack",
+                state: viewModel.snapshot.runner.state,
+                isActive: false
+            )
+        ]
+    }
+
+    private var projectState: ServiceState {
+        let states = [
+            viewModel.snapshot.runner.state,
+            viewModel.snapshot.ollama.state,
+            viewModel.snapshot.nexusUnity.state,
+            latestRunState
+        ]
+
+        if states.contains(.offline) { return .offline }
+        if states.contains(.warning) { return .warning }
+        if states.allSatisfy({ $0 == .online }) { return .online }
+        return .unknown
+    }
 }
 
 private enum DashboardSection: String, CaseIterable, Identifiable {
@@ -201,6 +265,124 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
         case .logs: "doc.text.magnifyingglass"
         case .scripts: "curlybraces.square"
         case .console: "terminal"
+        }
+    }
+}
+
+private struct ProjectMenuItem: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let badge: String
+    let icon: String
+    let state: ServiceState
+    let isActive: Bool
+}
+
+private struct ProjectMenuPanel: View {
+    let projects: [ProjectMenuItem]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Label("Projects", systemImage: "square.grid.2x2")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(projects) { project in
+                        ProjectMenuRow(project: project)
+                    }
+                }
+                .padding(10)
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Local")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    StatusDot(state: aggregateState)
+                    Text(aggregateState.rawValue)
+                        .font(.caption2.monospacedDigit())
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+        }
+        .frame(width: 204)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.58))
+    }
+
+    private var aggregateState: ServiceState {
+        let states = projects.map(\.state)
+        if states.contains(.offline) { return .offline }
+        if states.contains(.warning) { return .warning }
+        if states.contains(.unknown) { return .unknown }
+        return .online
+    }
+}
+
+private struct ProjectMenuRow: View {
+    let project: ProjectMenuItem
+
+    var body: some View {
+        HStack(spacing: 9) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(stateColor.opacity(project.isActive ? 0.15 : 0.08))
+                Image(systemName: project.icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(project.isActive ? stateColor : .secondary)
+            }
+            .frame(width: 31, height: 31)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text(project.title)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    StatusDot(state: project.state)
+                }
+
+                Text(project.subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Text(project.badge)
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(project.isActive ? Color.accentColor : .secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(9)
+        .frame(height: 66)
+        .background(project.isActive ? Color.accentColor.opacity(0.11) : Color(nsColor: .windowBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(project.isActive ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12))
+        )
+    }
+
+    private var stateColor: Color {
+        switch project.state {
+        case .online: .green
+        case .warning: .orange
+        case .offline: .red
+        case .unknown: .secondary
         }
     }
 }
