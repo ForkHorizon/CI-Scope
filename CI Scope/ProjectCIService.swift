@@ -4,26 +4,55 @@ struct ProjectCIService {
     let config: DashboardConfig
 
     func loadSnapshot(for project: CIProject) async -> ProjectCISnapshot {
+        async let authResult = loadAuthStatus()
         async let workflowsResult = loadWorkflows(for: project)
         async let runsResult = loadRuns(for: project)
 
+        let authResponse = await authResult
         let workflowResponse = await workflowsResult
         let runResponse = await runsResult
 
         var snapshot = ProjectCISnapshot(projectID: project.id)
+        snapshot.auth = authResponse
         snapshot.workflows = workflowResponse.value ?? []
         snapshot.runs = runResponse.value ?? []
         snapshot.refreshedAt = Date()
 
-        let errors = [workflowResponse.error, runResponse.error].compactMap { $0 }
+        var errors = [workflowResponse.error, runResponse.error].compactMap { $0 }
         if !errors.isEmpty {
+            if snapshot.auth.state == .offline, let detail = snapshot.auth.detail {
+                errors.insert("GitHub CLI auth:\n\(detail)", at: 0)
+            }
             snapshot.state = snapshot.workflows.isEmpty && snapshot.runs.isEmpty ? .offline : .warning
-            snapshot.error = errors.joined(separator: "\n")
+            snapshot.error = errors.joined(separator: "\n\n")
             return snapshot
         }
 
         snapshot.state = state(workflows: snapshot.workflows, runs: snapshot.runs)
         return snapshot
+    }
+
+    private func loadAuthStatus() async -> GitHubAuthSnapshot {
+        let command = "NO_COLOR=1 gh auth status -h github.com"
+        let result = await ShellClient.run(command, timeout: 10, config: config)
+        let detail = sanitizeAuthOutput(trimmedError(result.output, fallback: "GitHub CLI auth status is unavailable."))
+        let account = accountName(from: detail)
+
+        if result.exitCode == 0 {
+            return GitHubAuthSnapshot(
+                state: .online,
+                account: account ?? "-",
+                summary: account.map { "Authenticated as \($0)" } ?? "Authenticated",
+                detail: nil
+            )
+        }
+
+        return GitHubAuthSnapshot(
+            state: .offline,
+            account: account ?? "-",
+            summary: "Authentication failed",
+            detail: detail
+        )
     }
 
     private func loadWorkflows(for project: CIProject) async -> LoadResponse<[GitHubWorkflow]> {
@@ -129,6 +158,34 @@ struct ProjectCIService {
             .capitalized
     }
 
+    private func sanitizeAuthOutput(_ output: String) -> String {
+        output
+            .components(separatedBy: .newlines)
+            .map { line in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("- Token:") {
+                    return line.replacingOccurrences(of: trimmed, with: "- Token: hidden")
+                }
+                return line
+            }
+            .joined(separator: "\n")
+    }
+
+    private func accountName(from output: String) -> String? {
+        guard let range = output.range(of: "account ") else {
+            return nil
+        }
+
+        let suffix = output[range.upperBound...]
+        let terminators = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "("))
+        return suffix
+            .prefix { character in
+                String(character).rangeOfCharacter(from: terminators) == nil
+            }
+            .nilIfEmpty
+            .map(String.init)
+    }
+
     private func quoted(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
@@ -137,4 +194,10 @@ struct ProjectCIService {
 private struct LoadResponse<Value> {
     var value: Value?
     var error: String?
+}
+
+private extension Substring {
+    var nilIfEmpty: Substring? {
+        isEmpty ? nil : self
+    }
 }

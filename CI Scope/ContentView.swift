@@ -509,6 +509,7 @@ private struct ProjectCIPanel: View {
                     }
 
                     LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
+                    LimitedStatusRow(title: "GitHub CLI", value: githubAuthSummary, icon: "person.crop.circle.badge.checkmark", state: snapshot?.auth.state ?? .unknown)
                     LimitedStatusRow(title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
                     LimitedStatusRow(title: "Local runner", value: "Not configured", icon: "server.rack", state: .unknown)
 
@@ -538,9 +539,20 @@ private struct ProjectCIPanel: View {
             return isLoading ? "Loading" : "Not loaded"
         }
         if let error = snapshot.error, !error.isEmpty {
-            return "Error"
+            if snapshot.workflows.isEmpty && snapshot.runs.isEmpty {
+                return "Error"
+            }
+            let runs = snapshot.runs.isEmpty ? "runs unavailable" : "\(snapshot.runs.count) runs"
+            return "\(snapshot.workflows.count) workflows · \(runs)"
         }
         return "\(snapshot.workflows.count) workflows · \(snapshot.runs.count) runs"
+    }
+
+    private var githubAuthSummary: String {
+        guard let auth = snapshot?.auth else {
+            return isLoading ? "Checking" : "Not checked"
+        }
+        return auth.summary
     }
 }
 

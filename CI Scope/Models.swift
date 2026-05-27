@@ -69,9 +69,17 @@ struct GitHubWorkflow: Identifiable, Decodable {
     }
 }
 
+struct GitHubAuthSnapshot {
+    var state: ServiceState = .unknown
+    var account = "-"
+    var summary = "Not checked"
+    var detail: String?
+}
+
 struct ProjectCISnapshot {
     let projectID: CIProject.ID
     var state: ServiceState = .unknown
+    var auth = GitHubAuthSnapshot()
     var workflows: [GitHubWorkflow] = []
     var runs: [GitHubRun] = []
     var error: String?
