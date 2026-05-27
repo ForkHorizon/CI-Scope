@@ -441,9 +441,11 @@ private struct ProjectMenuRow: View {
                         .lineLimit(1)
                 }
             }
+            .padding(9)
+            .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-        .padding(9)
         .frame(height: 66)
         .background(isActive ? Color.accentColor.opacity(0.11) : Color(nsColor: .windowBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
