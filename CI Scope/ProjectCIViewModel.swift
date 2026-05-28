@@ -17,7 +17,6 @@ final class ProjectCIViewModel: ObservableObject {
     }
 
     func load(_ project: CIProject) async {
-        guard !project.isPrimary else { return }
         loadingProjectID = project.id
         let snapshot = await service.loadSnapshot(for: project)
         snapshots[project.id] = snapshot

@@ -8,16 +8,14 @@ struct CIProject: Identifiable, Codable, Equatable {
     let repositoryName: String
     let repositorySlug: String
     let remoteURL: String
-    let isPrimary: Bool
 
-    static let primary = CIProject(
+    static let seed = CIProject(
         id: "forkhorizon/nexusunity",
         title: "NexusUnity",
         repositoryOwner: "ForkHorizon",
         repositoryName: "NexusUnity",
         repositorySlug: "ForkHorizon/NexusUnity",
-        remoteURL: "git@github.com:ForkHorizon/NexusUnity.git",
-        isPrimary: true
+        remoteURL: "git@github.com:ForkHorizon/NexusUnity.git"
     )
 
     var normalizedSlug: String {
@@ -45,14 +43,14 @@ final class ProjectStore: ObservableObject {
         if let storedSelection, normalizedProjects.contains(where: { $0.id == storedSelection }) {
             self.selectedProjectID = storedSelection
         } else {
-            self.selectedProjectID = CIProject.primary.id
+            self.selectedProjectID = CIProject.seed.id
         }
 
         persist()
     }
 
     var selectedProject: CIProject {
-        projects.first(where: { $0.id == selectedProjectID }) ?? CIProject.primary
+        projects.first(where: { $0.id == selectedProjectID }) ?? CIProject.seed
     }
 
     func select(_ project: CIProject) {
@@ -76,8 +74,7 @@ final class ProjectStore: ObservableObject {
             repositoryOwner: parsed.owner,
             repositoryName: parsed.name,
             repositorySlug: slug,
-            remoteURL: parsed.remoteURL,
-            isPrimary: false
+            remoteURL: parsed.remoteURL
         )
 
         projects.append(project)
@@ -105,7 +102,7 @@ final class ProjectStore: ObservableObject {
             let data = defaults.data(forKey: key),
             let decoded = try? JSONDecoder().decode([CIProject].self, from: data)
         else {
-            return [CIProject.primary]
+            return [CIProject.seed]
         }
         return decoded
     }
@@ -114,7 +111,7 @@ final class ProjectStore: ObservableObject {
         var seen = Set<String>()
         var result: [CIProject] = []
 
-        for project in [CIProject.primary] + projects {
+        for project in [CIProject.seed] + projects {
             let slug = project.normalizedSlug
             guard !seen.contains(slug) else { continue }
             seen.insert(slug)

@@ -34,12 +34,10 @@ struct ContentView: View {
         )
         .background(Color(nsColor: .windowBackgroundColor))
         .animation(.easeInOut(duration: 0.18), value: isProjectMenuOpen)
-        .task {
-            viewModel.refresh()
-        }
         .task(id: selectedProject.id) {
-            if !selectedProject.isPrimary {
-                await projectCIViewModel.load(selectedProject)
+            await projectCIViewModel.load(selectedProject)
+            if hasLocalTools {
+                viewModel.refresh()
             }
         }
         .sheet(isPresented: $isAddingProject) {
@@ -53,22 +51,22 @@ struct ContentView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            if selectedProject.isPrimary {
-                VStack(spacing: 12) {
-                    statusGrid
-                    CommandStrip(runner: viewModel.commandRunner)
-                    sectionPicker
-                    contentPanel
-                }
-                .padding(14)
-            } else {
+            VStack(spacing: 12) {
                 ProjectCIPanel(
                     project: selectedProject,
                     snapshot: projectCIViewModel.snapshot(for: selectedProject.id),
                     isLoading: projectCIViewModel.loadingProjectID == selectedProject.id
                 )
-                    .padding(14)
+                .frame(minHeight: 260, maxHeight: hasLocalTools ? 360 : .infinity)
+
+                if hasLocalTools {
+                    statusGrid
+                    CommandStrip(runner: viewModel.commandRunner)
+                    sectionPicker
+                    contentPanel
+                }
             }
+            .padding(14)
         }
         .frame(minWidth: 587, maxWidth: .infinity)
     }
@@ -246,51 +244,33 @@ struct ContentView: View {
     }
 
     private var isRefreshing: Bool {
-        selectedProject.isPrimary
-            ? viewModel.isRefreshing
-            : projectCIViewModel.loadingProjectID == selectedProject.id
+        projectCIViewModel.loadingProjectID == selectedProject.id || (hasLocalTools && viewModel.isRefreshing)
     }
 
     private var refreshedAt: Date {
-        if selectedProject.isPrimary {
-            return viewModel.snapshot.refreshedAt
-        }
         return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt ?? Date()
     }
 
-    private var projectState: ServiceState {
-        let states = [
-            viewModel.snapshot.runner.state,
-            viewModel.snapshot.ollama.state,
-            viewModel.snapshot.nexusUnity.state,
-            latestRunState
-        ]
-
-        if states.contains(.offline) { return .offline }
-        if states.contains(.warning) { return .warning }
-        if states.allSatisfy({ $0 == .online }) { return .online }
-        return .unknown
-    }
-
     private func state(for project: CIProject) -> ServiceState {
-        project.isPrimary ? projectState : projectCIViewModel.snapshot(for: project.id)?.state ?? .unknown
+        projectCIViewModel.snapshot(for: project.id)?.state ?? .unknown
     }
 
     private func selectProject(_ project: CIProject) {
         projectStore.select(project)
-        if project.isPrimary {
+    }
+
+    private func refreshSelectedProject() {
+        Task {
+            await projectCIViewModel.load(selectedProject)
+        }
+
+        if hasLocalTools {
             viewModel.refresh()
         }
     }
 
-    private func refreshSelectedProject() {
-        if selectedProject.isPrimary {
-            viewModel.refresh()
-        } else {
-            Task {
-                await projectCIViewModel.load(selectedProject)
-            }
-        }
+    private var hasLocalTools: Bool {
+        selectedProject.normalizedSlug == viewModel.config.repositorySlug.lowercased()
     }
 }
 
@@ -415,7 +395,7 @@ private struct ProjectMenuRow: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(stateColor.opacity(isActive ? 0.15 : 0.08))
-                    Image(systemName: project.isPrimary ? "cube.transparent" : "folder")
+                    Image(systemName: "folder")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(isActive ? stateColor : .secondary)
                 }
@@ -459,7 +439,7 @@ private struct ProjectMenuRow: View {
 
     private var badge: String {
         if isActive { return "Active" }
-        return project.isPrimary ? "Primary" : "Saved"
+        return "Saved"
     }
 
     private var stateColor: Color {
