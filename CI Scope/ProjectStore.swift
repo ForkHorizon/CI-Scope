@@ -9,15 +9,6 @@ struct CIProject: Identifiable, Codable, Equatable {
     let repositorySlug: String
     let remoteURL: String
 
-    static let seed = CIProject(
-        id: "forkhorizon/nexusunity",
-        title: "NexusUnity",
-        repositoryOwner: "ForkHorizon",
-        repositoryName: "NexusUnity",
-        repositorySlug: "ForkHorizon/NexusUnity",
-        remoteURL: "git@github.com:ForkHorizon/NexusUnity.git"
-    )
-
     var normalizedSlug: String {
         repositorySlug.lowercased()
     }
@@ -26,7 +17,7 @@ struct CIProject: Identifiable, Codable, Equatable {
 @MainActor
 final class ProjectStore: ObservableObject {
     @Published private(set) var projects: [CIProject]
-    @Published private(set) var selectedProjectID: CIProject.ID
+    @Published private(set) var selectedProjectID: CIProject.ID?
 
     private let defaults: UserDefaults
     private let projectsKey = "ciScope.projects"
@@ -43,14 +34,15 @@ final class ProjectStore: ObservableObject {
         if let storedSelection, normalizedProjects.contains(where: { $0.id == storedSelection }) {
             self.selectedProjectID = storedSelection
         } else {
-            self.selectedProjectID = CIProject.seed.id
+            self.selectedProjectID = normalizedProjects.first?.id
         }
 
         persist()
     }
 
-    var selectedProject: CIProject {
-        projects.first(where: { $0.id == selectedProjectID }) ?? CIProject.seed
+    var selectedProject: CIProject? {
+        guard let selectedProjectID else { return nil }
+        return projects.first(where: { $0.id == selectedProjectID })
     }
 
     func select(_ project: CIProject) {
@@ -83,6 +75,25 @@ final class ProjectStore: ObservableObject {
         return project
     }
 
+    func removeProject(_ project: CIProject) {
+        guard let index = projects.firstIndex(where: { $0.id == project.id }) else { return }
+
+        let wasSelected = selectedProjectID == project.id
+        projects.remove(at: index)
+
+        if wasSelected {
+            if projects.isEmpty {
+                selectedProjectID = nil
+            } else {
+                selectedProjectID = projects[min(index, projects.count - 1)].id
+            }
+        } else if let selectedProjectID, !projects.contains(where: { $0.id == selectedProjectID }) {
+            self.selectedProjectID = projects.first?.id
+        }
+
+        persist()
+    }
+
     private func persist() {
         persistProjects()
         persistSelectedProject()
@@ -94,7 +105,11 @@ final class ProjectStore: ObservableObject {
     }
 
     private func persistSelectedProject() {
-        defaults.set(selectedProjectID, forKey: selectedProjectKey)
+        if let selectedProjectID {
+            defaults.set(selectedProjectID, forKey: selectedProjectKey)
+        } else {
+            defaults.removeObject(forKey: selectedProjectKey)
+        }
     }
 
     private static func loadProjects(from defaults: UserDefaults, key: String) -> [CIProject] {
@@ -102,7 +117,7 @@ final class ProjectStore: ObservableObject {
             let data = defaults.data(forKey: key),
             let decoded = try? JSONDecoder().decode([CIProject].self, from: data)
         else {
-            return [CIProject.seed]
+            return []
         }
         return decoded
     }
@@ -111,7 +126,7 @@ final class ProjectStore: ObservableObject {
         var seen = Set<String>()
         var result: [CIProject] = []
 
-        for project in [CIProject.seed] + projects {
+        for project in projects {
             let slug = project.normalizedSlug
             guard !seen.contains(slug) else { continue }
             seen.insert(slug)

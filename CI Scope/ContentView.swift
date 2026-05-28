@@ -17,6 +17,7 @@ struct ContentView: View {
                     selectedProjectID: projectStore.selectedProjectID,
                     stateForProject: state(for:),
                     onSelect: selectProject,
+                    onRemove: removeProject,
                     onAddProject: {
                         isAddingProject = true
                     }
@@ -34,9 +35,10 @@ struct ContentView: View {
         )
         .background(Color(nsColor: .windowBackgroundColor))
         .animation(.easeInOut(duration: 0.18), value: isProjectMenuOpen)
-        .task(id: selectedProject.id) {
+        .task(id: selectedProject?.id) {
+            guard let selectedProject else { return }
             await projectCIViewModel.load(selectedProject)
-            if hasLocalTools {
+            if isLocalToolsProject(selectedProject) {
                 viewModel.refresh()
             }
         }
@@ -51,15 +53,26 @@ struct ContentView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            dashboardContent
+        }
+        .frame(minWidth: 587, maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var dashboardContent: some View {
+        if let selectedProject {
+            let showsLocalTools = isLocalToolsProject(selectedProject)
+
             VStack(spacing: 12) {
                 ProjectCIPanel(
                     project: selectedProject,
                     snapshot: projectCIViewModel.snapshot(for: selectedProject.id),
                     isLoading: projectCIViewModel.loadingProjectID == selectedProject.id
                 )
-                .frame(minHeight: 260, maxHeight: hasLocalTools ? 360 : .infinity)
+                .frame(minHeight: 260, maxHeight: showsLocalTools ? 360 : .infinity)
 
-                if hasLocalTools {
+                if showsLocalTools {
+                    LocalToolsHeader()
                     statusGrid
                     CommandStrip(runner: viewModel.commandRunner)
                     sectionPicker
@@ -67,8 +80,12 @@ struct ContentView: View {
                 }
             }
             .padding(14)
+        } else {
+            EmptyProjectDashboard {
+                isAddingProject = true
+            }
+            .padding(14)
         }
-        .frame(minWidth: 587, maxWidth: .infinity)
     }
 
     private var header: some View {
@@ -99,7 +116,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("CI Scope")
                     .font(.system(size: 16, weight: .semibold))
-                Text(selectedProject.repositorySlug)
+                Text(selectedProject?.repositorySlug ?? "No project selected")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -107,10 +124,14 @@ struct ContentView: View {
 
             Spacer(minLength: 8)
 
-            StatusDot(state: state(for: selectedProject))
-            Text(refreshedAt.formatted(date: .omitted, time: .standard))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+            if let selectedProject {
+                StatusDot(state: state(for: selectedProject))
+            }
+            if let refreshedAt {
+                Text(refreshedAt.formatted(date: .omitted, time: .standard))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
 
             Button {
                 refreshSelectedProject()
@@ -120,7 +141,7 @@ struct ContentView: View {
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
-            .disabled(isRefreshing)
+            .disabled(selectedProject == nil || isRefreshing)
             .overlay {
                 if isRefreshing {
                     ProgressView()
@@ -155,7 +176,7 @@ struct ContentView: View {
                 state: viewModel.snapshot.ollama.state
             )
             StatusTile(
-                title: "Unity",
+                title: "Unity Server",
                 value: viewModel.snapshot.nexusUnity.status?.state ?? "Unknown",
                 detail: unityDetail,
                 icon: "cube.transparent",
@@ -239,16 +260,18 @@ struct ContentView: View {
         return .offline
     }
 
-    private var selectedProject: CIProject {
+    private var selectedProject: CIProject? {
         projectStore.selectedProject
     }
 
     private var isRefreshing: Bool {
-        projectCIViewModel.loadingProjectID == selectedProject.id || (hasLocalTools && viewModel.isRefreshing)
+        guard let selectedProject else { return false }
+        return projectCIViewModel.loadingProjectID == selectedProject.id || (isLocalToolsProject(selectedProject) && viewModel.isRefreshing)
     }
 
-    private var refreshedAt: Date {
-        return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt ?? Date()
+    private var refreshedAt: Date? {
+        guard let selectedProject else { return nil }
+        return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt
     }
 
     private func state(for project: CIProject) -> ServiceState {
@@ -259,18 +282,25 @@ struct ContentView: View {
         projectStore.select(project)
     }
 
+    private func removeProject(_ project: CIProject) {
+        projectStore.removeProject(project)
+        projectCIViewModel.removeSnapshot(for: project.id)
+    }
+
     private func refreshSelectedProject() {
+        guard let selectedProject else { return }
+
         Task {
             await projectCIViewModel.load(selectedProject)
         }
 
-        if hasLocalTools {
+        if isLocalToolsProject(selectedProject) {
             viewModel.refresh()
         }
     }
 
-    private var hasLocalTools: Bool {
-        selectedProject.normalizedSlug == viewModel.config.repositorySlug.lowercased()
+    private func isLocalToolsProject(_ project: CIProject) -> Bool {
+        project.normalizedSlug == viewModel.config.repositorySlug.lowercased()
     }
 }
 
@@ -303,9 +333,10 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
 
 private struct ProjectMenuPanel: View {
     let projects: [CIProject]
-    let selectedProjectID: CIProject.ID
+    let selectedProjectID: CIProject.ID?
     let stateForProject: (CIProject) -> ServiceState
     let onSelect: (CIProject) -> Void
+    let onRemove: (CIProject) -> Void
     let onAddProject: () -> Void
 
     var body: some View {
@@ -322,6 +353,11 @@ private struct ProjectMenuPanel: View {
 
             ScrollView {
                 LazyVStack(spacing: 8) {
+                    if projects.isEmpty {
+                        EmptyState(icon: "folder.badge.plus", text: "No projects saved")
+                            .frame(minHeight: 150)
+                    }
+
                     ForEach(projects) { project in
                         ProjectMenuRow(
                             project: project,
@@ -329,6 +365,8 @@ private struct ProjectMenuPanel: View {
                             isActive: project.id == selectedProjectID
                         ) {
                             onSelect(project)
+                        } onRemove: {
+                            onRemove(project)
                         }
                     }
 
@@ -355,12 +393,12 @@ private struct ProjectMenuPanel: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 7) {
-                Text("Local")
+                Text("Projects")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 6) {
                     StatusDot(state: aggregateState)
-                    Text(aggregateState.rawValue)
+                    Text(projects.isEmpty ? "No projects" : aggregateState.rawValue)
                         .font(.caption2.monospacedDigit())
                         .lineLimit(1)
                 }
@@ -373,6 +411,7 @@ private struct ProjectMenuPanel: View {
     }
 
     private var aggregateState: ServiceState {
+        guard !projects.isEmpty else { return .unknown }
         let states = projects.map(stateForProject)
         if states.contains(.offline) { return .offline }
         if states.contains(.warning) { return .warning }
@@ -386,48 +425,68 @@ private struct ProjectMenuRow: View {
     let state: ServiceState
     let isActive: Bool
     let onSelect: () -> Void
+    let onRemove: () -> Void
+
+    @State private var isHovering = false
 
     var body: some View {
-        Button {
-            onSelect()
-        } label: {
-            HStack(spacing: 9) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(stateColor.opacity(isActive ? 0.15 : 0.08))
-                    Image(systemName: "folder")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(isActive ? stateColor : .secondary)
-                }
-                .frame(width: 31, height: 31)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 5) {
-                        Text(project.title)
-                            .font(.callout.weight(.semibold))
-                            .foregroundStyle(isActive ? Color.accentColor : Color.primary)
-                            .lineLimit(1)
-                        Spacer(minLength: 0)
-                        StatusDot(state: state)
+        HStack(spacing: 5) {
+            Button {
+                onSelect()
+            } label: {
+                HStack(spacing: 9) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(stateColor.opacity(isActive ? 0.15 : 0.08))
+                        Image(systemName: "folder")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(isActive ? stateColor : .secondary)
                     }
+                    .frame(width: 31, height: 31)
 
-                    Text(project.repositorySlug)
-                        .font(.caption)
-                        .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 5) {
+                            Text(project.title)
+                                .font(.callout.weight(.semibold))
+                                .foregroundStyle(isActive ? Color.accentColor : Color.primary)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                            StatusDot(state: state)
+                        }
 
-                    Text(badge)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                        .lineLimit(1)
+                        Text(project.repositorySlug)
+                            .font(.caption)
+                            .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+
+                        Text(badge)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                            .lineLimit(1)
+                    }
                 }
+                .padding(.leading, 9)
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
+                .contentShape(RoundedRectangle(cornerRadius: 8))
             }
-            .padding(9)
-            .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
-            .contentShape(RoundedRectangle(cornerRadius: 8))
+            .buttonStyle(.plain)
+
+            Menu {
+                ProjectContextMenu(project: project, onRemove: onRemove)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                    .frame(width: 25, height: 25)
+                    .background(Color.secondary.opacity(isActive || isHovering ? 0.08 : 0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .opacity(isActive || isHovering ? 1 : 0.58)
+            .help("Project actions")
         }
-        .buttonStyle(.plain)
         .frame(height: 66)
         .background(isActive ? Color.accentColor.opacity(0.11) : Color(nsColor: .windowBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -435,6 +494,11 @@ private struct ProjectMenuRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isActive ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12))
         )
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+        .contextMenu {
+            ProjectContextMenu(project: project, onRemove: onRemove)
+        }
+        .onHover { isHovering = $0 }
     }
 
     private var badge: String {
@@ -448,6 +512,19 @@ private struct ProjectMenuRow: View {
         case .warning: .orange
         case .offline: .red
         case .unknown: .secondary
+        }
+    }
+}
+
+private struct ProjectContextMenu: View {
+    let project: CIProject
+    let onRemove: () -> Void
+
+    var body: some View {
+        Button(role: .destructive) {
+            onRemove()
+        } label: {
+            Label("Remove Project", systemImage: "trash")
         }
     }
 }
@@ -770,6 +847,65 @@ private struct AddProjectSheet: View {
     }
 }
 
+private struct EmptyProjectDashboard: View {
+    let onAddProject: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Spacer(minLength: 0)
+
+            Image(systemName: "folder.badge.plus")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: 4) {
+                Text("No project selected")
+                    .font(.headline)
+                Text("Add a repository to monitor its CI.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button {
+                onAddProject()
+            } label: {
+                Label("Add Project", systemImage: "plus")
+                    .font(.callout.weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
+                    .background(Color.accentColor.opacity(0.16))
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+            }
+            .buttonStyle(.plain)
+            .help("Add Project")
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.13))
+        )
+    }
+}
+
+private struct LocalToolsHeader: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Label("Local Tools", systemImage: "desktopcomputer")
+                .font(.caption.weight(.semibold))
+            Text("Configured runner and editor services")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer()
+        }
+        .padding(.horizontal, 2)
+    }
+}
+
 private struct StatusTile: View {
     let title: String
     let value: String
@@ -832,7 +968,7 @@ private struct CommandStrip: View {
     var body: some View {
         VStack(spacing: 9) {
             HStack {
-                Label("Commands", systemImage: "bolt.horizontal")
+                Label("Local Commands", systemImage: "bolt.horizontal")
                     .font(.caption.weight(.semibold))
                 Spacer()
                 if runner.isRunning {
@@ -988,7 +1124,7 @@ private struct CompactLogsPanel: View {
     @ObservedObject var viewModel: DashboardViewModel
 
     var body: some View {
-        PanelShell(title: "Runner Logs", icon: "doc.text.magnifyingglass") {
+        PanelShell(title: "Local Runner Logs", icon: "doc.text.magnifyingglass") {
             VStack(spacing: 8) {
                 Picker("Log", selection: $viewModel.selectedLog) {
                     ForEach(LogKind.allCases) { kind in
@@ -1034,7 +1170,7 @@ private struct CompactStagesPanel: View {
     let stages: [ScriptStage]
 
     var body: some View {
-        PanelShell(title: "Scripts Registry", icon: "curlybraces.square") {
+        PanelShell(title: "Local Scripts", icon: "curlybraces.square") {
             ScrollView {
                 LazyVStack(spacing: 7) {
                     ForEach(stages) { stage in
@@ -1080,7 +1216,7 @@ private struct CompactConsolePanel: View {
     @ObservedObject var runner: LocalCommandRunner
 
     var body: some View {
-        PanelShell(title: "Command Output", icon: "terminal") {
+        PanelShell(title: "Local Command Output", icon: "terminal") {
             VStack(spacing: 8) {
                 HStack {
                     if runner.isRunning {
