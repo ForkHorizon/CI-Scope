@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
@@ -423,20 +424,21 @@ private struct ProjectMenuRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 5) {
                         Text(project.title)
-                            .font(.caption.weight(.semibold))
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(isActive ? Color.accentColor : Color.primary)
                             .lineLimit(1)
                         Spacer(minLength: 0)
                         StatusDot(state: state)
                     }
 
                     Text(project.repositorySlug)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(isActive ? Color.accentColor : .secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
 
                     Text(badge)
-                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(isActive ? Color.accentColor : .secondary)
                         .lineLimit(1)
                 }
@@ -491,16 +493,44 @@ private struct ProjectCIPanel: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(project.title)
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 17, weight: .semibold))
                                 .lineLimit(1)
                             Text(project.repositorySlug)
-                                .font(.caption2)
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
 
                         Spacer()
+
+                        HStack(spacing: 6) {
+                            Button {
+                                copySSHURL()
+                            } label: {
+                                Label("Copy SSH", systemImage: "doc.on.doc")
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 8)
+                                    .frame(height: 28)
+                                    .background(Color.secondary.opacity(0.08))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Copy SSH URL")
+
+                            Button {
+                                openGitHubRepository()
+                            } label: {
+                                Label("GitHub", systemImage: "arrow.up.right.square")
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 8)
+                                    .frame(height: 28)
+                                    .background(Color.secondary.opacity(0.08))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Open GitHub repository")
+                        }
 
                         if isLoading {
                             ProgressView()
@@ -512,9 +542,8 @@ private struct ProjectCIPanel: View {
 
                     LazyVGrid(columns: projectInfoColumns, spacing: 8) {
                         LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
-                        LimitedStatusRow(title: "GitHub CLI", value: githubAuthSummary, icon: "person.crop.circle.badge.checkmark", state: snapshot?.auth.state ?? .unknown)
                         LimitedStatusRow(title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
-                        LimitedStatusRow(title: "Local runner", value: "Not configured", icon: "server.rack", state: .unknown)
+                        LimitedStatusRow(title: "Local runner", value: localRunnerSummary, icon: "server.rack", state: snapshot?.localRunner.state ?? .unknown)
                     }
 
                     if let error = snapshot?.error {
@@ -555,18 +584,41 @@ private struct ProjectCIPanel: View {
         return "\(snapshot.workflows.count) workflows · \(snapshot.runs.count) runs"
     }
 
-    private var githubAuthSummary: String {
-        guard let auth = snapshot?.auth else {
-            return isLoading ? "Checking" : "Not checked"
-        }
-        return auth.summary
-    }
-
     private var projectInfoColumns: [GridItem] {
         [
             GridItem(.flexible(), spacing: 8),
             GridItem(.flexible(), spacing: 8)
         ]
+    }
+
+    private var localRunnerSummary: String {
+        guard let runner = snapshot?.localRunner else {
+            return isLoading ? "Checking" : "Not loaded"
+        }
+        if runner.detail == "-" || runner.detail.isEmpty {
+            return runner.summary
+        }
+        if runner.summary.hasPrefix("Registered to") {
+            return runner.summary
+        }
+        return "\(runner.summary) · \(runner.detail)"
+    }
+
+    private var sshURL: String {
+        "git@github.com:\(project.repositorySlug).git"
+    }
+
+    private var githubURL: URL {
+        URL(string: "https://github.com/\(project.repositorySlug)")!
+    }
+
+    private func copySSHURL() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(sshURL, forType: .string)
+    }
+
+    private func openGitHubRepository() {
+        NSWorkspace.shared.open(githubURL)
     }
 }
 
@@ -576,7 +628,7 @@ private struct ProjectWorkflowList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text("Workflows")
-                .font(.caption.weight(.semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(.secondary)
 
             ForEach(workflows) { workflow in
@@ -584,17 +636,17 @@ private struct ProjectWorkflowList: View {
                     StatusDot(state: workflow.state.lowercased().contains("disabled") ? .warning : .online)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(workflow.name)
-                            .font(.caption.weight(.semibold))
+                            .font(.callout.weight(.semibold))
                             .lineLimit(1)
                         Text(workflow.path ?? workflow.state)
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
                     Spacer()
                     Text(workflow.state)
-                        .font(.caption2.monospacedDigit())
+                        .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -613,7 +665,7 @@ private struct ProjectRunList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text("Recent Runs")
-                .font(.caption.weight(.semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(.secondary)
 
             ForEach(runs.prefix(8)) { run in
@@ -660,10 +712,10 @@ private struct LimitedStatusRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(.callout.weight(.semibold))
                     .lineLimit(1)
                 Text(value)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -904,11 +956,11 @@ private struct RunRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(run.displayTitle)
-                        .font(.caption.weight(.semibold))
+                        .font(.callout.weight(.semibold))
                         .lineLimit(1)
                     Spacer(minLength: 6)
                     Text(run.compactConclusion)
-                        .font(.caption2.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(color)
                         .lineLimit(1)
                 }
@@ -919,7 +971,7 @@ private struct RunRow: View {
                     Text("·")
                     Text(shortDate(run.createdAt))
                 }
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             }
@@ -966,10 +1018,16 @@ private struct CompactLogsPanel: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
 
-                Text(logTitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    Text(logTitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    FileOpenButton(title: "stdout", path: viewModel.snapshot.logs.stdoutPath)
+                    FileOpenButton(title: "stderr", path: viewModel.snapshot.logs.stderrPath)
+                    FileOpenButton(title: "runner", path: viewModel.snapshot.logs.latestRunnerDiagPath)
+                    FileOpenButton(title: "worker", path: viewModel.snapshot.logs.latestWorkerDiagPath)
+                }
 
                 LogScroll(text: logText)
             }
@@ -1003,21 +1061,22 @@ private struct CompactStagesPanel: View {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 8) {
                                 Text(stage.title)
-                                    .font(.caption.weight(.semibold))
+                                    .font(.callout.weight(.semibold))
                                     .lineLimit(1)
                                 Spacer()
                                 Text(stage.source)
-                                    .font(.caption2.monospaced())
+                                    .font(.caption.monospaced())
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
+                                FileOpenButton(title: "Open Source", path: stage.sourcePath, icon: "doc.text.magnifyingglass")
                             }
                             Text(stage.detail)
-                                .font(.caption2)
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                             if let command = stage.command {
                                 Text(command)
-                                    .font(.caption2.monospaced())
+                                    .font(.caption.monospaced())
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                                     .truncationMode(.middle)
@@ -1068,6 +1127,37 @@ private struct CompactConsolePanel: View {
     }
 }
 
+private struct FileOpenButton: View {
+    let title: String
+    let path: String?
+    var icon = "folder"
+
+    var body: some View {
+        Button {
+            reveal()
+        } label: {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .labelStyle(.iconOnly)
+                .frame(width: 24, height: 24)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isAvailable)
+        .opacity(isAvailable ? 1 : 0.38)
+        .help(isAvailable ? "Open \(title)" : "\(title) file unavailable")
+    }
+
+    private var isAvailable: Bool {
+        guard let path else { return false }
+        return FileManager.default.fileExists(atPath: path)
+    }
+
+    private func reveal() {
+        guard let path, isAvailable else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+}
+
 private struct PanelShell<Content: View>: View {
     let title: String
     let icon: String
@@ -1102,7 +1192,7 @@ private struct LogScroll: View {
     var body: some View {
         ScrollView {
             Text(text)
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 11, design: .monospaced))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(9)

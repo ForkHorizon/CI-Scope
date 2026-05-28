@@ -132,7 +132,11 @@ struct DashboardService {
             latestRunnerDiagTail: runnerDiagResult.tail,
             latestWorkerDiagTail: workerDiagResult.tail,
             latestRunnerDiagName: runnerDiagResult.name,
-            latestWorkerDiagName: workerDiagResult.name
+            latestWorkerDiagName: workerDiagResult.name,
+            stdoutPath: config.runnerStdoutLog,
+            stderrPath: config.runnerStderrLog,
+            latestRunnerDiagPath: runnerDiagResult.path,
+            latestWorkerDiagPath: workerDiagResult.path
         )
     }
 
@@ -142,11 +146,11 @@ struct DashboardService {
         var stages: [ScriptStage] = []
 
         if let workflow = try? String(contentsOfFile: workflowPath, encoding: .utf8) {
-            stages.append(contentsOf: parseWorkflow(workflow))
+            stages.append(contentsOf: parseWorkflow(workflow, sourcePath: workflowPath))
         }
 
         if let script = try? String(contentsOfFile: scriptPath, encoding: .utf8) {
-            stages.append(contentsOf: parseValidationScript(script))
+            stages.append(contentsOf: parseValidationScript(script, sourcePath: scriptPath))
         }
 
         return stages
@@ -168,10 +172,12 @@ struct DashboardService {
         return result.output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func latestDiag(prefix: String, lines: Int) async -> (name: String, tail: String) {
+    private func latestDiag(prefix: String, lines: Int) async -> (name: String, tail: String, path: String?) {
         let command = """
         file=$(find \(quoted(config.runnerRoot + "/_diag")) -maxdepth 1 -type f -name '\(prefix)*.log' -print | sort | tail -n 1)
         if [ -n "$file" ]; then
+          printf '%s\\n' "$file"
+          printf '\\n---\\n'
           basename "$file"
           printf '\\n---\\n'
           tail -n \(lines) "$file"
@@ -179,9 +185,10 @@ struct DashboardService {
         """
         let result = await ShellClient.run(command, timeout: 5, config: config)
         let parts = result.output.components(separatedBy: "\n---\n")
-        let name = parts.first?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let tail = parts.dropFirst().joined(separator: "\n---\n").trimmingCharacters(in: .whitespacesAndNewlines)
-        return (name?.isEmpty == false ? name! : "\(prefix)diag", tail)
+        let path = parts.first?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = parts.dropFirst().first?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tail = parts.dropFirst(2).joined(separator: "\n---\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (name?.isEmpty == false ? name! : "\(prefix)diag", tail, path?.isEmpty == false ? path : nil)
     }
 
     private func processUptime(pid: Int?) async -> String {
@@ -197,7 +204,7 @@ struct DashboardService {
         return value.isEmpty ? nil : value
     }
 
-    private func parseWorkflow(_ text: String) -> [ScriptStage] {
+    private func parseWorkflow(_ text: String, sourcePath: String) -> [ScriptStage] {
         var stages: [ScriptStage] = []
         var inJobs = false
         var currentJob: String?
@@ -217,7 +224,8 @@ struct DashboardService {
                         source: "validate.yml",
                         title: currentJobName ?? currentJob,
                         detail: "job: \(currentJob)",
-                        command: nil
+                        command: nil,
+                        sourcePath: sourcePath
                     ))
                 }
                 currentJob = String(line.dropLast())
@@ -231,7 +239,7 @@ struct DashboardService {
 
             if currentJob != nil, line.hasPrefix("- name:") {
                 let title = String(line.dropFirst("- name:".count)).trimmingCharacters(in: .whitespaces)
-                stages.append(ScriptStage(source: "validate.yml", title: title, detail: "step", command: nil))
+                stages.append(ScriptStage(source: "validate.yml", title: title, detail: "step", command: nil, sourcePath: sourcePath))
             }
         }
 
@@ -240,14 +248,15 @@ struct DashboardService {
                 source: "validate.yml",
                 title: currentJobName ?? currentJob,
                 detail: "job: \(currentJob)",
-                command: nil
+                command: nil,
+                sourcePath: sourcePath
             ))
         }
 
         return stages
     }
 
-    private func parseValidationScript(_ text: String) -> [ScriptStage] {
+    private func parseValidationScript(_ text: String, sourcePath: String) -> [ScriptStage] {
         let commandByFunction: [String: String] = [
             "run_static_validation": "bash scripts/prepush-validate.sh --static-only",
             "run_ai_quality_validation": "bash scripts/prepush-validate.sh --quality-ai",
@@ -267,7 +276,8 @@ struct DashboardService {
                 source: "prepush-validate.sh",
                 title: title,
                 detail: "function: \(function)",
-                command: commandByFunction[function]
+                command: commandByFunction[function],
+                sourcePath: sourcePath
             )
         }
     }

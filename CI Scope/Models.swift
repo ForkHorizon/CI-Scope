@@ -69,21 +69,23 @@ struct GitHubWorkflow: Identifiable, Decodable {
     }
 }
 
-struct GitHubAuthSnapshot {
-    var state: ServiceState = .unknown
-    var account = "-"
-    var summary = "Not checked"
-    var detail: String?
-}
-
 struct ProjectCISnapshot {
     let projectID: CIProject.ID
     var state: ServiceState = .unknown
-    var auth = GitHubAuthSnapshot()
+    var localRunner = ProjectLocalRunnerStatus()
     var workflows: [GitHubWorkflow] = []
     var runs: [GitHubRun] = []
     var error: String?
     var refreshedAt = Date()
+}
+
+struct ProjectLocalRunnerStatus {
+    var state: ServiceState = .unknown
+    var summary = "Checking"
+    var detail = "-"
+    var repositorySlug: String?
+    var pid: Int?
+    var filePath: String?
 }
 
 struct OllamaLoadedModel: Identifiable, Decodable {
@@ -182,6 +184,10 @@ struct LogSnapshot {
     var latestWorkerDiagTail = ""
     var latestRunnerDiagName = "Runner diag"
     var latestWorkerDiagName = "Worker diag"
+    var stdoutPath: String?
+    var stderrPath: String?
+    var latestRunnerDiagPath: String?
+    var latestWorkerDiagPath: String?
 }
 
 struct ScriptStage: Identifiable {
@@ -190,6 +196,7 @@ struct ScriptStage: Identifiable {
     let title: String
     let detail: String
     let command: String?
+    let sourcePath: String?
 }
 
 struct DashboardSnapshot {
