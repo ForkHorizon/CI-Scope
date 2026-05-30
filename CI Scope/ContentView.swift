@@ -5,6 +5,9 @@ struct ContentView: View {
     @StateObject private var viewModel = DashboardViewModel()
     @StateObject private var projectStore = ProjectStore()
     @StateObject private var projectCIViewModel = ProjectCIViewModel()
+    @StateObject private var readabilityGateInstaller = ReadabilityGateInstallViewModel()
+    @StateObject private var runnerFleetViewModel = RunnerFleetViewModel()
+    @State private var workspaceTab: WorkspaceTab = .projects
     @State private var section: DashboardSection = .runs
     @State private var isProjectMenuOpen = true
     @State private var isAddingProject = false
@@ -13,9 +16,12 @@ struct ContentView: View {
         HStack(spacing: 0) {
             if isProjectMenuOpen {
                 ProjectMenuPanel(
+                    workspaceTab: $workspaceTab,
                     projects: projectStore.projects,
                     selectedProjectID: projectStore.selectedProjectID,
                     stateForProject: state(for:),
+                    runnerState: runnerFleetViewModel.snapshot.state,
+                    runnerCount: runnerFleetViewModel.snapshot.runners.count,
                     onSelect: selectProject,
                     onRemove: removeProject,
                     onAddProject: {
@@ -42,6 +48,11 @@ struct ContentView: View {
                 viewModel.refresh()
             }
         }
+        .task(id: workspaceTab) {
+            if workspaceTab == .runners {
+                await runnerFleetViewModel.load()
+            }
+        }
         .sheet(isPresented: $isAddingProject) {
             AddProjectSheet { input in
                 try projectStore.addProject(from: input)
@@ -60,6 +71,17 @@ struct ContentView: View {
 
     @ViewBuilder
     private var dashboardContent: some View {
+        switch workspaceTab {
+        case .projects:
+            projectDashboardContent
+        case .runners:
+            RunnersView(viewModel: runnerFleetViewModel)
+                .padding(14)
+        }
+    }
+
+    @ViewBuilder
+    private var projectDashboardContent: some View {
         if let selectedProject {
             let showsLocalTools = isLocalToolsProject(selectedProject)
 
@@ -67,7 +89,13 @@ struct ContentView: View {
                 ProjectCIPanel(
                     project: selectedProject,
                     snapshot: projectCIViewModel.snapshot(for: selectedProject.id),
-                    isLoading: projectCIViewModel.loadingProjectID == selectedProject.id
+                    isLoading: projectCIViewModel.loadingProjectID == selectedProject.id,
+                    readabilityGateStatus: readabilityGateInstaller.snapshot(for: selectedProject),
+                    onInstallReadabilityGate: {
+                        readabilityGateInstaller.install(in: selectedProject) {
+                            refreshSelectedProject()
+                        }
+                    }
                 )
                 .frame(minHeight: 260, maxHeight: showsLocalTools ? 360 : .infinity)
 
@@ -107,16 +135,16 @@ struct ContentView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 7)
                     .fill(Color.accentColor.opacity(0.16))
-                Image(systemName: "waveform.path.ecg")
+                Image(systemName: headerIcon)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.accentColor)
             }
             .frame(width: 34, height: 34)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("CI Scope")
+                Text(headerTitle)
                     .font(.system(size: 16, weight: .semibold))
-                Text(selectedProject?.repositorySlug ?? "No project selected")
+                Text(headerSubtitle)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -124,9 +152,7 @@ struct ContentView: View {
 
             Spacer(minLength: 8)
 
-            if let selectedProject {
-                StatusDot(state: state(for: selectedProject))
-            }
+            StatusDot(state: headerState)
             if let refreshedAt {
                 Text(refreshedAt.formatted(date: .omitted, time: .standard))
                     .font(.caption.monospacedDigit())
@@ -134,14 +160,14 @@ struct ContentView: View {
             }
 
             Button {
-                refreshSelectedProject()
+                refreshCurrentTab()
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 13, weight: .semibold))
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
-            .disabled(selectedProject == nil || isRefreshing)
+            .disabled(!canRefresh || isRefreshing)
             .overlay {
                 if isRefreshing {
                     ProgressView()
@@ -265,13 +291,69 @@ struct ContentView: View {
     }
 
     private var isRefreshing: Bool {
-        guard let selectedProject else { return false }
-        return projectCIViewModel.loadingProjectID == selectedProject.id || (isLocalToolsProject(selectedProject) && viewModel.isRefreshing)
+        switch workspaceTab {
+        case .projects:
+            guard let selectedProject else { return false }
+            return projectCIViewModel.loadingProjectID == selectedProject.id || (isLocalToolsProject(selectedProject) && viewModel.isRefreshing)
+        case .runners:
+            return runnerFleetViewModel.isLoading
+        }
     }
 
     private var refreshedAt: Date? {
-        guard let selectedProject else { return nil }
-        return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt
+        switch workspaceTab {
+        case .projects:
+            guard let selectedProject else { return nil }
+            return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt
+        case .runners:
+            return runnerFleetViewModel.snapshot.refreshedAt
+        }
+    }
+
+    private var canRefresh: Bool {
+        switch workspaceTab {
+        case .projects:
+            selectedProject != nil
+        case .runners:
+            true
+        }
+    }
+
+    private var headerSubtitle: String {
+        switch workspaceTab {
+        case .projects:
+            selectedProject?.repositorySlug ?? "No project selected"
+        case .runners:
+            "Runners · \(runnerFleetViewModel.snapshot.runners.count) configured"
+        }
+    }
+
+    private var headerTitle: String {
+        switch workspaceTab {
+        case .projects:
+            selectedProject?.title ?? "Projects"
+        case .runners:
+            "Runners"
+        }
+    }
+
+    private var headerIcon: String {
+        switch workspaceTab {
+        case .projects:
+            "square.grid.2x2"
+        case .runners:
+            "server.rack"
+        }
+    }
+
+    private var headerState: ServiceState {
+        switch workspaceTab {
+        case .projects:
+            guard let selectedProject else { return .unknown }
+            return state(for: selectedProject)
+        case .runners:
+            return runnerFleetViewModel.snapshot.state
+        }
     }
 
     private func state(for project: CIProject) -> ServiceState {
@@ -279,6 +361,7 @@ struct ContentView: View {
     }
 
     private func selectProject(_ project: CIProject) {
+        workspaceTab = .projects
         projectStore.select(project)
     }
 
@@ -299,8 +382,40 @@ struct ContentView: View {
         }
     }
 
+    private func refreshCurrentTab() {
+        switch workspaceTab {
+        case .projects:
+            refreshSelectedProject()
+        case .runners:
+            Task {
+                await runnerFleetViewModel.load()
+            }
+        }
+    }
+
     private func isLocalToolsProject(_ project: CIProject) -> Bool {
         project.normalizedSlug == viewModel.config.repositorySlug.lowercased()
+    }
+}
+
+private enum WorkspaceTab: String, CaseIterable, Identifiable {
+    case projects
+    case runners
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .projects: "Projects"
+        case .runners: "Runners"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .projects: "square.grid.2x2"
+        case .runners: "server.rack"
+        }
     }
 }
 
@@ -332,9 +447,13 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
 }
 
 private struct ProjectMenuPanel: View {
+    @Binding var workspaceTab: WorkspaceTab
+
     let projects: [CIProject]
     let selectedProjectID: CIProject.ID?
     let stateForProject: (CIProject) -> ServiceState
+    let runnerState: ServiceState
+    let runnerCount: Int
     let onSelect: (CIProject) -> Void
     let onRemove: (CIProject) -> Void
     let onAddProject: () -> Void
@@ -342,7 +461,7 @@ private struct ProjectMenuPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Label("Projects", systemImage: "square.grid.2x2")
+                Label("Menu", systemImage: "sidebar.left")
                     .font(.caption.weight(.semibold))
                 Spacer()
             }
@@ -351,8 +470,39 @@ private struct ProjectMenuPanel: View {
 
             Divider()
 
+            VStack(spacing: 7) {
+                WorkspaceMenuRow(
+                    tab: .projects,
+                    state: aggregateState,
+                    count: projects.count,
+                    isActive: workspaceTab == .projects
+                ) {
+                    workspaceTab = .projects
+                }
+
+                WorkspaceMenuRow(
+                    tab: .runners,
+                    state: runnerState,
+                    count: runnerCount,
+                    isActive: workspaceTab == .runners
+                ) {
+                    workspaceTab = .runners
+                }
+            }
+            .padding(10)
+
+            Divider()
+
             ScrollView {
                 LazyVStack(spacing: 8) {
+                    HStack {
+                        Text("Projects")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 2)
+
                     if projects.isEmpty {
                         EmptyState(icon: "folder.badge.plus", text: "No projects saved")
                             .frame(minHeight: 150)
@@ -362,7 +512,7 @@ private struct ProjectMenuPanel: View {
                         ProjectMenuRow(
                             project: project,
                             state: stateForProject(project),
-                            isActive: project.id == selectedProjectID
+                            isActive: workspaceTab == .projects && project.id == selectedProjectID
                         ) {
                             onSelect(project)
                         } onRemove: {
@@ -397,8 +547,8 @@ private struct ProjectMenuPanel: View {
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 6) {
-                    StatusDot(state: aggregateState)
-                    Text(projects.isEmpty ? "No projects" : aggregateState.rawValue)
+                    StatusDot(state: footerState)
+                    Text(footerText)
                         .font(.caption2.monospacedDigit())
                         .lineLimit(1)
                 }
@@ -417,6 +567,92 @@ private struct ProjectMenuPanel: View {
         if states.contains(.warning) { return .warning }
         if states.contains(.unknown) { return .unknown }
         return .online
+    }
+
+    private var footerState: ServiceState {
+        switch workspaceTab {
+        case .projects:
+            aggregateState
+        case .runners:
+            runnerState
+        }
+    }
+
+    private var footerText: String {
+        switch workspaceTab {
+        case .projects:
+            projects.isEmpty ? "No projects" : aggregateState.rawValue
+        case .runners:
+            runnerCount == 0 ? "Runners not loaded" : "\(runnerCount) runners · \(runnerState.rawValue)"
+        }
+    }
+}
+
+private struct WorkspaceMenuRow: View {
+    let tab: WorkspaceTab
+    let state: ServiceState
+    let count: Int
+    let isActive: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(stateColor.opacity(isActive ? 0.16 : 0.08))
+                    Image(systemName: tab.icon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(isActive ? stateColor : .secondary)
+                }
+                .frame(width: 31, height: 31)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 5) {
+                        Text(tab.title)
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(isActive ? Color.accentColor : Color.primary)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        StatusDot(state: state)
+                    }
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, minHeight: 51, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .background(isActive ? Color.accentColor.opacity(0.11) : Color(nsColor: .windowBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isActive ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12))
+        )
+        .help(tab.title)
+    }
+
+    private var detail: String {
+        switch tab {
+        case .projects:
+            count == 1 ? "1 project" : "\(count) projects"
+        case .runners:
+            count == 0 ? "Load runner status" : "\(count) configured"
+        }
+    }
+
+    private var stateColor: Color {
+        switch state {
+        case .online: .green
+        case .warning: .orange
+        case .offline: .red
+        case .unknown: .secondary
+        }
     }
 }
 
@@ -533,6 +769,8 @@ private struct ProjectCIPanel: View {
     let project: CIProject
     let snapshot: ProjectCISnapshot?
     let isLoading: Bool
+    let readabilityGateStatus: ReadabilityGateInstallSnapshot
+    let onInstallReadabilityGate: () -> Void
 
     var body: some View {
         PanelShell(title: "GitHub CI", icon: "point.3.connected.trianglepath.dotted") {
@@ -562,6 +800,26 @@ private struct ProjectCIPanel: View {
                         Spacer()
 
                         HStack(spacing: 6) {
+                            Button {
+                                onInstallReadabilityGate()
+                            } label: {
+                                Label(readabilityGateStatus.isInstalling ? "Installing" : "AI Gate", systemImage: "checklist.checked")
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 8)
+                                    .frame(height: 28)
+                                    .background(Color.secondary.opacity(0.08))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(readabilityGateStatus.isInstalling)
+                            .overlay {
+                                if readabilityGateStatus.isInstalling {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                            }
+                            .help("Create a PR that installs the AI Readability GitHub Action")
+
                             Button {
                                 copySSHURL()
                             } label: {
@@ -601,6 +859,10 @@ private struct ProjectCIPanel: View {
                         LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
                         LimitedStatusRow(title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
                         LimitedStatusRow(title: "Local runner", value: localRunnerSummary, icon: "server.rack", state: snapshot?.localRunner.state ?? .unknown)
+                    }
+
+                    if readabilityGateStatus != .idle {
+                        ReadabilityGateInstallBox(status: readabilityGateStatus)
                     }
 
                     if let error = snapshot?.error {
@@ -676,6 +938,59 @@ private struct ProjectCIPanel: View {
 
     private func openGitHubRepository() {
         NSWorkspace.shared.open(githubURL)
+    }
+}
+
+private struct ReadabilityGateInstallBox: View {
+    let status: ReadabilityGateInstallSnapshot
+
+    var body: some View {
+        HStack(spacing: 8) {
+            StatusDot(state: status.state)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(status.title)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                Text(status.detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+            }
+
+            Spacer(minLength: 8)
+
+            if let pullRequestURL = status.pullRequestURL {
+                Button {
+                    NSWorkspace.shared.open(pullRequestURL)
+                } label: {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 26, height: 26)
+                }
+                .buttonStyle(.plain)
+                .help("Open pull request")
+            }
+        }
+        .padding(9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(statusColor.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(statusColor.opacity(0.18))
+        )
+    }
+
+    private var statusColor: Color {
+        switch status.state {
+        case .online: .green
+        case .warning: .orange
+        case .offline: .red
+        case .unknown: .secondary
+        }
     }
 }
 

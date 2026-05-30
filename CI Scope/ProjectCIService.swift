@@ -35,43 +35,110 @@ struct ProjectCIService {
     }
 
     private func loadLocalRunner(for project: CIProject) async -> ProjectLocalRunnerStatus {
-        let runnerPath = config.runnerRoot + "/.runner"
-        guard let runner = readRunnerConfiguration(path: runnerPath) else {
+        let localRunners = config.actionsRunners.compactMap(readLocalRunner)
+        if let runner = localRunners.first(where: { localRunner($0, appliesTo: project) }) {
+            return await localRunnerStatus(runner, for: project)
+        }
+
+        return await repositoryRunnerStatus(
+            for: project,
+            localRunners: localRunners
+        )
+    }
+
+    private func repositoryRunnerStatus(
+        for project: CIProject,
+        localRunners: [LocalRunnerInfo]
+    ) async -> ProjectLocalRunnerStatus {
+        let command = "gh api \(quoted("repos/\(project.repositorySlug)/actions/runners"))"
+        let result = await ShellClient.run(command, timeout: 15, config: config)
+        guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
             return ProjectLocalRunnerStatus(
-                state: .unknown,
-                summary: "No runner config",
-                detail: runnerPath,
-                repositorySlug: nil,
+                state: .warning,
+                summary: "Runner status unknown",
+                detail: trimmedError(result.output, fallback: "Could not read repo runners."),
+                repositorySlug: localRunners.first?.repositorySlug,
                 pid: nil,
-                filePath: runnerPath
+                filePath: nil
             )
         }
 
-        let runnerSlug = gitHubSlug(from: runner.gitHubUrl)
-        guard runnerSlug?.lowercased() == project.normalizedSlug else {
+        guard let runnerList = try? JSONDecoder().decode(GitHubRunnerList.self, from: data) else {
             return ProjectLocalRunnerStatus(
-                state: .unknown,
-                summary: runnerSlug.map { "Registered to \($0)" } ?? "Runner repo unknown",
-                detail: runner.agentName ?? "Local runner",
-                repositorySlug: runnerSlug,
+                state: .warning,
+                summary: "Runner status unknown",
+                detail: "Could not parse repo runners.",
+                repositorySlug: localRunners.first?.repositorySlug,
                 pid: nil,
-                filePath: runnerPath
+                filePath: nil
+            )
+        }
+
+        let macRunners = runnerList.runners.filter { $0.hasLabels(config.actionsRunnerRequiredLabels) }
+        guard !macRunners.isEmpty else {
+            return ProjectLocalRunnerStatus(
+                state: .offline,
+                summary: "No CI runner",
+                detail: missingRunnerDetail(for: project, localRunners: localRunners),
+                repositorySlug: localRunners.first?.repositorySlug,
+                pid: nil,
+                filePath: nil
+            )
+        }
+
+        let onlineRunner = macRunners.first { $0.status.lowercased() == "online" && !$0.busy }
+        let busyRunner = macRunners.first { $0.status.lowercased() == "online" && $0.busy }
+        let selectedRunner = onlineRunner ?? busyRunner ?? macRunners[0]
+        let state: ServiceState = if onlineRunner != nil {
+            .online
+        } else if busyRunner != nil {
+            .warning
+        } else {
+            .offline
+        }
+        let summary = if onlineRunner != nil {
+            "Repo runner online"
+        } else if busyRunner != nil {
+            "Repo runner busy"
+        } else {
+            "Repo runner offline"
+        }
+
+        return ProjectLocalRunnerStatus(
+            state: state,
+            summary: summary,
+            detail: selectedRunner.name,
+            repositorySlug: project.repositorySlug,
+            pid: nil,
+            filePath: nil
+        )
+    }
+
+    private func localRunnerStatus(_ runner: LocalRunnerInfo, for project: CIProject) async -> ProjectLocalRunnerStatus {
+        guard let serviceLabel = serviceLabel(for: runner.config) else {
+            return ProjectLocalRunnerStatus(
+                state: .warning,
+                summary: "Runner configured",
+                detail: "Service not installed for \(runner.config.title).",
+                repositorySlug: runner.repositorySlug ?? project.repositorySlug,
+                pid: nil,
+                filePath: runner.config.runnerConfigurationPath
             )
         }
 
         let uid = await ShellClient.run("id -u", timeout: 3, config: config)
             .output
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let launch = await ShellClient.run("launchctl print gui/\(uid)/\(config.runnerServiceLabel)", timeout: 5, config: config)
+        let launch = await ShellClient.run("launchctl print gui/\(uid)/\(serviceLabel)", timeout: 5, config: config)
 
         guard launch.exitCode == 0 else {
             return ProjectLocalRunnerStatus(
                 state: .offline,
                 summary: "Service unavailable",
-                detail: trimmedError(launch.output, fallback: "launchctl could not read runner service."),
-                repositorySlug: runnerSlug,
+                detail: trimmedError(launch.output, fallback: "launchctl could not read \(runner.config.title)."),
+                repositorySlug: runner.repositorySlug ?? project.repositorySlug,
                 pid: nil,
-                filePath: runnerPath
+                filePath: runner.config.runnerConfigurationPath
             )
         }
 
@@ -79,16 +146,127 @@ struct ProjectCIService {
         let pid = intMatch(in: launch.output, pattern: #"pid = ([0-9]+)"#)
         let uptime = await processUptime(pid: pid)
         let state: ServiceState = launchState == "running" ? .online : .offline
-        let detail = "PID \(pid.map(String.init) ?? "-") · \(uptime)"
+        let remoteRunner = await remoteRunner(matching: runner)
+        let missingLabels = missingLabels(for: runner, remoteRunner: remoteRunner)
+        let hasRequiredLabels = missingLabels.isEmpty
+        let labelSummary = hasRequiredLabels ? launchState.capitalized : "Label mismatch"
+        let detail = hasRequiredLabels
+            ? "\(runner.config.title) · PID \(pid.map(String.init) ?? "-") · \(uptime)"
+            : "\(runner.config.title) is missing required labels: \(missingLabels.joined(separator: ", "))"
 
         return ProjectLocalRunnerStatus(
-            state: state,
-            summary: launchState.capitalized,
+            state: hasRequiredLabels ? state : .warning,
+            summary: labelSummary,
             detail: detail,
-            repositorySlug: runnerSlug,
+            repositorySlug: runner.repositorySlug ?? project.repositorySlug,
             pid: pid,
-            filePath: runnerPath
+            filePath: runner.config.runnerConfigurationPath
         )
+    }
+
+    private func readLocalRunner(_ runnerConfig: ActionsRunnerConfig) -> LocalRunnerInfo? {
+        guard let runner = readRunnerConfiguration(path: runnerConfig.runnerConfigurationPath) else {
+            return nil
+        }
+
+        return LocalRunnerInfo(
+            config: runnerConfig,
+            runner: runner,
+            repositorySlug: gitHubSlug(from: runner.gitHubUrl),
+            owner: gitHubOwner(from: runner.gitHubUrl)
+        )
+    }
+
+    private func localRunner(_ runner: LocalRunnerInfo, appliesTo project: CIProject) -> Bool {
+        switch runner.config.scope {
+        case .organization(let organization):
+            return project.repositoryOwner.caseInsensitiveCompare(organization) == .orderedSame
+                && runner.owner?.caseInsensitiveCompare(organization) == .orderedSame
+        case .personalAccount(let account):
+            return project.repositoryOwner.caseInsensitiveCompare(account) == .orderedSame
+                && runner.repositorySlug?.lowercased() == project.normalizedSlug
+        case .repository(let slug):
+            return project.normalizedSlug == slug.lowercased()
+                && runner.repositorySlug?.lowercased() == project.normalizedSlug
+        }
+    }
+
+    private func serviceLabel(for runnerConfig: ActionsRunnerConfig) -> String? {
+        if let serviceLabel = runnerConfig.serviceLabel {
+            return serviceLabel
+        }
+
+        let servicePath = runnerConfig.root + "/.service"
+        guard
+            let contents = try? String(contentsOfFile: servicePath, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            !contents.isEmpty
+        else {
+            return nil
+        }
+
+        return URL(fileURLWithPath: contents)
+            .deletingPathExtension()
+            .lastPathComponent
+    }
+
+    private func missingRunnerDetail(for project: CIProject, localRunners: [LocalRunnerInfo]) -> String {
+        if let orgRunner = config.actionsRunners.first(where: { runnerConfig in
+            if case .organization(let organization) = runnerConfig.scope {
+                return project.repositoryOwner.caseInsensitiveCompare(organization) == .orderedSame
+            }
+            return false
+        }) {
+            return "Install \(orgRunner.title) with labels: \(orgRunner.requiredLabels.joined(separator: ", "))."
+        }
+
+        if let personalRunner = config.actionsRunners.first(where: { runnerConfig in
+            if case .personalAccount(let account) = runnerConfig.scope {
+                return project.repositoryOwner.caseInsensitiveCompare(account) == .orderedSame
+            }
+            return false
+        }) {
+            return "Personal repos need a repo-level runner. Reconfigure \(personalRunner.title) to \(project.repositorySlug)."
+        }
+
+        if let localRunner = localRunners.first {
+            return "Local runner is registered to \(localRunner.repositorySlug ?? localRunner.owner ?? localRunner.config.scope.description)."
+        }
+
+        return "No configured local runner scope matches \(project.repositorySlug)."
+    }
+
+    private func remoteRunner(matching runner: LocalRunnerInfo) async -> GitHubActionsRunner? {
+        let command: String?
+        switch runner.config.scope {
+        case .organization(let organization):
+            command = "gh api \(quoted("orgs/\(organization)/actions/runners"))"
+        case .personalAccount, .repository:
+            guard let repositorySlug = runner.repositorySlug else { return nil }
+            command = "gh api \(quoted("repos/\(repositorySlug)/actions/runners"))"
+        }
+
+        guard let command else { return nil }
+        let result = await ShellClient.run(command, timeout: 15, config: config)
+        guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
+            return nil
+        }
+
+        guard let runnerList = try? JSONDecoder().decode(GitHubRunnerList.self, from: data) else {
+            return nil
+        }
+
+        return runnerList.runners.first {
+            $0.name.caseInsensitiveCompare(runner.runner.agentName ?? "") == .orderedSame
+        }
+    }
+
+    private func missingLabels(for runner: LocalRunnerInfo, remoteRunner: GitHubActionsRunner?) -> [String] {
+        guard let remoteRunner else {
+            return runner.config.requiredLabels
+        }
+        let availableLabels = Set(remoteRunner.labels.map { $0.name.lowercased() })
+        return runner.config.requiredLabels.filter { !availableLabels.contains($0.lowercased()) }
     }
 
     private func loadAuthStatus() async -> GitHubAuthSnapshot {
@@ -289,6 +467,29 @@ struct ProjectCIService {
         return "\(parts[0])/\(parts[1])"
     }
 
+    private func gitHubOwner(from value: String?) -> String? {
+        guard var value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            return nil
+        }
+
+        if value.hasPrefix("git@github.com:") {
+            value = String(value.dropFirst("git@github.com:".count))
+        } else if value.hasPrefix("https://github.com/") {
+            value = String(value.dropFirst("https://github.com/".count))
+        } else if value.hasPrefix("http://github.com/") {
+            value = String(value.dropFirst("http://github.com/".count))
+        }
+
+        value = value.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if value.hasSuffix(".git") {
+            value = String(value.dropLast(4))
+        }
+
+        return value.split(separator: "/", omittingEmptySubsequences: true)
+            .first
+            .map(String.init)
+    }
+
     private func processUptime(pid: Int?) async -> String {
         guard let pid else { return "-" }
         let result = await ShellClient.run("ps -p \(pid) -o etime= | xargs", timeout: 3, config: config)
@@ -323,6 +524,33 @@ private struct GitHubAuthSnapshot {
 private struct RunnerConfiguration: Decodable {
     let agentName: String?
     let gitHubUrl: String?
+}
+
+private struct LocalRunnerInfo {
+    let config: ActionsRunnerConfig
+    let runner: RunnerConfiguration
+    let repositorySlug: String?
+    let owner: String?
+}
+
+private struct GitHubRunnerList: Decodable {
+    let runners: [GitHubActionsRunner]
+}
+
+private struct GitHubActionsRunner: Decodable {
+    let name: String
+    let status: String
+    let busy: Bool
+    let labels: [GitHubRunnerLabel]
+
+    func hasLabels(_ requiredLabels: [String]) -> Bool {
+        let availableLabels = Set(labels.map { $0.name.lowercased() })
+        return requiredLabels.allSatisfy { availableLabels.contains($0) }
+    }
+}
+
+private struct GitHubRunnerLabel: Decodable {
+    let name: String
 }
 
 private struct LoadResponse<Value> {
