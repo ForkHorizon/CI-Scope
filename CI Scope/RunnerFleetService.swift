@@ -47,36 +47,52 @@ struct RunnerFleetService {
         snapshot.error = launch.error
 
         let remoteResult = await remoteRunner(for: runnerConfig, localRunner: localRunner)
-        if let remote = remoteResult.value {
-            snapshot.githubState = remote.status.lowercased() == "online" ? .online : .offline
-            snapshot.remoteName = remote.name
-            snapshot.remoteStatus = remote.status
-            snapshot.isBusy = remote.busy
-            snapshot.labels = remote.labels.map(\.name).sorted()
-            snapshot.missingLabels = missingLabels(for: runnerConfig, remoteRunner: remote)
-        } else {
+        applyRemoteStatus(remoteResult, runnerConfig: runnerConfig, snapshot: &snapshot)
+        let jobs = await repositoryJobs(for: runnerConfig, localRunner: localRunner, runnerName: snapshot.remoteName)
+        snapshot.visibleRepositoryCount = jobs.visibleRepositoryCount
+        snapshot.activeJobs = jobs.active
+        snapshot.queuedJobs = jobs.queued
+
+        snapshot.state = state(for: snapshot)
+        return snapshot
+    }
+
+    private func applyRemoteStatus(
+        _ remoteResult: FleetLoadResponse<FleetGitHubActionsRunner>,
+        runnerConfig: ActionsRunnerConfig,
+        snapshot: inout RunnerMonitorSnapshot
+    ) {
+        guard let remote = remoteResult.value else {
             snapshot.githubState = .unknown
             snapshot.missingLabels = runnerConfig.requiredLabels
             snapshot.error = [snapshot.error, remoteResult.error]
                 .compactMap { $0 }
                 .joined(separator: "\n")
                 .nilIfEmpty
+            return
         }
 
-        let repositories = await repositoriesVisibleToRunner(runnerConfig, localRunner: localRunner)
-        snapshot.visibleRepositoryCount = repositories.count
-        snapshot.activeJobs = await activeJobs(
-            repositories: repositories,
-            runnerName: snapshot.remoteName,
-            requiredLabels: runnerConfig.requiredLabels
-        )
-        snapshot.queuedJobs = await queuedJobs(
-            repositories: repositories,
-            requiredLabels: runnerConfig.requiredLabels
-        )
+        snapshot.githubState = remote.status.lowercased() == "online" ? .online : .offline
+        snapshot.remoteName = remote.name
+        snapshot.remoteStatus = remote.status
+        snapshot.isBusy = remote.busy
+        snapshot.labels = remote.labels.map(\.name).sorted()
+        snapshot.missingLabels = missingLabels(for: runnerConfig, remoteRunner: remote)
+    }
 
-        snapshot.state = state(for: snapshot)
-        return snapshot
+    private func repositoryJobs(
+        for runnerConfig: ActionsRunnerConfig,
+        localRunner: FleetLocalRunnerInfo?,
+        runnerName: String
+    ) async -> (visibleRepositoryCount: Int, active: [RunnerWorkItem], queued: [RunnerWorkItem]) {
+        let repositories = await repositoriesVisibleToRunner(runnerConfig, localRunner: localRunner)
+        let active = await activeJobs(
+            repositories: repositories,
+            runnerName: runnerName,
+            requiredLabels: runnerConfig.requiredLabels
+        )
+        let queued = await queuedJobs(repositories: repositories, requiredLabels: runnerConfig.requiredLabels)
+        return (repositories.count, active, queued)
     }
 
     private func state(for snapshot: RunnerMonitorSnapshot) -> ServiceState {
