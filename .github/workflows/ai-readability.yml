@@ -27,7 +27,7 @@ concurrency:
 jobs:
   readability:
     name: AI readability gate
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: [self-hosted, macOS, ARM64, ci-scope]
 
     steps:
       - name: Checkout
