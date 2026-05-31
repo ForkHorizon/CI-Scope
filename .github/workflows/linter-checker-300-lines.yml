@@ -1,0 +1,80 @@
+name: Linter Checker 300 lines
+
+on:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Files to scan
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - changed
+  schedule:
+    - cron: "0 5 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-readability-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  readability:
+    name: Linter Checker 300 lines
+    runs-on: [self-hosted, macOS, ARM64, ci-scope]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Select scan mode
+        id: scan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "${{ github.event_name }}" in
+            pull_request)
+              echo "mode=changed" >> "$GITHUB_OUTPUT"
+              echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+              echo "head=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+              ;;
+            merge_group)
+              echo "mode=changed" >> "$GITHUB_OUTPUT"
+              echo "base=${{ github.event.merge_group.base_sha }}" >> "$GITHUB_OUTPUT"
+              echo "head=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+              ;;
+            workflow_dispatch)
+              echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+              echo "base=origin/${{ github.event.repository.default_branch }}" >> "$GITHUB_OUTPUT"
+              echo "head=HEAD" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "mode=all" >> "$GITHUB_OUTPUT"
+              echo "base=origin/${{ github.event.repository.default_branch }}" >> "$GITHUB_OUTPUT"
+              echo "head=HEAD" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Run Linter Checker 300 lines
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ steps.scan.outputs.mode }}" = "changed" ]; then
+            python3 scripts/linter-checker-300-lines.py \
+              --config .linter-checker-300-lines.json \
+              --mode changed \
+              --base "${{ steps.scan.outputs.base }}" \
+              --head "${{ steps.scan.outputs.head }}"
+          else
+            python3 scripts/linter-checker-300-lines.py --config .linter-checker-300-lines.json --mode all
+          fi
