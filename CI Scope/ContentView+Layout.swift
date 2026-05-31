@@ -18,6 +18,18 @@ extension ContentView {
         case .runners:
             RunnersView(viewModel: runnerFleetViewModel)
                 .padding(14)
+        case .scripts:
+            ScriptsView(
+                store: scriptStore,
+                installer: scriptInstallViewModel,
+                projects: projectStore.projects,
+                selectedProject: selectedProject,
+                onInstallSuccess: { project in
+                    Task {
+                        await projectCIViewModel.load(project)
+                    }
+                }
+            )
         }
     }
 
@@ -30,13 +42,7 @@ extension ContentView {
                 ProjectCIPanel(
                     project: selectedProject,
                     snapshot: projectCIViewModel.snapshot(for: selectedProject.id),
-                    isLoading: projectCIViewModel.loadingProjectID == selectedProject.id,
-                    readabilityGateStatus: readabilityGateInstaller.snapshot(for: selectedProject),
-                    onInstallReadabilityGate: {
-                        readabilityGateInstaller.install(in: selectedProject) {
-                            refreshSelectedProject()
-                        }
-                    }
+                    isLoading: projectCIViewModel.loadingProjectID == selectedProject.id
                 )
                 .frame(minHeight: 260, maxHeight: showsLocalTools ? 360 : .infinity)
 

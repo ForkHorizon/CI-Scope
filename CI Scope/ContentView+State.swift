@@ -40,6 +40,8 @@ extension ContentView {
             return projectCIViewModel.loadingProjectID == selectedProject.id || (isLocalToolsProject(selectedProject) && viewModel.isRefreshing)
         case .runners:
             return runnerFleetViewModel.isLoading
+        case .scripts:
+            return false
         }
     }
 
@@ -50,6 +52,8 @@ extension ContentView {
             return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt
         case .runners:
             return runnerFleetViewModel.snapshot.refreshedAt
+        case .scripts:
+            return nil
         }
     }
 
@@ -59,6 +63,8 @@ extension ContentView {
             selectedProject != nil
         case .runners:
             true
+        case .scripts:
+            false
         }
     }
 
@@ -68,6 +74,8 @@ extension ContentView {
             selectedProject?.repositorySlug ?? "No project selected"
         case .runners:
             "Runners · \(runnerFleetViewModel.snapshot.runners.count) configured"
+        case .scripts:
+            "\(scriptStore.scripts.count) installable scripts"
         }
     }
 
@@ -77,6 +85,8 @@ extension ContentView {
             selectedProject?.title ?? "Projects"
         case .runners:
             "Runners"
+        case .scripts:
+            "Scripts"
         }
     }
 
@@ -86,6 +96,8 @@ extension ContentView {
             "square.grid.2x2"
         case .runners:
             "server.rack"
+        case .scripts:
+            "curlybraces.square"
         }
     }
 
@@ -96,6 +108,8 @@ extension ContentView {
             return state(for: selectedProject)
         case .runners:
             return runnerFleetViewModel.snapshot.state
+        case .scripts:
+            return scriptStore.scripts.isEmpty ? .unknown : .online
         }
     }
 
@@ -133,6 +147,8 @@ extension ContentView {
             Task {
                 await runnerFleetViewModel.load()
             }
+        case .scripts:
+            break
         }
     }
 

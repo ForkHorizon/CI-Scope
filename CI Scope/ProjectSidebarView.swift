@@ -8,6 +8,8 @@ struct ProjectMenuPanel: View {
     let stateForProject: (CIProject) -> ServiceState
     let runnerState: ServiceState
     let runnerCount: Int
+    let scriptState: ServiceState
+    let scriptCount: Int
     let onSelect: (CIProject) -> Void
     let onRemove: (CIProject) -> Void
     let onAddProject: () -> Void
@@ -41,6 +43,15 @@ struct ProjectMenuPanel: View {
                     isActive: workspaceTab == .runners
                 ) {
                     workspaceTab = .runners
+                }
+
+                WorkspaceMenuRow(
+                    tab: .scripts,
+                    state: scriptState,
+                    count: scriptCount,
+                    isActive: workspaceTab == .scripts
+                ) {
+                    workspaceTab = .scripts
                 }
             }
             .padding(10)
@@ -129,6 +140,8 @@ struct ProjectMenuPanel: View {
             aggregateState
         case .runners:
             runnerState
+        case .scripts:
+            scriptState
         }
     }
 
@@ -138,6 +151,8 @@ struct ProjectMenuPanel: View {
             projects.isEmpty ? "No projects" : aggregateState.rawValue
         case .runners:
             runnerCount == 0 ? "Runners not loaded" : "\(runnerCount) runners · \(runnerState.rawValue)"
+        case .scripts:
+            scriptCount == 0 ? "No scripts" : "\(scriptCount) scripts · \(scriptState.rawValue)"
         }
     }
 }
@@ -197,6 +212,8 @@ struct WorkspaceMenuRow: View {
             count == 1 ? "1 project" : "\(count) projects"
         case .runners:
             count == 0 ? "Load runner status" : "\(count) configured"
+        case .scripts:
+            count == 1 ? "1 script" : "\(count) scripts"
         }
     }
 
