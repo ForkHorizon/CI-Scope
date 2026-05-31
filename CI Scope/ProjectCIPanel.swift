@@ -5,6 +5,9 @@ struct ProjectCIPanel: View {
     let project: CIProject
     let snapshot: ProjectCISnapshot?
     let isLoading: Bool
+    let scripts: [AutomationScript]
+    let removalSnapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
+    let onRemoveScript: (AutomationScript) -> Void
 
     var body: some View {
         PanelShell(title: "GitHub CI", icon: "point.3.connected.trianglepath.dotted") {
@@ -77,6 +80,14 @@ struct ProjectCIPanel: View {
 
                     if let error = snapshot?.error {
                         ErrorBox(text: error)
+                    }
+
+                    if !scripts.isEmpty {
+                        ProjectScriptRemovalList(
+                            scripts: scripts,
+                            snapshot: removalSnapshot,
+                            onRemove: onRemoveScript
+                        )
                     }
 
                     if let snapshot, !snapshot.workflows.isEmpty {

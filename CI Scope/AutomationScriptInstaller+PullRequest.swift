@@ -9,7 +9,34 @@ extension AutomationScriptInstaller {
         if let existingURL = try await existingPullRequestURL(project: project, branch: renderer.branchName) {
             return existingURL
         }
-        return try await createPullRequest(project: project, renderer: renderer, tempRoot: tempRoot)
+        return try await createPullRequest(
+            project: project,
+            base: renderer.defaultBranch,
+            branch: renderer.branchName,
+            title: renderer.pullRequestTitle,
+            body: renderer.pullRequestBody,
+            tempRoot: tempRoot
+        )
+    }
+
+    func removalPullRequestURL(
+        project: CIProject,
+        script: AutomationScript,
+        defaultBranch: String,
+        branchName: String,
+        tempRoot: URL
+    ) async throws -> URL? {
+        if let existingURL = try await existingPullRequestURL(project: project, branch: branchName) {
+            return existingURL
+        }
+        return try await createPullRequest(
+            project: project,
+            base: defaultBranch,
+            branch: branchName,
+            title: "Remove \(script.title) automation",
+            body: removalPullRequestBody(for: script),
+            tempRoot: tempRoot
+        )
     }
 
     func existingPullRequestURL(project: CIProject, branch: String) async throws -> URL? {
@@ -23,18 +50,21 @@ extension AutomationScriptInstaller {
 
     func createPullRequest(
         project: CIProject,
-        renderer: AutomationScriptRenderer,
+        base: String,
+        branch: String,
+        title: String,
+        body: String,
         tempRoot: URL
     ) async throws -> URL? {
         let bodyURL = tempRoot.appendingPathComponent("pull-request-body.md")
-        try renderer.pullRequestBody.write(to: bodyURL, atomically: true, encoding: .utf8)
+        try body.write(to: bodyURL, atomically: true, encoding: .utf8)
         let output = try await run(
             """
             gh pr create \
               --repo \(quoted(project.repositorySlug)) \
-              --base \(quoted(renderer.defaultBranch)) \
-              --head \(quoted(renderer.branchName)) \
-              --title \(quoted(renderer.pullRequestTitle)) \
+              --base \(quoted(base)) \
+              --head \(quoted(branch)) \
+              --title \(quoted(title)) \
               --body-file \(quoted(bodyURL.path))
             """,
             timeout: 60,
@@ -57,5 +87,29 @@ extension AutomationScriptInstaller {
             detail: "Open and merge the PR. The workflow uses this script's configured runner labels.",
             pullRequestURL: pullRequestURL
         )
+    }
+
+    func alreadyRemovedResult(_ script: AutomationScript, defaultBranch: String) -> AutomationScriptInstallResult {
+        AutomationScriptInstallResult(
+            title: "\(script.title) already removed",
+            detail: "No installed script files were found on \(defaultBranch).",
+            pullRequestURL: nil
+        )
+    }
+
+    func removalReadyResult(_ script: AutomationScript, pullRequestURL: URL?) -> AutomationScriptInstallResult {
+        AutomationScriptInstallResult(
+            title: "\(script.title) removal PR ready",
+            detail: "Open and merge the PR to remove this script from the project.",
+            pullRequestURL: pullRequestURL
+        )
+    }
+
+    func removalPullRequestBody(for script: AutomationScript) -> String {
+        """
+        Removes the \(script.title) automation managed by CI Scope.
+
+        This PR removes the files currently configured in the script library item.
+        """
     }
 }

@@ -42,7 +42,16 @@ extension ContentView {
                 ProjectCIPanel(
                     project: selectedProject,
                     snapshot: projectCIViewModel.snapshot(for: selectedProject.id),
-                    isLoading: projectCIViewModel.loadingProjectID == selectedProject.id
+                    isLoading: projectCIViewModel.loadingProjectID == selectedProject.id,
+                    scripts: scriptStore.scripts,
+                    removalSnapshot: { script in
+                        scriptInstallViewModel.removalSnapshot(for: script, project: selectedProject)
+                    },
+                    onRemoveScript: { script in
+                        scriptInstallViewModel.remove(script: script, project: selectedProject) {
+                            refreshSelectedProject()
+                        }
+                    }
                 )
                 .frame(minHeight: 260, maxHeight: showsLocalTools ? 360 : .infinity)
 

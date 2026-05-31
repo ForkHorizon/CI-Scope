@@ -49,6 +49,49 @@ struct AutomationScriptInstaller {
         return readyResult(script, pullRequestURL: pullRequestURL)
     }
 
+    func remove(
+        script: AutomationScript,
+        project: CIProject,
+        variableValues: [String: String]
+    ) async throws -> AutomationScriptInstallResult {
+        _ = try await run("NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
+        let defaultBranch = try await defaultBranch(for: project)
+        let renderer = AutomationScriptRenderer(
+            script: script,
+            project: project,
+            variableValues: variableValues,
+            defaultBranch: defaultBranch
+        )
+        try AutomationScriptValidator.validateForSave(script)
+
+        let tempRoot = temporaryRoot()
+        let repoURL = tempRoot.appendingPathComponent("repo", isDirectory: true)
+        try fileManager.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempRoot) }
+
+        try await clone(project: project, defaultBranch: defaultBranch, into: repoURL)
+        let branchName = "ci-scope/remove-\(script.id)"
+        let branchExists = await remoteBranchExists(branchName, cwd: repoURL)
+        try await checkoutBranch(branchName, exists: branchExists, cwd: repoURL)
+        let files = try renderer.renderedFiles()
+        try await remove(files, cwd: repoURL)
+
+        if try await hasStagedChanges(files: files, cwd: repoURL) {
+            try await commitAndPushRemoval(script: script, branchName: branchName, cwd: repoURL)
+        }
+        guard try await branchDiffersFromDefault(defaultBranch: defaultBranch, cwd: repoURL) else {
+            return alreadyRemovedResult(script, defaultBranch: defaultBranch)
+        }
+        let pullRequestURL = try await removalPullRequestURL(
+            project: project,
+            script: script,
+            defaultBranch: defaultBranch,
+            branchName: branchName,
+            tempRoot: tempRoot
+        )
+        return removalReadyResult(script, pullRequestURL: pullRequestURL)
+    }
+
     private func defaultBranch(for project: CIProject) async throws -> String {
         let output = try await run(
             "gh repo view \(quoted(project.repositorySlug)) --json defaultBranchRef --jq '.defaultBranchRef.name'",
@@ -111,6 +154,14 @@ struct AutomationScriptInstaller {
         _ = try await run(stageCommand(for: files), cwd: cwd, step: "Stage automation files")
     }
 
+    private func remove(_ files: [AutomationScriptFile], cwd: URL) async throws {
+        _ = try await run(
+            "git rm -f --ignore-unmatch -- \(gitPaths(files))",
+            cwd: cwd,
+            step: "Remove automation files"
+        )
+    }
+
     private func stageCommand(for files: [AutomationScriptFile]) -> String {
         let paths = files.map { quoted($0.destinationPath) }.joined(separator: " ")
         let executablePaths = files.filter(\.isExecutable).map { quoted($0.destinationPath) }
@@ -132,6 +183,18 @@ struct AutomationScriptInstaller {
             cwd: cwd,
             timeout: 180,
             step: "Commit and push automation script"
+        )
+    }
+
+    private func commitAndPushRemoval(script: AutomationScript, branchName: String, cwd: URL) async throws {
+        _ = try await run(
+            """
+            git -c user.name='CI Scope' -c user.email='ci-scope@users.noreply.github.com' commit -m \(quoted("Remove \(script.title) automation"))
+            git push --set-upstream origin \(quoted(branchName))
+            """,
+            cwd: cwd,
+            timeout: 180,
+            step: "Commit and push automation removal"
         )
     }
 
