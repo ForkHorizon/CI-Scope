@@ -46,9 +46,18 @@ enum LocalCommandPreset: String, CaseIterable, Identifiable {
     }
 
     private func unitySmokeCommand(config: DashboardConfig) -> String {
+        [
+            unitySmokeSetupScript(unityEditorPath: quote(config.unityEditorPath)),
+            unitySmokeManifestScript(),
+            unitySmokeImportScript(),
+            unitySmokeDependencyCheckScript()
+        ].joined(separator: "\n\n")
+    }
+
+    private func unitySmokeSetupScript(unityEditorPath: String) -> String {
         """
         set -euo pipefail
-        UNITY_EDITOR_PATH=\(quote(config.unityEditorPath))
+        UNITY_EDITOR_PATH=\(unityEditorPath)
         test -x "$UNITY_EDITOR_PATH"
 
         export SMOKE_ROOT="${TMPDIR:-/tmp}/nexus-unity-package-smoke-local-$(date +%s)"
@@ -57,7 +66,11 @@ enum LocalCommandPreset: String, CaseIterable, Identifiable {
 
         rm -rf "$SMOKE_ROOT"
         "$UNITY_EDITOR_PATH" -batchmode -quit -createProject "$SMOKE_ROOT" -logFile "$SMOKE_CREATE_LOG"
+        """
+    }
 
+    private func unitySmokeManifestScript() -> String {
+        """
         python3 - <<'PY'
         import json
         import os
@@ -70,7 +83,11 @@ enum LocalCommandPreset: String, CaseIterable, Identifiable {
         dependencies["com.forkhorizon.nexus.unity"] = f"file:{os.environ['PACKAGE_ROOT']}"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\\n", encoding="utf-8")
         PY
+        """
+    }
 
+    private func unitySmokeImportScript() -> String {
+        """
         if ! "$UNITY_EDITOR_PATH" -batchmode -quit -projectPath "$SMOKE_ROOT" -logFile "$SMOKE_IMPORT_LOG"; then
           echo "::error::Unity package smoke import failed."
           tail -n 200 "$SMOKE_IMPORT_LOG" || true
@@ -83,7 +100,11 @@ enum LocalCommandPreset: String, CaseIterable, Identifiable {
           tail -n 200 "$SMOKE_IMPORT_LOG" || true
           exit 1
         fi
+        """
+    }
 
+    private func unitySmokeDependencyCheckScript() -> String {
+        """
         python3 - <<'PY'
         import json
         import os
