@@ -115,6 +115,16 @@ struct AutomationScriptInstallSnapshot: Equatable {
         )
     }
 
+    static func removing(_ script: AutomationScript) -> AutomationScriptInstallSnapshot {
+        AutomationScriptInstallSnapshot(
+            state: .warning,
+            title: "Removing \(script.title)",
+            detail: "Creating branch, removing script files, and preparing a pull request.",
+            isInstalling: true,
+            pullRequestURL: nil
+        )
+    }
+
     static func succeeded(_ result: AutomationScriptInstallResult) -> AutomationScriptInstallSnapshot {
         AutomationScriptInstallSnapshot(
             state: .online,

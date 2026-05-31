@@ -17,7 +17,11 @@ final class AutomationScriptInstallViewModel: ObservableObject {
 
     func snapshot(for script: AutomationScript?) -> AutomationScriptInstallSnapshot {
         guard let script else { return .idle }
-        return snapshots[script.id] ?? .idle
+        return snapshots[installKey(script)] ?? .idle
+    }
+
+    func removalSnapshot(for script: AutomationScript, project: CIProject) -> AutomationScriptInstallSnapshot {
+        snapshots[removeKey(script, project: project)] ?? .idle
     }
 
     func install(
@@ -27,12 +31,13 @@ final class AutomationScriptInstallViewModel: ObservableObject {
         onSuccess: @escaping () -> Void = {}
     ) {
         guard !snapshots.values.contains(where: \.isInstalling) else { return }
+        let snapshotKey = installKey(script)
         guard let project else {
-            snapshots[script.id] = .failed(AutomationScriptError.missingProject.localizedDescription)
+            snapshots[snapshotKey] = .failed(AutomationScriptError.missingProject.localizedDescription)
             return
         }
 
-        snapshots[script.id] = .installing(script)
+        snapshots[snapshotKey] = .installing(script)
         Task {
             do {
                 let result = try await installer.install(
@@ -40,11 +45,47 @@ final class AutomationScriptInstallViewModel: ObservableObject {
                     project: project,
                     variableValues: variableValues
                 )
-                snapshots[script.id] = .succeeded(result)
+                snapshots[snapshotKey] = .succeeded(result)
                 onSuccess()
             } catch {
-                snapshots[script.id] = .failed(error.localizedDescription)
+                snapshots[snapshotKey] = .failed(error.localizedDescription)
             }
         }
+    }
+
+    func remove(
+        script: AutomationScript,
+        project: CIProject?,
+        onSuccess: @escaping () -> Void = {}
+    ) {
+        guard !snapshots.values.contains(where: \.isInstalling) else { return }
+        guard let project else { return }
+        let snapshotKey = removeKey(script, project: project)
+        snapshots[snapshotKey] = .removing(script)
+        Task {
+            do {
+                let result = try await installer.remove(
+                    script: script,
+                    project: project,
+                    variableValues: defaultValues(for: script)
+                )
+                snapshots[snapshotKey] = .succeeded(result)
+                onSuccess()
+            } catch {
+                snapshots[snapshotKey] = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    private func defaultValues(for script: AutomationScript) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: script.variables.map { ($0.id, $0.defaultValue) })
+    }
+
+    private func installKey(_ script: AutomationScript) -> String {
+        "install:\(script.id)"
+    }
+
+    private func removeKey(_ script: AutomationScript, project: CIProject) -> String {
+        "remove:\(project.id):\(script.id)"
     }
 }
