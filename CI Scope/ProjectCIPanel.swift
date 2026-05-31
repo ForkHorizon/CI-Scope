@@ -5,8 +5,6 @@ struct ProjectCIPanel: View {
     let project: CIProject
     let snapshot: ProjectCISnapshot?
     let isLoading: Bool
-    let readabilityGateStatus: ReadabilityGateInstallSnapshot
-    let onInstallReadabilityGate: () -> Void
 
     var body: some View {
         PanelShell(title: "GitHub CI", icon: "point.3.connected.trianglepath.dotted") {
@@ -36,26 +34,6 @@ struct ProjectCIPanel: View {
                         Spacer()
 
                         HStack(spacing: 6) {
-                            Button {
-                                onInstallReadabilityGate()
-                            } label: {
-                                Label(readabilityGateStatus.isInstalling ? "Installing" : "AI Gate", systemImage: "checklist.checked")
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 8)
-                                    .frame(height: 28)
-                                    .background(Color.secondary.opacity(0.08))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(readabilityGateStatus.isInstalling)
-                            .overlay {
-                                if readabilityGateStatus.isInstalling {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                }
-                            }
-                            .help("Create a PR that installs the AI Readability GitHub Action")
-
                             Button {
                                 copySSHURL()
                             } label: {
@@ -95,10 +73,6 @@ struct ProjectCIPanel: View {
                         LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
                         LimitedStatusRow(title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
                         LimitedStatusRow(title: "Local runner", value: localRunnerSummary, icon: "server.rack", state: snapshot?.localRunner.state ?? .unknown)
-                    }
-
-                    if readabilityGateStatus != .idle {
-                        ReadabilityGateInstallBox(status: readabilityGateStatus)
                     }
 
                     if let error = snapshot?.error {
@@ -174,58 +148,5 @@ struct ProjectCIPanel: View {
 
     func openGitHubRepository() {
         NSWorkspace.shared.open(githubURL)
-    }
-}
-
-struct ReadabilityGateInstallBox: View {
-    let status: ReadabilityGateInstallSnapshot
-
-    var body: some View {
-        HStack(spacing: 8) {
-            StatusDot(state: status.state)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(status.title)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                Text(status.detail)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-            }
-
-            Spacer(minLength: 8)
-
-            if let pullRequestURL = status.pullRequestURL {
-                Button {
-                    NSWorkspace.shared.open(pullRequestURL)
-                } label: {
-                    Image(systemName: "arrow.up.right.square")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(width: 26, height: 26)
-                }
-                .buttonStyle(.plain)
-                .help("Open pull request")
-            }
-        }
-        .padding(9)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(statusColor.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-        .overlay(
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(statusColor.opacity(0.18))
-        )
-    }
-
-    var statusColor: Color {
-        switch status.state {
-        case .online: .green
-        case .warning: .orange
-        case .offline: .red
-        case .unknown: .secondary
-        }
     }
 }

@@ -5,7 +5,8 @@ struct ContentView: View {
     @StateObject var viewModel = DashboardViewModel()
     @StateObject var projectStore = ProjectStore()
     @StateObject var projectCIViewModel = ProjectCIViewModel()
-    @StateObject var readabilityGateInstaller = ReadabilityGateInstallViewModel()
+    @StateObject var scriptStore = AutomationScriptStore()
+    @StateObject var scriptInstallViewModel = AutomationScriptInstallViewModel()
     @StateObject var runnerFleetViewModel = RunnerFleetViewModel()
     @State var workspaceTab: WorkspaceTab = .projects
     @State var section: DashboardSection = .runs
@@ -22,6 +23,8 @@ struct ContentView: View {
                     stateForProject: state(for:),
                     runnerState: runnerFleetViewModel.snapshot.state,
                     runnerCount: runnerFleetViewModel.snapshot.runners.count,
+                    scriptState: scriptStore.scripts.isEmpty ? .unknown : .online,
+                    scriptCount: scriptStore.scripts.count,
                     onSelect: selectProject,
                     onRemove: removeProject,
                     onAddProject: {
