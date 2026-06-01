@@ -6,7 +6,9 @@ struct ProjectCIPanel: View {
     let snapshot: ProjectCISnapshot?
     let isLoading: Bool
     let scripts: [AutomationScript]
+    let isBrokerManaged: Bool
     let removalSnapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
+    let onAttachToBroker: () -> Void
     let onRemoveScript: (AutomationScript) -> Void
 
     var body: some View {
@@ -76,22 +78,23 @@ struct ProjectCIPanel: View {
                         LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
                         LimitedStatusRow(title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
                         LimitedStatusRow(title: "Local runner", value: localRunnerSummary, icon: "server.rack", state: snapshot?.localRunner.state ?? .unknown)
+                        brokerAccessRow
                     }
 
                     if let error = snapshot?.error {
                         ErrorBox(text: error)
                     }
 
-                    if !scripts.isEmpty {
+                    if !installedScripts.isEmpty {
                         ProjectScriptRemovalList(
-                            scripts: scripts,
+                            installedScripts: installedScripts,
                             snapshot: removalSnapshot,
                             onRemove: onRemoveScript
                         )
                     }
 
-                    if let snapshot, !snapshot.workflows.isEmpty {
-                        ProjectWorkflowList(workflows: snapshot.workflows)
+                    if !unmanagedWorkflows.isEmpty {
+                        ProjectWorkflowList(workflows: unmanagedWorkflows)
                     }
 
                     if let snapshot, !snapshot.runs.isEmpty {
@@ -105,6 +108,41 @@ struct ProjectCIPanel: View {
                 .padding(12)
             }
         }
+    }
+
+    private var brokerAccessRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "point.3.filled.connected.trianglepath.dotted")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Local broker")
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                Text(isBrokerManaged ? "Broker managed" : "No local broker access")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            if isBrokerManaged {
+                StatusDot(state: .online)
+            } else {
+                Button("Attach") {
+                    onAttachToBroker()
+                }
+                .font(.caption.weight(.semibold))
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .background(Color.secondary.opacity(0.055))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
     }
 
     var ciSummary: String {
@@ -122,6 +160,37 @@ struct ProjectCIPanel: View {
             return "No actions available"
         }
         return "\(snapshot.workflows.count) workflows · \(snapshot.runs.count) runs"
+    }
+
+    var installedScripts: [InstalledAutomationScript] {
+        guard snapshot != nil else { return [] }
+
+        let matches = scripts.compactMap { script -> InstalledAutomationScript? in
+            guard let workflow = script.matchingWorkflow(in: snapshot) else { return nil }
+            return InstalledAutomationScript(script: script, workflow: workflow)
+        }
+
+        return matches.reduce(into: []) { result, match in
+            guard let workflowPath = match.workflow.path?.normalizedWorkflowPath else {
+                result.append(match)
+                return
+            }
+            if let existingIndex = result.firstIndex(where: { $0.workflow.path?.normalizedWorkflowPath == workflowPath }) {
+                if match.workflow.name == match.script.title {
+                    result[existingIndex] = match
+                }
+            } else {
+                result.append(match)
+            }
+        }
+    }
+
+    var unmanagedWorkflows: [GitHubWorkflow] {
+        let managedPaths = Set(installedScripts.compactMap { $0.workflow.path?.normalizedWorkflowPath })
+        return snapshot?.workflows.filter { workflow in
+            guard let path = workflow.path?.normalizedWorkflowPath else { return true }
+            return !managedPaths.contains(path)
+        } ?? []
     }
 
     var projectInfoColumns: [GridItem] {
@@ -159,5 +228,14 @@ struct ProjectCIPanel: View {
 
     func openGitHubRepository() {
         NSWorkspace.shared.open(githubURL)
+    }
+}
+
+private extension String {
+    var normalizedWorkflowPath: String {
+        trimmed
+            .replacingOccurrences(of: "\\", with: "/")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .lowercased()
     }
 }

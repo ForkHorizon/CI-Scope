@@ -37,9 +37,11 @@ extension ContentView {
         switch workspaceTab {
         case .projects:
             guard let selectedProject else { return false }
-            return projectCIViewModel.loadingProjectID == selectedProject.id || (isLocalToolsProject(selectedProject) && viewModel.isRefreshing)
+            return projectCIViewModel.loadingProjectID == selectedProject.id
         case .runners:
             return runnerFleetViewModel.isLoading
+        case .localTools:
+            return viewModel.isRefreshing
         case .scripts:
             return false
         }
@@ -52,6 +54,8 @@ extension ContentView {
             return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt
         case .runners:
             return runnerFleetViewModel.snapshot.refreshedAt
+        case .localTools:
+            return viewModel.snapshot.refreshedAt
         case .scripts:
             return nil
         }
@@ -62,6 +66,8 @@ extension ContentView {
         case .projects:
             selectedProject != nil
         case .runners:
+            true
+        case .localTools:
             true
         case .scripts:
             false
@@ -74,6 +80,8 @@ extension ContentView {
             selectedProject?.repositorySlug ?? "No project selected"
         case .runners:
             "Runners · \(runnerFleetViewModel.snapshot.runners.count) configured"
+        case .localTools:
+            viewModel.snapshot.errors.isEmpty ? "Configured local services" : "\(viewModel.snapshot.errors.count) issue(s)"
         case .scripts:
             "\(scriptStore.scripts.count) installable scripts"
         }
@@ -85,6 +93,8 @@ extension ContentView {
             selectedProject?.title ?? "Projects"
         case .runners:
             "Runners"
+        case .localTools:
+            "Local Tools"
         case .scripts:
             "Scripts"
         }
@@ -96,6 +106,8 @@ extension ContentView {
             "square.grid.2x2"
         case .runners:
             "server.rack"
+        case .localTools:
+            "desktopcomputer"
         case .scripts:
             "curlybraces.square"
         }
@@ -108,9 +120,23 @@ extension ContentView {
             return state(for: selectedProject)
         case .runners:
             return runnerFleetViewModel.snapshot.state
+        case .localTools:
+            return localToolsState
         case .scripts:
             return scriptStore.scripts.isEmpty ? .unknown : .online
         }
+    }
+
+    var localToolsState: ServiceState {
+        let states = [
+            viewModel.snapshot.runner.state,
+            viewModel.snapshot.ollama.state,
+            viewModel.snapshot.nexusUnity.state
+        ]
+        if states.contains(.offline) { return .offline }
+        if states.contains(.warning) { return .warning }
+        if states.contains(.unknown) { return .unknown }
+        return .online
     }
 
     func state(for project: CIProject) -> ServiceState {
@@ -125,34 +151,45 @@ extension ContentView {
     func removeProject(_ project: CIProject) {
         projectStore.removeProject(project)
         projectCIViewModel.removeSnapshot(for: project.id)
+        scriptInstallViewModel.clearCompletedRemovalSnapshots(for: project)
     }
 
-    func refreshSelectedProject() {
+    func refreshSelectedProject(clearCompletedScriptOperations: Bool = false) {
         guard let selectedProject else { return }
+
+        if clearCompletedScriptOperations {
+            scriptInstallViewModel.clearCompletedRemovalSnapshots(for: selectedProject)
+        }
 
         Task {
             await projectCIViewModel.load(selectedProject)
         }
+    }
 
-        if isLocalToolsProject(selectedProject) {
-            viewModel.refresh()
+    func isBrokerManaged(_ project: CIProject) -> Bool {
+        LocalBrokerService(config: DashboardConfig()).isManaged(project: project)
+    }
+
+    func attachToBroker(_ project: CIProject) {
+        Task {
+            try? await LocalBrokerService(config: DashboardConfig()).attach(project: project)
+            await projectCIViewModel.load(project)
+            await runnerFleetViewModel.load()
         }
     }
 
     func refreshCurrentTab() {
         switch workspaceTab {
         case .projects:
-            refreshSelectedProject()
+            refreshSelectedProject(clearCompletedScriptOperations: true)
         case .runners:
             Task {
                 await runnerFleetViewModel.load()
             }
+        case .localTools:
+            viewModel.refresh()
         case .scripts:
             break
         }
-    }
-
-    func isLocalToolsProject(_ project: CIProject) -> Bool {
-        project.normalizedSlug == viewModel.config.repositorySlug.lowercased()
     }
 }

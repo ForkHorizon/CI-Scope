@@ -1,22 +1,22 @@
 import SwiftUI
 
 struct ProjectScriptRemovalList: View {
-    let scripts: [AutomationScript]
+    let installedScripts: [InstalledAutomationScript]
     let snapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
     let onRemove: (AutomationScript) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("Library Scripts")
+            Text("Installed Scripts")
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            ForEach(scripts) { script in
+            ForEach(installedScripts) { installedScript in
                 ProjectScriptRemovalRow(
-                    script: script,
-                    snapshot: snapshot(script)
+                    installedScript: installedScript,
+                    snapshot: snapshot(installedScript.script)
                 ) {
-                    onRemove(script)
+                    onRemove(installedScript.script)
                 }
             }
         }
@@ -24,7 +24,7 @@ struct ProjectScriptRemovalList: View {
 }
 
 struct ProjectScriptRemovalRow: View {
-    let script: AutomationScript
+    let installedScript: InstalledAutomationScript
     let snapshot: AutomationScriptInstallSnapshot
     let onRemove: () -> Void
 
@@ -33,13 +33,14 @@ struct ProjectScriptRemovalRow: View {
             HStack(spacing: 8) {
                 StatusDot(state: rowState)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(script.title)
+                    Text(installedScript.title)
                         .font(.callout.weight(.semibold))
                         .lineLimit(1)
-                    Text(script.summary)
+                    Text(installedScript.detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                 }
 
                 Spacer()
@@ -63,6 +64,6 @@ struct ProjectScriptRemovalRow: View {
     }
 
     private var rowState: ServiceState {
-        snapshot == .idle ? .unknown : snapshot.state
+        snapshot == .idle ? installedScript.state : snapshot.state
     }
 }

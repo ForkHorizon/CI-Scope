@@ -5,7 +5,7 @@ struct RunnerFleetService {
 
     func loadSnapshot() async -> RunnerFleetSnapshot {
         let indexed = await withTaskGroup(of: (Int, RunnerMonitorSnapshot).self) { group in
-            for pair in config.actionsRunners.enumerated() {
+            for pair in visibleRunnerConfigs.enumerated() {
                 group.addTask {
                     let runner = await loadRunner(pair.element)
                     return (pair.offset, runner)
@@ -18,12 +18,22 @@ struct RunnerFleetService {
             }
             return results.sorted { $0.0 < $1.0 }.map(\.1)
         }
+        let broker = await LocalBrokerService(config: config).loadRunnerSnapshot()
 
         return RunnerFleetSnapshot(
-            runners: indexed,
+            runners: indexed + [broker],
             refreshedAt: Date(),
-            errors: indexed.compactMap(\.error)
+            errors: (indexed + [broker]).compactMap(\.error)
         )
+    }
+
+    private var visibleRunnerConfigs: [ActionsRunnerConfig] {
+        config.actionsRunners.filter { runner in
+            if case .personalAccount = runner.scope {
+                return false
+            }
+            return true
+        }
     }
 
     private func loadRunner(_ runnerConfig: ActionsRunnerConfig) async -> RunnerMonitorSnapshot {

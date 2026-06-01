@@ -23,6 +23,8 @@ struct ContentView: View {
                     stateForProject: state(for:),
                     runnerState: runnerFleetViewModel.snapshot.state,
                     runnerCount: runnerFleetViewModel.snapshot.runners.count,
+                    localToolsState: localToolsState,
+                    localToolsIssueCount: viewModel.snapshot.errors.count,
                     scriptState: scriptStore.scripts.isEmpty ? .unknown : .online,
                     scriptCount: scriptStore.scripts.count,
                     onSelect: selectProject,
@@ -47,13 +49,12 @@ struct ContentView: View {
         .task(id: selectedProject?.id) {
             guard let selectedProject else { return }
             await projectCIViewModel.load(selectedProject)
-            if isLocalToolsProject(selectedProject) {
-                viewModel.refresh()
-            }
         }
         .task(id: workspaceTab) {
             if workspaceTab == .runners {
                 await runnerFleetViewModel.load()
+            } else if workspaceTab == .localTools {
+                viewModel.refresh()
             }
         }
         .sheet(isPresented: $isAddingProject) {

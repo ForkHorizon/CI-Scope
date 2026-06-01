@@ -2,6 +2,10 @@ import Foundation
 
 extension ProjectCIService {
     func loadLocalRunner(for project: CIProject) async -> ProjectLocalRunnerStatus {
+        if LocalBrokerService(config: config).isManaged(project: project) {
+            return await brokerRunnerStatus(for: project)
+        }
+
         let localRunners = config.actionsRunners.compactMap(readLocalRunner)
         if let runner = localRunners.first(where: { localRunner($0, appliesTo: project) }) {
             return await localRunnerStatus(runner, for: project)
@@ -10,6 +14,29 @@ extension ProjectCIService {
         return await repositoryRunnerStatus(
             for: project,
             localRunners: localRunners
+        )
+    }
+
+    func brokerRunnerStatus(for project: CIProject) async -> ProjectLocalRunnerStatus {
+        let broker = await LocalBrokerService(config: config).loadRunnerSnapshot()
+        let active = broker.activeJobs.first { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
+        let queued = broker.queuedJobs.filter { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
+        let summary = if active != nil {
+            "Running locally"
+        } else if !queued.isEmpty {
+            "Waiting for broker"
+        } else {
+            "Broker managed"
+        }
+        let detail = active?.title ?? (queued.first?.title ?? "Local Mac Broker · \(broker.uptime)")
+
+        return ProjectLocalRunnerStatus(
+            state: broker.state,
+            summary: summary,
+            detail: detail,
+            repositorySlug: project.repositorySlug,
+            pid: broker.pid,
+            filePath: LocalBrokerService(config: config).registryURL.path
         )
     }
 
@@ -211,7 +238,7 @@ extension ProjectCIService {
             }
             return false
         }) {
-            return "Personal repos need a repo-level runner. Reconfigure \(personalRunner.title) to \(project.repositorySlug)."
+            return "Attach \(project.repositorySlug) to Local Mac Broker. Current runner is \(personalRunner.title)."
         }
 
         if let localRunner = localRunners.first {
