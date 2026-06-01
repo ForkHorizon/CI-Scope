@@ -33,7 +33,7 @@ struct ContentView: View {
                         isAddingProject = true
                     }
                 )
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                .transition(.move(edge: .leading).combined(with: .opacity))
                 Divider()
             }
             dashboardSurface

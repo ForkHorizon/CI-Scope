@@ -88,7 +88,7 @@ enum AutomationScriptSeedProvider {
                 defaultValue: "50",
                 help: "Largest allowed function or method length.",
                 options: []
-            )
+            ),
         ]
     }
 
@@ -110,70 +110,70 @@ enum AutomationScriptSeedProvider {
                 destinationPath: ".{{script_slug}}.json",
                 isExecutable: false,
                 contents: """
-                {
-                  "xcode_workspace": "",
-                  "xcode_project": "",
-                  "xcode_scheme": "",
-                  "xcode_destination": "generic/platform=macOS",
-                  "xcode_configuration": "Debug",
-                  "swift_format_config": ".swift-format",
-                  "fallback_swift_format_config": ".ci-scope-swift-format.json",
-                  "dead_code_enabled": true,
-                  "dead_code_install_periphery": true,
-                  "periphery_arguments": []
-                }
+                    {
+                      "xcode_workspace": "",
+                      "xcode_project": "",
+                      "xcode_scheme": "",
+                      "xcode_destination": "generic/platform=macOS",
+                      "xcode_configuration": "Debug",
+                      "swift_format_config": ".swift-format",
+                      "fallback_swift_format_config": ".ci-scope-swift-format.json",
+                      "dead_code_enabled": true,
+                      "dead_code_install_periphery": true,
+                      "periphery_arguments": []
+                    }
 
-                """
+                    """
             ),
             AutomationScriptFile(
                 id: "swift-format-config",
                 destinationPath: ".ci-scope-swift-format.json",
                 isExecutable: false,
                 contents: """
-                {
-                  "indentation": {
-                    "spaces": 4
-                  },
-                  "lineLength": 140,
-                  "version": 1
-                }
+                    {
+                      "indentation": {
+                        "spaces": 4
+                      },
+                      "lineLength": 140,
+                      "version": 1
+                    }
 
-                """
+                    """
             ),
             AutomationScriptFile(
                 id: "workflow",
                 destinationPath: ".github/workflows/{{script_slug}}.yml",
                 isExecutable: false,
                 contents: """
-                name: {{script_title}}
-
-                on:
-                  pull_request:
-                  workflow_dispatch:
-
-                jobs:
-                  swift-quality-gate:
                     name: {{script_title}}
-                    runs-on: [{{runner_labels}}]
-                    steps:
-                      - uses: actions/checkout@v6
-                      - run: python3 scripts/{{script_slug}}.py --config .{{script_slug}}.json --stage all --mode all
 
-                """
+                    on:
+                      pull_request:
+                      workflow_dispatch:
+
+                    jobs:
+                      swift-quality-gate:
+                        name: {{script_title}}
+                        runs-on: [{{runner_labels}}]
+                        steps:
+                          - uses: actions/checkout@v6
+                          - run: python3 scripts/{{script_slug}}.py --config .{{script_slug}}.json --stage all --mode all
+
+                    """
             ),
             AutomationScriptFile(
                 id: "checker",
                 destinationPath: "scripts/{{script_slug}}.py",
                 isExecutable: true,
                 contents: """
-                #!/usr/bin/env python3
-                import sys
+                    #!/usr/bin/env python3
+                    import sys
 
-                print("::error::Bundled Swift Quality Gate seed is missing. Reinstall or rebuild CI Scope.")
-                sys.exit(2)
+                    print("::error::Bundled Swift Quality Gate seed is missing. Reinstall or rebuild CI Scope.")
+                    sys.exit(2)
 
-                """
-            )
+                    """
+            ),
         ]
     }
 

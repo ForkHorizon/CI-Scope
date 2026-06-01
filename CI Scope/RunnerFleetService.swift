@@ -75,7 +75,8 @@ struct RunnerFleetService {
         guard let remote = remoteResult.value else {
             snapshot.githubState = .unknown
             snapshot.missingLabels = runnerConfig.requiredLabels
-            snapshot.error = [snapshot.error, remoteResult.error]
+            snapshot.error =
+                [snapshot.error, remoteResult.error]
                 .compactMap { $0 }
                 .joined(separator: "\n")
                 .nilIfEmpty

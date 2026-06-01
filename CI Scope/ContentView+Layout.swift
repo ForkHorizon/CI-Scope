@@ -146,10 +146,12 @@ extension ContentView {
     }
 
     var statusGrid: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 10),
-            GridItem(.flexible(), spacing: 10)
-        ], spacing: 10) {
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 10),
+                GridItem(.flexible(), spacing: 10),
+            ], spacing: 10
+        ) {
             StatusTile(
                 title: "Runner",
                 value: viewModel.snapshot.runner.launchctlState.capitalized,

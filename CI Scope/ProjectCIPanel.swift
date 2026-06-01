@@ -76,8 +76,11 @@ struct ProjectCIPanel: View {
 
                     LazyVGrid(columns: projectInfoColumns, spacing: 8) {
                         LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
-                        LimitedStatusRow(title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
-                        LimitedStatusRow(title: "Local runner", value: localRunnerSummary, icon: "server.rack", state: snapshot?.localRunner.state ?? .unknown)
+                        LimitedStatusRow(
+                            title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
+                        LimitedStatusRow(
+                            title: "Local runner", value: localRunnerSummary, icon: "server.rack",
+                            state: snapshot?.localRunner.state ?? .unknown)
                         brokerAccessRow
                     }
 
@@ -196,7 +199,7 @@ struct ProjectCIPanel: View {
     var projectInfoColumns: [GridItem] {
         [
             GridItem(.flexible(), spacing: 8),
-            GridItem(.flexible(), spacing: 8)
+            GridItem(.flexible(), spacing: 8),
         ]
     }
 

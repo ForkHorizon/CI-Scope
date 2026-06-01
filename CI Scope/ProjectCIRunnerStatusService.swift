@@ -21,13 +21,14 @@ extension ProjectCIService {
         let broker = await LocalBrokerService(config: config).loadRunnerSnapshot()
         let active = broker.activeJobs.first { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
         let queued = broker.queuedJobs.filter { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
-        let summary = if active != nil {
-            "Running locally"
-        } else if !queued.isEmpty {
-            "Waiting for broker"
-        } else {
-            "Broker managed"
-        }
+        let summary =
+            if active != nil {
+                "Running locally"
+            } else if !queued.isEmpty {
+                "Waiting for broker"
+            } else {
+                "Broker managed"
+            }
         let detail = active?.title ?? (queued.first?.title ?? "Local Mac Broker · \(broker.uptime)")
 
         return ProjectLocalRunnerStatus(
@@ -101,20 +102,22 @@ extension ProjectCIService {
         let onlineRunner = macRunners.first { $0.status.lowercased() == "online" && !$0.busy }
         let busyRunner = macRunners.first { $0.status.lowercased() == "online" && $0.busy }
         let selectedRunner = onlineRunner ?? busyRunner ?? macRunners[0]
-        let state: ServiceState = if onlineRunner != nil {
-            .online
-        } else if busyRunner != nil {
-            .warning
-        } else {
-            .offline
-        }
-        let summary = if onlineRunner != nil {
-            "Repo runner online"
-        } else if busyRunner != nil {
-            "Repo runner busy"
-        } else {
-            "Repo runner offline"
-        }
+        let state: ServiceState =
+            if onlineRunner != nil {
+                .online
+            } else if busyRunner != nil {
+                .warning
+            } else {
+                .offline
+            }
+        let summary =
+            if onlineRunner != nil {
+                "Repo runner online"
+            } else if busyRunner != nil {
+                "Repo runner busy"
+            } else {
+                "Repo runner offline"
+            }
 
         return ProjectLocalRunnerStatus(
             state: state,
@@ -162,7 +165,8 @@ extension ProjectCIService {
         let missingLabels = missingLabels(for: runner, remoteRunner: remoteRunner)
         let hasRequiredLabels = missingLabels.isEmpty
         let labelSummary = hasRequiredLabels ? launchState.capitalized : "Label mismatch"
-        let detail = hasRequiredLabels
+        let detail =
+            hasRequiredLabels
             ? "\(runner.config.title) · PID \(pid.map(String.init) ?? "-") · \(uptime)"
             : "\(runner.config.title) is missing required labels: \(missingLabels.joined(separator: ", "))"
 
@@ -242,7 +246,8 @@ extension ProjectCIService {
         }
 
         if let localRunner = localRunners.first {
-            return "Local runner is registered to \(localRunner.repositorySlug ?? localRunner.owner ?? localRunner.config.scope.description)."
+            return
+                "Local runner is registered to \(localRunner.repositorySlug ?? localRunner.owner ?? localRunner.config.scope.description)."
         }
 
         return "No configured local runner scope matches \(project.repositorySlug)."

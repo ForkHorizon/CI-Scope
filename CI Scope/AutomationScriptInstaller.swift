@@ -210,7 +210,8 @@ struct AutomationScriptInstaller {
         guard script.defaultSeedID == "ai-readability" || script.id == "ai-readability" else { return [] }
 
         let currentPaths = Set(currentFiles.map { normalizedPath($0.destinationPath) })
-        return legacyReadabilityInstallPaths
+        return
+            legacyReadabilityInstallPaths
             .filter { path in
                 !currentPaths.contains(normalizedPath(path))
                     && fileManager.fileExists(atPath: cwd.appendingPathComponent(path).path)
@@ -229,7 +230,7 @@ struct AutomationScriptInstaller {
         [
             ".ai-readability.json",
             ".github/workflows/ai-readability.yml",
-            "scripts/ai-readability-check.py"
+            "scripts/ai-readability-check.py",
         ]
     }
 

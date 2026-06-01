@@ -131,7 +131,7 @@ extension ContentView {
         let states = [
             viewModel.snapshot.runner.state,
             viewModel.snapshot.ollama.state,
-            viewModel.snapshot.nexusUnity.state
+            viewModel.snapshot.nexusUnity.state,
         ]
         if states.contains(.offline) { return .offline }
         if states.contains(.warning) { return .warning }

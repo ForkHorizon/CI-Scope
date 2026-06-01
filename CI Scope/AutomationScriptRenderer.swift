@@ -67,7 +67,7 @@ struct AutomationScriptRenderer {
             "script_id": script.id,
             "script_slug": script.scriptSlug,
             "script_title": script.title,
-            "script_summary": script.summary
+            "script_summary": script.summary,
         ]
     }
 

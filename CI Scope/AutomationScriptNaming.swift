@@ -2,7 +2,8 @@ import Foundation
 
 enum AutomationScriptNaming {
     static func slug(title: String, fallback: String) -> String {
-        let folded = title
+        let folded =
+            title
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             .lowercased()
 
@@ -24,7 +25,8 @@ enum AutomationScriptNaming {
             return trimmed
         }
 
-        let fallbackSlug = fallback
+        let fallbackSlug =
+            fallback
             .lowercased()
             .unicodeScalars
             .map { $0.isASCIIAlphanumeric ? String($0) : "-" }

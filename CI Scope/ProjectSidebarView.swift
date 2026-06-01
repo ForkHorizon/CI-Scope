@@ -165,7 +165,8 @@ struct ProjectMenuPanel: View {
         case .runners:
             runnerCount == 0 ? "Runners not loaded" : "\(runnerCount) runners · \(runnerState.rawValue)"
         case .localTools:
-            localToolsIssueCount == 0 ? "Local tools · \(localToolsState.rawValue)" : "\(localToolsIssueCount) issues · \(localToolsState.rawValue)"
+            localToolsIssueCount == 0
+                ? "Local tools · \(localToolsState.rawValue)" : "\(localToolsIssueCount) issues · \(localToolsState.rawValue)"
         case .scripts:
             scriptCount == 0 ? "No scripts" : "\(scriptCount) scripts · \(scriptState.rawValue)"
         }
