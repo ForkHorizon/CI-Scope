@@ -41,11 +41,19 @@ extension AutomationScriptInstaller {
 
     func existingPullRequestURL(project: CIProject, branch: String) async throws -> URL? {
         let result = await shell(
-            "gh pr view \(quoted(branch)) --repo \(quoted(project.repositorySlug)) --json url --jq '.url'",
+            """
+            gh pr list \
+              --repo \(quoted(project.repositorySlug)) \
+              --head \(quoted(branch)) \
+              --state open \
+              --json url \
+              --jq '.[0].url // empty'
+            """,
             timeout: 30
         )
         guard result.exitCode == 0 else { return nil }
-        return URL(string: result.output.trimmed)
+        let url = result.output.trimmed
+        return url.isEmpty ? nil : URL(string: url)
     }
 
     func createPullRequest(

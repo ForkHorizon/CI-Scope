@@ -28,6 +28,7 @@ final class AutomationScriptInstallViewModel: ObservableObject {
         script: AutomationScript,
         project: CIProject?,
         variableValues: [String: String],
+        mode: AutomationScriptInstallMode,
         onSuccess: @escaping () -> Void = {}
     ) {
         guard !snapshots.values.contains(where: \.isInstalling) else { return }
@@ -43,7 +44,8 @@ final class AutomationScriptInstallViewModel: ObservableObject {
                 let result = try await installer.install(
                     script: script,
                     project: project,
-                    variableValues: variableValues
+                    variableValues: variableValues,
+                    mode: mode
                 )
                 snapshots[snapshotKey] = .succeeded(result)
                 onSuccess()
@@ -74,6 +76,13 @@ final class AutomationScriptInstallViewModel: ObservableObject {
             } catch {
                 snapshots[snapshotKey] = .failed(error.localizedDescription)
             }
+        }
+    }
+
+    func clearCompletedRemovalSnapshots(for project: CIProject) {
+        let prefix = "remove:\(project.id):"
+        snapshots = snapshots.filter { key, snapshot in
+            !key.hasPrefix(prefix) || snapshot.isInstalling
         }
     }
 

@@ -18,6 +18,8 @@ extension ContentView {
         case .runners:
             RunnersView(viewModel: runnerFleetViewModel)
                 .padding(14)
+        case .localTools:
+            localToolsDashboardContent
         case .scripts:
             ScriptsView(
                 store: scriptStore,
@@ -36,16 +38,18 @@ extension ContentView {
     @ViewBuilder
     var projectDashboardContent: some View {
         if let selectedProject {
-            let showsLocalTools = isLocalToolsProject(selectedProject)
-
             VStack(spacing: 12) {
                 ProjectCIPanel(
                     project: selectedProject,
                     snapshot: projectCIViewModel.snapshot(for: selectedProject.id),
                     isLoading: projectCIViewModel.loadingProjectID == selectedProject.id,
                     scripts: scriptStore.scripts,
+                    isBrokerManaged: isBrokerManaged(selectedProject),
                     removalSnapshot: { script in
                         scriptInstallViewModel.removalSnapshot(for: script, project: selectedProject)
+                    },
+                    onAttachToBroker: {
+                        attachToBroker(selectedProject)
                     },
                     onRemoveScript: { script in
                         scriptInstallViewModel.remove(script: script, project: selectedProject) {
@@ -53,15 +57,7 @@ extension ContentView {
                         }
                     }
                 )
-                .frame(minHeight: 260, maxHeight: showsLocalTools ? 360 : .infinity)
-
-                if showsLocalTools {
-                    LocalToolsHeader()
-                    statusGrid
-                    CommandStrip(runner: viewModel.commandRunner)
-                    sectionPicker
-                    contentPanel
-                }
+                .frame(minHeight: 260, maxHeight: .infinity)
             }
             .padding(14)
         } else {
@@ -70,6 +66,17 @@ extension ContentView {
             }
             .padding(14)
         }
+    }
+
+    var localToolsDashboardContent: some View {
+        VStack(spacing: 12) {
+            LocalToolsHeader()
+            statusGrid
+            CommandStrip(runner: viewModel.commandRunner)
+            sectionPicker
+            contentPanel
+        }
+        .padding(14)
     }
 
     var header: some View {
@@ -139,10 +146,12 @@ extension ContentView {
     }
 
     var statusGrid: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 10),
-            GridItem(.flexible(), spacing: 10)
-        ], spacing: 10) {
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 10),
+                GridItem(.flexible(), spacing: 10),
+            ], spacing: 10
+        ) {
             StatusTile(
                 title: "Runner",
                 value: viewModel.snapshot.runner.launchctlState.capitalized,

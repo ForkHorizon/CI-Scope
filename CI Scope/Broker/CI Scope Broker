@@ -1,0 +1,299 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import glob
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import tarfile
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
+POLL_SECONDS = 15
+MAX_RETRIES = 3
+ROOT = Path.home() / "Library/Application Support/CI Scope/Broker"
+REGISTRY_PATH = ROOT / "managed-repos.json"
+STATE_PATH = ROOT / "broker-state.json"
+JOBS_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/jobs"
+LOG_DIR = Path.home() / "Library/Logs/CI Scope/Broker"
+
+
+def main() -> int:
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print("CI Scope Broker: polls managed GitHub repos and runs one JIT runner job at a time.")
+        return 0
+    os.environ["PATH"] = ":".join(
+        [
+            "/opt/homebrew/bin",
+            "/opt/homebrew/sbin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/usr/sbin",
+            "/sbin",
+            os.environ.get("PATH", ""),
+        ]
+    )
+    ensure_dirs()
+    state = read_state()
+    while True:
+        try:
+            state = tick(state)
+        except Exception as exc:
+            state["lastError"] = str(exc)
+            state["updatedAt"] = now()
+            write_state(state)
+        time.sleep(POLL_SECONDS)
+
+
+def tick(state: dict) -> dict:
+    registry = read_registry()
+    repos = [repo for repo in registry.get("repos", []) if repo.get("enabled", True)]
+    retries = state.get("retries") or {}
+    active = state.get("active")
+
+    if active and active.get("pid") and process_alive(active["pid"]):
+        queue, statuses = collect_queue(repos)
+        return save_state(active, queue, statuses, None, retries)
+
+    if active:
+        retries = update_retry(active, retries)
+
+    queue, statuses = collect_queue(repos)
+    dispatchable = [job for job in queue if retries.get(job["id"], 0) < MAX_RETRIES]
+    if not dispatchable:
+        return save_state(None, queue, statuses, None, retries)
+
+    job = dispatchable[0]
+    process = start_runner(job)
+    active_job = dict(job)
+    active_job["pid"] = process.pid
+    write_state(save_state(active_job, queue, statuses, None, retries))
+    return wait_for_runner(process, active_job, statuses, retries)
+
+
+def collect_queue(repos: list[dict]) -> tuple[list[dict], list[dict]]:
+    jobs = []
+    statuses = []
+    for repo in repos:
+        slug = repo["slug"]
+        try:
+            repo_jobs = queued_jobs(slug)
+            jobs.extend(repo_jobs)
+            statuses.append(repo_status(slug, "ok", len(repo_jobs), None))
+        except Exception as exc:
+            statuses.append(repo_status(slug, "warning", 0, str(exc)))
+    jobs.sort(key=lambda item: item.get("createdAt", ""))
+    return jobs, statuses
+
+
+def queued_jobs(slug: str) -> list[dict]:
+    runs = gh_json(f"repos/{slug}/actions/runs?status=queued&per_page=20")
+    result = []
+    for run in runs.get("workflow_runs", []):
+        jobs = gh_json(f"repos/{slug}/actions/runs/{run['id']}/jobs?per_page=100")
+        for job in jobs.get("jobs", []):
+            if job.get("status") != "queued":
+                continue
+            labels = job.get("labels") or []
+            if not has_labels(labels):
+                continue
+            result.append(job_payload(slug, run, job, labels))
+    return result
+
+
+def start_runner(job: dict) -> subprocess.Popen:
+    encoded = generate_jit_config(job)
+    runner_dir = prepare_runner_dir(job)
+    log_file = LOG_DIR / f"{safe_name(job['id'])}.log"
+    log_handle = open(log_file, "a", encoding="utf-8")
+    log_handle.write(f"[{now()}] starting JIT runner for {job['id']}\n")
+    log_handle.flush()
+    return subprocess.Popen(
+        ["./run.sh", "--jitconfig", encoded],
+        cwd=runner_dir,
+        stdout=log_handle,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+
+
+def wait_for_runner(process: subprocess.Popen, active: dict, statuses: list[dict], retries: dict) -> dict:
+    exit_code = process.wait()
+    active["exitCode"] = exit_code
+    active["status"] = "completed" if exit_code == 0 else "failed"
+    refreshed = refresh_run(active)
+    if refreshed.get("status") == "queued":
+        retries = update_retry(active, retries)
+    return save_state(None, [], statuses, refreshed.get("lastError"), retries)
+
+
+def generate_jit_config(job: dict) -> str:
+    payload = {
+        "name": f"ci-scope-{safe_name(job['repositorySlug'])}-{job['runId']}-{job.get('jobId') or 'run'}",
+        "runner_group_id": 1,
+        "labels": LABELS,
+        "work_folder": "_work",
+    }
+    output = gh_json(
+        f"repos/{job['repositorySlug']}/actions/runners/generate-jitconfig",
+        method="POST",
+        payload=payload,
+    )
+    encoded = output.get("encoded_jit_config")
+    if not encoded:
+        raise RuntimeError("GitHub did not return encoded_jit_config.")
+    return encoded
+
+
+def prepare_runner_dir(job: dict) -> Path:
+    archive = find_runner_archive()
+    runner_dir = JOBS_DIR / safe_name(job["id"])
+    if runner_dir.exists():
+        shutil.rmtree(runner_dir)
+    runner_dir.mkdir(parents=True)
+    with tarfile.open(archive) as tar:
+        tar.extractall(runner_dir)
+    return runner_dir
+
+
+def find_runner_archive() -> Path:
+    patterns = [
+        "~/actions-runner*/**/actions-runner-osx-arm64-*.tar.gz",
+        "~/actions-runners*/**/actions-runner-osx-arm64-*.tar.gz",
+    ]
+    matches = []
+    for pattern in patterns:
+        matches.extend(glob.glob(os.path.expanduser(pattern), recursive=True))
+    if not matches:
+        raise RuntimeError("No cached actions-runner-osx-arm64 archive was found.")
+    return Path(max(matches, key=lambda path: Path(path).stat().st_mtime))
+
+
+def refresh_run(job: dict) -> dict:
+    try:
+        run = gh_json(f"repos/{job['repositorySlug']}/actions/runs/{job['runId']}")
+        return {"status": run.get("status"), "lastError": None}
+    except Exception as exc:
+        return {"status": "unknown", "lastError": str(exc)}
+
+
+def gh_json(endpoint: str, method: str = "GET", payload: dict | None = None) -> dict:
+    command = ["gh", "api", "-X", method, endpoint]
+    data = None
+    if payload is not None:
+        command.extend(["--input", "-"])
+        data = json.dumps(payload)
+    completed = subprocess.run(command, input=data, text=True, capture_output=True, timeout=60)
+    if completed.returncode != 0:
+        message = completed.stderr.strip() or completed.stdout.strip() or f"gh api failed: {endpoint}"
+        raise RuntimeError(message)
+    return json.loads(completed.stdout or "{}")
+
+
+def job_payload(slug: str, run: dict, job: dict, labels: list[str]) -> dict:
+    job_id = job.get("id")
+    run_id = run.get("id")
+    return {
+        "id": f"{slug}:{run_id}:{job_id}",
+        "repositorySlug": slug,
+        "workflowName": run.get("name") or "Workflow",
+        "title": run.get("display_title") or run.get("name") or "Workflow run",
+        "jobName": job.get("name") or "Queued job",
+        "headBranch": run.get("head_branch") or "-",
+        "status": job.get("status") or run.get("status") or "queued",
+        "url": job.get("html_url") or run.get("html_url") or "",
+        "createdAt": job.get("created_at") or run.get("created_at") or now(),
+        "labels": labels,
+        "runId": run_id,
+        "jobId": job_id,
+    }
+
+
+def save_state(active, queue, statuses, error, retries) -> dict:
+    state = {
+        "version": 1,
+        "updatedAt": now(),
+        "servicePID": os.getpid(),
+        "active": active,
+        "queue": queue,
+        "repos": statuses,
+        "lastError": error,
+        "retries": retries,
+    }
+    write_state(state)
+    return state
+
+
+def read_registry() -> dict:
+    if not REGISTRY_PATH.exists():
+        return {"version": 1, "repos": []}
+    return json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+
+
+def read_state() -> dict:
+    if not STATE_PATH.exists():
+        return {"version": 1, "queue": [], "repos": [], "retries": {}}
+    try:
+        return json.loads(STATE_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"version": 1, "queue": [], "repos": [], "retries": {}}
+
+
+def write_state(state: dict) -> None:
+    tmp = STATE_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(STATE_PATH)
+
+
+def update_retry(job: dict, retries: dict) -> dict:
+    result = dict(retries)
+    result[job["id"]] = result.get(job["id"], 0) + 1
+    return result
+
+
+def repo_status(slug: str, state: str, count: int, error: str | None) -> dict:
+    return {
+        "slug": slug,
+        "state": state,
+        "queuedCount": count,
+        "lastCheckedAt": now(),
+        "lastError": error,
+    }
+
+
+def has_labels(labels: list[str]) -> bool:
+    available = {label.lower() for label in labels}
+    return all(label.lower() in available for label in LABELS)
+
+
+def process_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def safe_name(value: str) -> str:
+    return "".join(char if char.isalnum() or char in "-_." else "-" for char in value)
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def ensure_dirs() -> None:
+    ROOT.mkdir(parents=True, exist_ok=True)
+    JOBS_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    raise SystemExit(main())

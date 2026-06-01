@@ -13,7 +13,7 @@ It is built for situations where GitHub workflows run on a local Mac and the imp
 - Provides repository actions such as copying the SSH URL and opening GitHub.
 - Supports right-click and ellipsis context menus for project actions, including removing projects.
 - Shows a clean empty state when there are no saved projects.
-- Shows optional local tooling only when the selected repository matches the configured local runner setup.
+- Shows optional local tooling in a separate workspace-level Local Tools view.
 
 For the currently configured local setup, CI Scope can also show:
 
@@ -48,7 +48,7 @@ Removing a project deletes only the local saved entry. It does not delete files,
 
 Every selected repository uses the same CI detail screen.
 
-The extra local tools section appears only when the selected repository slug matches `DashboardConfig.repositorySlug`. In the current local configuration that points at `ForkHorizon/NexusUnity`, but that is only configuration data, not a special app rule.
+Local tooling is not embedded into any project page. It lives in the Local Tools workspace tab and uses `DashboardConfig` for the machine-specific runner, repository path, logs, services, and local command presets.
 
 The local configuration is currently hardcoded in:
 

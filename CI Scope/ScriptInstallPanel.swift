@@ -5,6 +5,7 @@ struct ScriptInstallPanel: View {
     let script: AutomationScript?
     let projects: [CIProject]
     @Binding var selectedProjectID: CIProject.ID?
+    @Binding var runnerMode: AutomationScriptInstallMode
     @Binding var variableValues: [String: String]
     let snapshot: AutomationScriptInstallSnapshot
     let onInstall: () -> Void
@@ -13,6 +14,7 @@ struct ScriptInstallPanel: View {
         PanelShell(title: "Install", icon: "arrow.triangle.branch") {
             VStack(alignment: .leading, spacing: 10) {
                 projectPicker
+                runnerModePicker
                 Divider()
                 variableInputs
                 Spacer(minLength: 0)
@@ -25,6 +27,25 @@ struct ScriptInstallPanel: View {
                 .disabled(script == nil || selectedProjectID == nil || snapshot.isInstalling)
             }
             .padding(10)
+        }
+    }
+
+    private var runnerModePicker: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Runner")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Picker("Runner", selection: $runnerMode) {
+                ForEach(AutomationScriptInstallMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            Text(runnerMode.detail(for: script))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

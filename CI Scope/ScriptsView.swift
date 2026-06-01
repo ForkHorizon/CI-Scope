@@ -12,6 +12,7 @@ struct ScriptsView: View {
     @State private var originalScriptID: String?
     @State private var selectedProjectID: CIProject.ID?
     @State private var variableValues: [String: String] = [:]
+    @State private var runnerMode: AutomationScriptInstallMode = .localBroker
     @State private var errorMessage: String?
     @State private var editorSection: ScriptEditorSection = .details
 
@@ -20,7 +21,7 @@ struct ScriptsView: View {
             ScriptLibraryList(
                 scripts: store.scripts,
                 selectedScriptID: store.selectedScriptID,
-                canDeleteSelected: store.selectedScript?.defaultSeedID == nil,
+                canDeleteSelected: store.selectedScript != nil,
                 onSelect: select,
                 onCreate: createScript,
                 onDelete: deleteSelected
@@ -43,6 +44,7 @@ struct ScriptsView: View {
                 script: draft,
                 projects: projects,
                 selectedProjectID: $selectedProjectID,
+                runnerMode: $runnerMode,
                 variableValues: $variableValues,
                 snapshot: installer.snapshot(for: draft),
                 onInstall: installDraft
@@ -119,9 +121,9 @@ struct ScriptsView: View {
     private func installDraft() {
         guard let draft else { return }
         do {
-            try store.save(draft, replacing: originalScriptID)
+            let savedScript = try store.save(draft, replacing: originalScriptID)
             let project = projects.first { $0.id == selectedProjectID }
-            installer.install(script: draft, project: project, variableValues: installValues(for: draft)) {
+            installer.install(script: savedScript, project: project, variableValues: installValues(for: savedScript), mode: runnerMode) {
                 if let project {
                     onInstallSuccess(project)
                 }

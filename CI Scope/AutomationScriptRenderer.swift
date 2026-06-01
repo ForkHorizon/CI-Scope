@@ -5,6 +5,7 @@ struct AutomationScriptRenderer {
     let project: CIProject
     let variableValues: [String: String]
     let defaultBranch: String
+    var runnerLabelsOverride: [String]? = nil
 
     var branchName: String {
         render(script.branchName)
@@ -61,9 +62,12 @@ struct AutomationScriptRenderer {
             "repository_slug": project.repositorySlug,
             "repository_owner": project.repositoryOwner,
             "repository_name": project.repositoryName,
-            "runner_labels": script.runnerLabels.joined(separator: ", "),
+            "runner_labels": (runnerLabelsOverride ?? script.runnerLabels).joined(separator: ", "),
             "default_branch": defaultBranch,
-            "script_id": script.id
+            "script_id": script.id,
+            "script_slug": script.scriptSlug,
+            "script_title": script.title,
+            "script_summary": script.summary,
         ]
     }
 
