@@ -79,7 +79,12 @@ extension AutomationScriptStore {
                 || file.contents.contains("max_file_lines")
                 || file.contents.contains("max_function_lines")
         }
-        guard hasOldReadabilitySettings || hasOldReadabilityStage else {
+        let hasNonBlockingDeadCodeGate = script.files.contains { file in
+            file.destinationPath.normalizedScriptStorePath == "scripts/{{script_slug}}.py"
+                && file.contents.contains("periphery")
+                && !file.contents.contains("\"--strict\"")
+        }
+        guard hasOldReadabilitySettings || hasOldReadabilityStage || hasNonBlockingDeadCodeGate else {
             return script
         }
 
