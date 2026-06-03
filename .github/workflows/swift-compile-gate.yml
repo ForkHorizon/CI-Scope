@@ -1,0 +1,33 @@
+name: Swift Compile Gate
+
+on:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swift-compile-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swift-compile-gate:
+    name: Swift Compile Gate
+    runs-on: [self-hosted, macOS, ARM64, ci-scope-broker]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/swift-compile-gate.py --config .swift-compile-gate.json
