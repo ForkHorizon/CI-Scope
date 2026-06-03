@@ -175,7 +175,7 @@ def run_dead_code(root: Path, config: dict) -> None:
 
     periphery = ensure_periphery(config)
     project = detect_project(root, config)
-    cmd = [periphery, "scan", "--format", "xcode", "--strict", "--disable-update-check"]
+    cmd = [periphery, "scan", "--format", "xcode"]
     cmd.extend(str(arg) for arg in config.get("periphery_arguments", []))
 
     if project.kind == "xcode-workspace":
