@@ -144,23 +144,23 @@ final class ProjectStore: ObservableObject {
 
         if trimmed.hasPrefix("git@github.com:") {
             let path = String(trimmed.dropFirst("git@github.com:".count))
-            return try parsePath(path, originalInput: trimmed)
+            return try parsePath(path)
         }
 
         if trimmed.hasPrefix("https://github.com/") {
             let path = String(trimmed.dropFirst("https://github.com/".count))
-            return try parsePath(path, originalInput: trimmed)
+            return try parsePath(path)
         }
 
         if trimmed.hasPrefix("http://github.com/") {
             let path = String(trimmed.dropFirst("http://github.com/".count))
-            return try parsePath(path, originalInput: trimmed)
+            return try parsePath(path)
         }
 
-        return try parsePath(trimmed, originalInput: trimmed)
+        return try parsePath(trimmed)
     }
 
-    private static func parsePath(_ path: String, originalInput: String) throws -> ParsedRepository {
+    private static func parsePath(_ path: String) throws -> ParsedRepository {
         let sanitized = path
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -178,11 +178,13 @@ final class ProjectStore: ObservableObject {
             throw ProjectStoreError.invalidRepositoryURL
         }
 
-        return ParsedRepository(owner: owner, name: name, remoteURL: originalInput)
+        let remoteURL = "https://github.com/\(owner)/\(name).git"
+        return ParsedRepository(owner: owner, name: name, remoteURL: remoteURL)
     }
 
     private static func isValidGitHubComponent(_ value: String) -> Bool {
         guard !value.isEmpty else { return false }
+        if value.hasPrefix("-") || value.hasPrefix(".") { return false }
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
         return value.unicodeScalars.allSatisfy { allowed.contains($0) }
     }

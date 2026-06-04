@@ -141,24 +141,21 @@ extension ProjectCIService {
             )
         }
 
-        let uid = await ShellClient.run("id -u", timeout: 3, config: config)
-            .output
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let launch = await ShellClient.run("launchctl print gui/\(uid)/\(serviceLabel)", timeout: 5, config: config)
+        let launch = await launchctlPrint(serviceLabel: serviceLabel)
 
-        guard launch.exitCode == 0 else {
+        guard let output = launch?.output, launch?.exitCode == 0 else {
             return ProjectLocalRunnerStatus(
                 state: .offline,
                 summary: "Service unavailable",
-                detail: trimmedError(launch.output, fallback: "launchctl could not read \(runner.config.title)."),
+                detail: trimmedError(launch?.output ?? "Could not verify current user ID.", fallback: "launchctl could not read \(runner.config.title)."),
                 repositorySlug: runner.repositorySlug ?? project.repositorySlug,
                 pid: nil,
                 filePath: runner.config.runnerConfigurationPath
             )
         }
 
-        let launchState = firstMatch(in: launch.output, pattern: #"state = ([a-zA-Z]+)"#) ?? "unknown"
-        let pid = intMatch(in: launch.output, pattern: #"pid = ([0-9]+)"#)
+        let launchState = firstMatch(in: output, pattern: #"state = ([a-zA-Z]+)"#) ?? "unknown"
+        let pid = intMatch(in: output, pattern: #"pid = ([0-9]+)"#)
         let uptime = await processUptime(pid: pid)
         let state: ServiceState = launchState == "running" ? .online : .offline
         let remoteRunner = await remoteRunner(matching: runner)
@@ -178,6 +175,18 @@ extension ProjectCIService {
             pid: pid,
             filePath: runner.config.runnerConfigurationPath
         )
+    }
+
+    func launchctlPrint(serviceLabel: String) async -> ShellResult? {
+        let uid = await ShellClient.run("id -u", timeout: 3, config: config)
+            .output
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let validUid = Int(uid) else {
+            return nil
+        }
+
+        return await ShellClient.run("launchctl print gui/\(validUid)/\(serviceLabel)", timeout: 5, config: config)
     }
 
     func readLocalRunner(_ runnerConfig: ActionsRunnerConfig) -> LocalRunnerInfo? {
