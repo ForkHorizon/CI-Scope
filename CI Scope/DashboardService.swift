@@ -57,8 +57,8 @@ struct DashboardService {
 
     func loadGitHubRuns() async -> [GitHubRun] {
         let command = """
-        gh run list --repo \(config.repositorySlug) --limit 20 --json databaseId,status,conclusion,displayTitle,workflowName,headBranch,event,createdAt,updatedAt,url
-        """
+            gh run list --repo \(quoted(config.repositorySlug)) --limit 20 --json databaseId,status,conclusion,displayTitle,workflowName,headBranch,event,createdAt,updatedAt,url
+            """
         let result = await ShellClient.run(command, cwd: config.repositoryRoot, timeout: 15, config: config)
         guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
             return []
@@ -91,7 +91,8 @@ struct DashboardService {
         var snapshot = NexusUnitySnapshot()
         do {
             let payload = #"{"jsonrpc":"2.0","method":"get_server_status","params":{},"id":1}"#
-            let command = "curl -fsS -H 'Content-Type: application/json' --data \(quoted(payload)) \(quoted(config.nexusUnityURL.absoluteString))"
+            let command =
+                "curl -fsS -H 'Content-Type: application/json' --data \(quoted(payload)) \(quoted(config.nexusUnityURL.absoluteString))"
             let result = await ShellClient.run(command, timeout: 8, config: config)
             guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
                 throw DashboardServiceError.commandFailed(result.output)
@@ -157,7 +158,8 @@ struct DashboardService {
     }
 
     private func getJSON(path: String, baseURL: URL) async throws -> Data {
-        let base = baseURL.absoluteString.hasSuffix("/")
+        let base =
+            baseURL.absoluteString.hasSuffix("/")
             ? String(baseURL.absoluteString.dropLast())
             : baseURL.absoluteString
         let result = await ShellClient.run("curl -fsS \(quoted(base + path))", timeout: 8, config: config)
@@ -168,21 +170,22 @@ struct DashboardService {
     }
 
     private func tail(path: String, lines: Int) async -> String {
-        let result = await ShellClient.run("test -f \(quoted(path)) && tail -n \(lines) \(quoted(path)) || true", timeout: 5, config: config)
+        let result = await ShellClient.run(
+            "test -f \(quoted(path)) && tail -n \(lines) \(quoted(path)) || true", timeout: 5, config: config)
         return result.output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func latestDiag(prefix: String, lines: Int) async -> (name: String, tail: String, path: String?) {
         let command = """
-        file=$(find \(quoted(config.runnerRoot + "/_diag")) -maxdepth 1 -type f -name '\(prefix)*.log' -print | sort | tail -n 1)
-        if [ -n "$file" ]; then
-          printf '%s\\n' "$file"
-          printf '\\n---\\n'
-          basename "$file"
-          printf '\\n---\\n'
-          tail -n \(lines) "$file"
-        fi
-        """
+            file=$(find \(quoted(config.runnerRoot + "/_diag")) -maxdepth 1 -type f -name '\(prefix)*.log' -print | sort | tail -n 1)
+            if [ -n "$file" ]; then
+              printf '%s\\n' "$file"
+              printf '\\n---\\n'
+              basename "$file"
+              printf '\\n---\\n'
+              tail -n \(lines) "$file"
+            fi
+            """
         let result = await ShellClient.run(command, timeout: 5, config: config)
         let parts = result.output.components(separatedBy: "\n---\n")
         let path = parts.first?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -199,7 +202,9 @@ struct DashboardService {
     }
 
     private func lastNonEmptyLine(path: String) async -> String? {
-        let result = await ShellClient.run("test -f \(quoted(path)) && awk 'NF { line=$0 } END { print line }' \(quoted(path)) || true", timeout: 3, config: config)
+        let result = await ShellClient.run(
+            "test -f \(quoted(path)) && awk 'NF { line=$0 } END { print line }' \(quoted(path)) || true", timeout: 3,
+            config: config)
         let value = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
     }
