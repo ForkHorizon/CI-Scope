@@ -57,8 +57,8 @@ struct DashboardService {
 
     func loadGitHubRuns() async -> [GitHubRun] {
         let command = """
-        gh run list --repo \(quoted(config.repositorySlug)) --limit 20 --json databaseId,status,conclusion,displayTitle,workflowName,headBranch,event,createdAt,updatedAt,url
-        """
+            gh run list --repo \(quoted(config.repositorySlug)) --limit 20 --json databaseId,status,conclusion,displayTitle,workflowName,headBranch,event,createdAt,updatedAt,url
+            """
         let result = await ShellClient.run(command, cwd: config.repositoryRoot, timeout: 15, config: config)
         guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
             return []
