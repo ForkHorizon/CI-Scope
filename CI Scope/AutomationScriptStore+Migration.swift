@@ -116,10 +116,6 @@ extension AutomationScriptStore {
 }
 
 extension AutomationScript {
-    func hasSameDestinationPaths(as script: AutomationScript) -> Bool {
-        destinationPathSet == script.destinationPathSet
-    }
-
     var destinationPathSet: Set<String> {
         Set(files.map { $0.destinationPath.normalizedScriptStorePath })
     }

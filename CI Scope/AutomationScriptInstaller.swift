@@ -193,8 +193,8 @@ struct AutomationScriptInstaller {
         let paths = files.map { quoted($0.destinationPath) }.joined(separator: " ")
         let executablePaths = files.filter(\.isExecutable).map { quoted($0.destinationPath) }
         let chmod = executablePaths.isEmpty ? "" : "chmod +x \(executablePaths.joined(separator: " "))\n"
-        let update = executablePaths.isEmpty ? "" : "git update-index --chmod=+x -- \(executablePaths.joined(separator: " "))\n"
-        return "set -euo pipefail\n\(chmod)git add -f -- \(paths)\n\(update)"
+        let stageExecutable = executablePaths.isEmpty ? "" : "git add -f --chmod=+x -- \(executablePaths.joined(separator: " "))\n"
+        return "set -euo pipefail\n\(chmod)git add -f -- \(paths)\n\(stageExecutable)"
     }
 
     private func hasStagedChanges(files: [AutomationScriptFile], cwd: URL) async throws -> Bool {

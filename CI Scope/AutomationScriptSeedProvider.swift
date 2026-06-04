@@ -1,7 +1,7 @@
 import Foundation
 
 enum AutomationScriptSeedProvider {
-    static let defaultSeedIDs = ["ai-readability", "swift-quality-gate"]
+    static let defaultSeedIDs = ["ai-readability", "swift-quality-gate", "swift-compile-gate"]
 
     static func loadDefaultScripts() throws -> [AutomationScript] {
         try defaultSeedIDs.map { try loadSeed($0) }
@@ -16,6 +16,8 @@ enum AutomationScriptSeedProvider {
             return fallbackReadabilitySeed()
         case "swift-quality-gate":
             return fallbackSwiftQualityGateSeed()
+        case "swift-compile-gate":
+            return fallbackSwiftCompileGateSeed()
         default:
             throw AutomationScriptError.missingSeed(id)
         }
@@ -66,6 +68,23 @@ enum AutomationScriptSeedProvider {
             variables: [],
             files: fallbackSwiftQualityFiles,
             defaultSeedID: "swift-quality-gate"
+        )
+    }
+
+    private static func fallbackSwiftCompileGateSeed() -> AutomationScript {
+        AutomationScript(
+            id: "swift-compile-gate",
+            title: "Swift Compile Gate",
+            summary: "Compiles Swift projects and blocks configured critical warnings.",
+            detail: "Installs a Swift compile workflow, JSON config, and Python checker.",
+            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
+            branchName: "ci-scope/install-{{script_id}}",
+            commitMessage: "Add {{script_title}}",
+            pullRequestTitle: "Add {{script_title}}",
+            pullRequestBody: fallbackSwiftCompileGatePullRequestBody,
+            variables: [],
+            files: fallbackSwiftCompileGateFiles,
+            defaultSeedID: "swift-compile-gate"
         )
     }
 
@@ -177,6 +196,24 @@ enum AutomationScriptSeedProvider {
         ]
     }
 
+    private static var fallbackSwiftCompileGateFiles: [AutomationScriptFile] {
+        [
+            AutomationScriptFile(
+                id: "checker",
+                destinationPath: "scripts/{{script_slug}}.py",
+                isExecutable: true,
+                contents: """
+                    #!/usr/bin/env python3
+                    import sys
+
+                    print("::error::Bundled Swift Compile Gate seed is missing. Reinstall or rebuild CI Scope.")
+                    sys.exit(2)
+
+                    """
+            )
+        ]
+    }
+
     private static var fallbackWorkflow: String {
         """
         name: {{script_title}}
@@ -206,6 +243,14 @@ enum AutomationScriptSeedProvider {
         Adds {{script_title}} managed by CI Scope.
 
         This PR adds a Swift workflow with build, format, and dead-code gates.
+        """
+    }
+
+    private static var fallbackSwiftCompileGatePullRequestBody: String {
+        """
+        Adds {{script_title}} managed by CI Scope.
+
+        This PR adds a Swift workflow that compiles the project and blocks configured critical warnings.
         """
     }
 }

@@ -144,7 +144,6 @@ final class AutomationScriptStore: ObservableObject {
             let isAlreadyStored =
                 storedScriptIDs.contains(seed.id)
                 || storedSeedIDs.contains(seed.id)
-                || storedScripts.contains { $0.hasSameDestinationPaths(as: seed) }
             if !isAlreadyStored, !deletedSeedIDs.contains(seed.id) {
                 try write(seed)
             }
