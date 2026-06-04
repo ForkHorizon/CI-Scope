@@ -110,7 +110,8 @@ final class NotificationManager {
         content.body = "Runner \(runnerName) is now offline."
         content.sound = UNNotificationSound.default
 
-        let request = UNNotificationRequest(identifier: "runner-\(runnerName)-\(Date().timeIntervalSince1970)", content: content, trigger: nil)
+        let identifier = "runner-\(runnerName)-\(Date().timeIntervalSince1970)"
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
 }
