@@ -41,7 +41,7 @@ final class AutomationScriptStore: ObservableObject {
         try ensureUnique(storedScript.id, replacing: oldID)
         try write(storedScript)
         if let oldID, oldID != storedScript.id {
-            try? FileManager.default.removeItem(at: url(for: oldID))
+            if let oldURL = try? url(for: oldID) { try? FileManager.default.removeItem(at: oldURL) }
         }
         reloadFromDisk(selecting: storedScript.id)
         return storedScript
@@ -52,7 +52,7 @@ final class AutomationScriptStore: ObservableObject {
         if let seedID = defaultSeedID(for: selectedScript) {
             try? markDefaultSeedDeleted(seedID)
         }
-        try? FileManager.default.removeItem(at: url(for: selectedScript.id))
+        if let scriptURL = try? url(for: selectedScript.id) { try? FileManager.default.removeItem(at: scriptURL) }
         reloadFromDisk(selecting: nil)
     }
 
@@ -62,7 +62,7 @@ final class AutomationScriptStore: ObservableObject {
         try write(seed)
         try unmarkDefaultSeedDeleted(seedID)
         if selectedScript.id != seed.id {
-            try? FileManager.default.removeItem(at: url(for: selectedScript.id))
+            if let scriptURL = try? url(for: selectedScript.id) { try? FileManager.default.removeItem(at: scriptURL) }
         }
         reloadFromDisk(selecting: seed.id)
     }
@@ -186,7 +186,7 @@ final class AutomationScriptStore: ObservableObject {
 
     private func write(_ script: AutomationScript) throws {
         let data = try encoder.encode(script)
-        try data.write(to: url(for: script.id), options: .atomic)
+        try data.write(to: try url(for: script.id), options: .atomic)
     }
 
     private func ensureUnique(_ id: String, replacing oldID: String?) throws {
@@ -210,16 +210,16 @@ final class AutomationScriptStore: ObservableObject {
         return candidate
     }
 
-    private func url(for id: String) -> URL {
-        directoryURL.appendingPathComponent("\(id).json")
+    private func url(for id: String) throws -> URL {
+        try directoryURL.safelyAppendingPathComponent("\(id).json")
     }
 
     private var deletedDefaultsURL: URL {
-        directoryURL.appendingPathComponent("deleted-default-scripts.json")
+        try! directoryURL.safelyAppendingPathComponent("deleted-default-scripts.json")
     }
 
     private static func storageDirectory(fileManager: FileManager) -> URL {
         let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("CI Scope/Scripts", isDirectory: true)
+        return try! base.safelyAppendingPathComponent("CI Scope/Scripts", isDirectory: true)
     }
 }

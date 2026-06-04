@@ -26,8 +26,8 @@ struct AutomationScriptInstaller {
         )
         try renderer.validate()
 
-        let tempRoot = temporaryRoot()
-        let repoURL = tempRoot.appendingPathComponent("repo", isDirectory: true)
+        let tempRoot = try temporaryRoot()
+        let repoURL = try tempRoot.safelyAppendingPathComponent("repo", isDirectory: true)
         try fileManager.createDirectory(at: tempRoot, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempRoot) }
 
@@ -88,8 +88,8 @@ struct AutomationScriptInstaller {
         )
         try AutomationScriptValidator.validateForSave(script)
 
-        let tempRoot = temporaryRoot()
-        let repoURL = tempRoot.appendingPathComponent("repo", isDirectory: true)
+        let tempRoot = try temporaryRoot()
+        let repoURL = try tempRoot.safelyAppendingPathComponent("repo", isDirectory: true)
         try fileManager.createDirectory(at: tempRoot, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempRoot) }
 
@@ -167,7 +167,7 @@ struct AutomationScriptInstaller {
 
     private func write(_ files: [AutomationScriptFile], to repoURL: URL) throws {
         for file in files {
-            let destinationURL = repoURL.appendingPathComponent(file.destinationPath)
+            let destinationURL = try repoURL.safelyAppendingPathComponent(file.destinationPath)
             try fileManager.createDirectory(
                 at: destinationURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
@@ -214,7 +214,7 @@ struct AutomationScriptInstaller {
             legacyReadabilityInstallPaths
             .filter { path in
                 !currentPaths.contains(normalizedPath(path))
-                    && fileManager.fileExists(atPath: cwd.appendingPathComponent(path).path)
+                    && fileManager.fileExists(atPath: (try? cwd.safelyAppendingPathComponent(path))?.path ?? "")
             }
             .map { path in
                 AutomationScriptFile(

@@ -70,24 +70,24 @@ struct LocalBrokerService {
     }
 
     var brokerDirectory: URL {
-        applicationSupportDirectory.appendingPathComponent("Broker", isDirectory: true)
+        try! applicationSupportDirectory.safelyAppendingPathComponent("Broker", isDirectory: true)
     }
 
     var registryURL: URL {
-        brokerDirectory.appendingPathComponent("managed-repos.json")
+        try! brokerDirectory.safelyAppendingPathComponent("managed-repos.json")
     }
 
     var stateURL: URL {
-        brokerDirectory.appendingPathComponent("broker-state.json")
+        try! brokerDirectory.safelyAppendingPathComponent("broker-state.json")
     }
 
     var logsDirectory: URL {
-        fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Logs/CI Scope/Broker", isDirectory: true)
+        try! fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .safelyAppendingPathComponent("Logs/CI Scope/Broker", isDirectory: true)
     }
 
     private var applicationSupportDirectory: URL {
-        fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("CI Scope", isDirectory: true)
+        try! fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .safelyAppendingPathComponent("CI Scope", isDirectory: true)
     }
 }

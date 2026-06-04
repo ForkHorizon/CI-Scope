@@ -25,9 +25,9 @@ extension AutomationScriptInstaller {
         await ShellClient.run(command, cwd: cwd?.path, timeout: timeout, config: config)
     }
 
-    func temporaryRoot() -> URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("ci-scope-script-\(UUID().uuidString)", isDirectory: true)
+    func temporaryRoot() throws -> URL {
+        try FileManager.default.temporaryDirectory
+            .safelyAppendingPathComponent("ci-scope-script-\(UUID().uuidString)", isDirectory: true)
     }
 
     func gitPaths(_ files: [AutomationScriptFile]) -> String {

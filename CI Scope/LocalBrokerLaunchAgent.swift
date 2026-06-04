@@ -37,7 +37,7 @@ extension LocalBrokerService {
         guard let sourceURL = brokerResourceURL else {
             throw LocalBrokerError.missingResource
         }
-        let destinationURL = brokerDirectory.appendingPathComponent("CI Scope Broker")
+        let destinationURL = try! brokerDirectory.safelyAppendingPathComponent("CI Scope Broker")
         if (try? Data(contentsOf: sourceURL)) != (try? Data(contentsOf: destinationURL)) {
             try? fileManager.removeItem(at: destinationURL)
             try fileManager.copyItem(at: sourceURL, to: destinationURL)
@@ -52,8 +52,8 @@ extension LocalBrokerService {
     }
 
     private var launchAgentURL: URL {
-        fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("LaunchAgents/\(LocalBrokerConstants.serviceLabel).plist")
+        try! fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .safelyAppendingPathComponent("LaunchAgents/\(LocalBrokerConstants.serviceLabel).plist")
     }
 
     private func launchAgentIsLoaded() async -> Bool {
@@ -95,9 +95,9 @@ extension LocalBrokerService {
             <string>\(config.shellPath)</string>
           </dict>
           <key>StandardOutPath</key>
-          <string>\(logsDirectory.appendingPathComponent("broker.out.log").path)</string>
+          <string>\(try! logsDirectory.safelyAppendingPathComponent("broker.out.log").path)</string>
           <key>StandardErrorPath</key>
-          <string>\(logsDirectory.appendingPathComponent("broker.err.log").path)</string>
+          <string>\(try! logsDirectory.safelyAppendingPathComponent("broker.err.log").path)</string>
         </dict>
         </plist>
         """
