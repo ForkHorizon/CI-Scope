@@ -30,10 +30,17 @@ struct DashboardService {
         let uid = await ShellClient.run("id -u", timeout: 3, config: config)
             .output
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let label = config.runnerServiceLabel
-        let launch = await ShellClient.run("launchctl print gui/\(uid)/\(label)", timeout: 5, config: config)
 
         var status = RunnerStatus()
+        guard let validUid = Int(uid) else {
+            status.state = .offline
+            status.error = "Could not verify current user ID."
+            return status
+        }
+
+        let label = config.runnerServiceLabel
+        let launch = await ShellClient.run("launchctl print gui/\(validUid)/\(label)", timeout: 5, config: config)
+
         if launch.exitCode != 0 {
             status.state = .offline
             status.error = launch.output.trimmingCharacters(in: .whitespacesAndNewlines)
