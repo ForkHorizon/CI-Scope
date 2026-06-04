@@ -62,5 +62,8 @@ struct ContentView: View {
                 try projectStore.addProject(from: input)
             }
         }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            refreshCurrentTab()
+        }
     }
 }

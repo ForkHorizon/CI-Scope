@@ -25,6 +25,10 @@ final class DashboardViewModel: ObservableObject {
         Task {
             let nextSnapshot = await service.loadSnapshot()
             snapshot = nextSnapshot
+
+            NotificationManager.shared.checkRunUpdates(projectSlug: config.repositorySlug, runs: snapshot.runs)
+            NotificationManager.shared.checkDashboardRunnerUpdate(runner: snapshot.runner)
+
             isRefreshing = false
         }
     }
