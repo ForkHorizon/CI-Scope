@@ -178,10 +178,10 @@ extension ContentView {
         }
     }
 
-    func refreshCurrentTab() {
+    func refreshCurrentTab(isAutoRefresh: Bool = false) {
         switch workspaceTab {
         case .projects:
-            refreshSelectedProject(clearCompletedScriptOperations: true)
+            refreshSelectedProject(clearCompletedScriptOperations: !isAutoRefresh)
         case .runners:
             Task {
                 await runnerFleetViewModel.load()
