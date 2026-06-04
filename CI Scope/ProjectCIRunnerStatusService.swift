@@ -144,10 +144,12 @@ extension ProjectCIService {
         let launch = await launchctlPrint(serviceLabel: serviceLabel)
 
         guard let output = launch?.output, launch?.exitCode == 0 else {
+            let errorOutput = launch?.output ?? "Could not verify current user ID."
+            let fallbackError = "launchctl could not read \(runner.config.title)."
             return ProjectLocalRunnerStatus(
                 state: .offline,
                 summary: "Service unavailable",
-                detail: trimmedError(launch?.output ?? "Could not verify current user ID.", fallback: "launchctl could not read \(runner.config.title)."),
+                detail: trimmedError(errorOutput, fallback: fallbackError),
                 repositorySlug: runner.repositorySlug ?? project.repositorySlug,
                 pid: nil,
                 filePath: runner.config.runnerConfigurationPath

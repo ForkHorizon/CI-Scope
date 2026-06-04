@@ -164,6 +164,7 @@ final class ProjectStore: ObservableObject {
         let sanitized = path
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
         let parts = sanitized.split(separator: "/", omittingEmptySubsequences: true)
 
         guard parts.count == 2 else {
