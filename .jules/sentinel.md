@@ -8,6 +8,11 @@
 **Learning:** Manual string manipulation is prone to bugs and bypasses. Regular expressions are better suited for strict input validation, specifically for specific URL formats and usernames constraints.
 **Prevention:** Always use strict regular expressions with anchor tags (`^` and `$`) and strict character classes when parsing and validating potentially malicious input.
 
+## 2024-05-24 - Validate System Command Input
+**Vulnerability:** Input values used in shell commands, such as URL parameters or system output (e.g. `uid`), lack proper integer/format validation. Malicious or malformed inputs could lead to command injection.
+**Learning:** Always validate that system-provided inputs, such as user IDs (`id -u`), are indeed integers before passing them to subsequent commands like `launchctl print gui/\(uid)`. For GitHub inputs, reject inputs that start with `-` or `.`. Reconstruct URLs using explicit validation components rather than raw inputs.
+**Prevention:** Enforce strict type validation (`Int(uid) != nil`) and format checking (`isValidGitHubComponent`) before interpolation, and use the `quoted()` function for variable strings.
+
 ## 2025-02-12 - Secure Info.plist by Enforcing ATS
 **Vulnerability:** Found lack of App Transport Security (ATS) enforcement in the generated Info.plist via Xcode configuration. Local HTTP tools or external calls could be intercepted via plaintext.
 **Learning:** ATS should be explicitly configured in the Xcode project to enforce strict HTTPS connections while allowing necessary local networking.

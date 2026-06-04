@@ -164,7 +164,19 @@ final class ProjectStore: ObservableObject {
         let owner = nsString.substring(with: ownerRange)
         let name = nsString.substring(with: repoRange)
 
-        return ParsedRepository(owner: owner, name: name, remoteURL: trimmed)
+        guard isValidGitHubComponent(owner), isValidGitHubComponent(name) else {
+            throw ProjectStoreError.invalidRepositoryURL
+        }
+
+        let remoteURL = "https://github.com/\(owner)/\(name).git"
+        return ParsedRepository(owner: owner, name: name, remoteURL: remoteURL)
+    }
+
+    private static func isValidGitHubComponent(_ value: String) -> Bool {
+        guard !value.isEmpty else { return false }
+        if value.hasPrefix("-") || value.hasPrefix(".") { return false }
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+        return value.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 
     private struct ParsedRepository {
