@@ -142,7 +142,10 @@ final class ProjectStore: ObservableObject {
             throw ProjectStoreError.emptyInput
         }
 
-        let pattern = "^(?:https?://github\\.com/|git@github\\.com:)?([a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38})/([a-zA-Z0-9_.-]+?)(?:\\.git)?/?$"
+        let protocolGroup = "^(?:https?://github\\.com/|git@github\\.com:)?"
+        let ownerGroup = "([a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38})"
+        let repoGroup = "/([a-zA-Z0-9_.-]+?)(?:\\.git)?/?$"
+        let pattern = protocolGroup + ownerGroup + repoGroup
 
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
             throw ProjectStoreError.invalidRepositoryURL
