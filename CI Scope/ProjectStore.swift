@@ -161,10 +161,8 @@ final class ProjectStore: ObservableObject {
     }
 
     private static func parsePath(_ path: String) throws -> ParsedRepository {
-        let sanitized = path
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let sanitized = path.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-
         let parts = sanitized.split(separator: "/", omittingEmptySubsequences: true)
 
         guard parts.count == 2 else {
