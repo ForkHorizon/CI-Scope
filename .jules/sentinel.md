@@ -2,13 +2,7 @@
 **Vulnerability:** Found unquoted string interpolation in `ShellClient.run` commands (`gh run list --repo \(config.repositorySlug)`). A malicious string could inject shell commands.
 **Learning:** In Swift, string interpolations passed to bash commands without quotes can lead to command injection if the variable data can be influenced by users.
 **Prevention:** Always use `quoted(value)` when interpolating string variables into shell commands. Ensure that all string input is properly escaped.
-
 ## 2025-02-14 - Prevent Terminal Injection
 **Vulnerability:** ShellClient command outputs directly rendered in UI without sanitizing ANSI control sequences.
 **Learning:** Raw terminal outputs can contain malicious ANSI escape sequences that manipulate logs or inject terminal commands when rendered.
 **Prevention:** Use regex replacement to strip out CSI, OSC sequences and raw ESC characters from shell outputs.
-
-## 2025-02-12 - Secure Info.plist by Enforcing ATS
-**Vulnerability:** Found lack of App Transport Security (ATS) enforcement in the generated Info.plist via Xcode configuration. Local HTTP tools or external calls could be intercepted via plaintext.
-**Learning:** ATS should be explicitly configured in the Xcode project to enforce strict HTTPS connections while allowing necessary local networking.
-**Prevention:** Set `INFOPLIST_KEY_NSAppTransportSecurity` to define `<key>NSAllowsArbitraryLoads</key><false/>` and `<key>NSAllowsLocalNetworking</key><true/>` when `GENERATE_INFOPLIST_FILE` is enabled.

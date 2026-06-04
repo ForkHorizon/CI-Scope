@@ -42,8 +42,16 @@ enum ShellClient {
     }
 
     private static func sanitizeOutput(_ output: String) -> String {
-        var sanitized = output.replacingOccurrences(of: "\u{001B}\\[[0-9;?]*[a-zA-Z]", with: "", options: .regularExpression)
-        sanitized = sanitized.replacingOccurrences(of: "\u{001B}\\][^\u{0007}\u{001B}]*(?:\u{0007}|\u{001B}\\\\)", with: "", options: .regularExpression)
+        var sanitized = output.replacingOccurrences(
+            of: "\u{001B}\\[[0-9;?]*[a-zA-Z]",
+            with: "",
+            options: .regularExpression
+        )
+        sanitized = sanitized.replacingOccurrences(
+            of: "\u{001B}\\][^\u{0007}\u{001B}]*(?:\u{0007}|\u{001B}\\\\)",
+            with: "",
+            options: .regularExpression
+        )
         sanitized = sanitized.replacingOccurrences(of: "\u{001B}", with: "")
         return sanitized
     }

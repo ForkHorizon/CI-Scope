@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import SwiftUI
 
 struct ContentView: View {
@@ -13,8 +12,6 @@ struct ContentView: View {
     @State var section: DashboardSection = .runs
     @State var isProjectMenuOpen = true
     @State var isAddingProject = false
-
-    let autoRefreshTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -63,11 +60,6 @@ struct ContentView: View {
         .sheet(isPresented: $isAddingProject) {
             AddProjectSheet { input in
                 try projectStore.addProject(from: input)
-            }
-        }
-        .onReceive(autoRefreshTimer) { _ in
-            if canRefresh && !isRefreshing {
-                refreshCurrentTab(isAutoRefresh: true)
             }
         }
     }
