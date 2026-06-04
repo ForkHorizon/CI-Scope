@@ -35,9 +35,17 @@ enum ShellClient {
                 terminate(process, after: timeout)
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 let output = String(data: data, encoding: .utf8) ?? ""
-                continuation.resume(returning: ShellResult(exitCode: process.terminationStatus, output: output))
+                let sanitizedOutput = sanitizeOutput(output)
+                continuation.resume(returning: ShellResult(exitCode: process.terminationStatus, output: sanitizedOutput))
             }
         }
+    }
+
+    private static func sanitizeOutput(_ output: String) -> String {
+        var sanitized = output.replacingOccurrences(of: "\u{001B}\\[[0-9;?]*[a-zA-Z]", with: "", options: .regularExpression)
+        sanitized = sanitized.replacingOccurrences(of: "\u{001B}\\][^\u{0007}\u{001B}]*(?:\u{0007}|\u{001B}\\\\)", with: "", options: .regularExpression)
+        sanitized = sanitized.replacingOccurrences(of: "\u{001B}", with: "")
+        return sanitized
     }
 
     private static func configuredProcess(
