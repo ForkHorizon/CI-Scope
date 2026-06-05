@@ -64,7 +64,7 @@ extension AutomationScriptInstaller {
         body: String,
         tempRoot: URL
     ) async throws -> URL? {
-        let bodyURL = tempRoot.appendingPathComponent("pull-request-body.md")
+        let bodyURL = try tempRoot.safelyAppendingPathComponent("pull-request-body.md")
         try body.write(to: bodyURL, atomically: true, encoding: .utf8)
         let output = try await run(
             """
