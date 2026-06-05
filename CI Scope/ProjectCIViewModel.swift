@@ -23,6 +23,9 @@ final class ProjectCIViewModel: ObservableObject {
         let snapshot = await service.loadSnapshot(for: project)
         guard !invalidatedProjectIDs.contains(project.id) else { return }
         snapshots[project.id] = snapshot
+
+        NotificationManager.shared.checkRunUpdates(projectSlug: project.repositorySlug, runs: snapshot.runs)
+
         if loadingProjectID == project.id {
             loadingProjectID = nil
         }

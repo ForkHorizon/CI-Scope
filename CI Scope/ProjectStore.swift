@@ -142,47 +142,39 @@ final class ProjectStore: ObservableObject {
             throw ProjectStoreError.emptyInput
         }
 
-        if trimmed.hasPrefix("git@github.com:") {
-            let path = String(trimmed.dropFirst("git@github.com:".count))
-            return try parsePath(path, originalInput: trimmed)
-        }
+        let protocolGroup = "^(?:https?://github\\.com/|git@github\\.com:)?"
+        let ownerGroup = "([a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38})"
+        let repoGroup = "/([a-zA-Z0-9_.-]+?)(?:\\.git)?/?$"
+        let pattern = protocolGroup + ownerGroup + repoGroup
 
-        if trimmed.hasPrefix("https://github.com/") {
-            let path = String(trimmed.dropFirst("https://github.com/".count))
-            return try parsePath(path, originalInput: trimmed)
-        }
-
-        if trimmed.hasPrefix("http://github.com/") {
-            let path = String(trimmed.dropFirst("http://github.com/".count))
-            return try parsePath(path, originalInput: trimmed)
-        }
-
-        return try parsePath(trimmed, originalInput: trimmed)
-    }
-
-    private static func parsePath(_ path: String, originalInput: String) throws -> ParsedRepository {
-        let sanitized = path
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let parts = sanitized.split(separator: "/", omittingEmptySubsequences: true)
-
-        guard parts.count == 2 else {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
             throw ProjectStoreError.invalidRepositoryURL
         }
 
-        let owner = String(parts[0])
-        let rawName = String(parts[1])
-        let name = rawName.hasSuffix(".git") ? String(rawName.dropLast(4)) : rawName
+        let nsString = trimmed as NSString
+        let results = regex.matches(in: trimmed, range: NSRange(location: 0, length: nsString.length))
+
+        guard let match = results.first, match.numberOfRanges == 3 else {
+            throw ProjectStoreError.invalidRepositoryURL
+        }
+
+        let ownerRange = match.range(at: 1)
+        let repoRange = match.range(at: 2)
+
+        let owner = nsString.substring(with: ownerRange)
+        let name = nsString.substring(with: repoRange)
 
         guard isValidGitHubComponent(owner), isValidGitHubComponent(name) else {
             throw ProjectStoreError.invalidRepositoryURL
         }
 
-        return ParsedRepository(owner: owner, name: name, remoteURL: originalInput)
+        let remoteURL = "https://github.com/\(owner)/\(name).git"
+        return ParsedRepository(owner: owner, name: name, remoteURL: remoteURL)
     }
 
     private static func isValidGitHubComponent(_ value: String) -> Bool {
         guard !value.isEmpty else { return false }
+        if value.hasPrefix("-") || value.hasPrefix(".") { return false }
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
         return value.unicodeScalars.allSatisfy { allowed.contains($0) }
     }

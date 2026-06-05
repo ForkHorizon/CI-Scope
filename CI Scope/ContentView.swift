@@ -1,6 +1,8 @@
 import AppKit
+import Combine
 import SwiftUI
 
+@MainActor
 struct ContentView: View {
     @StateObject var viewModel = DashboardViewModel()
     @StateObject var projectStore = ProjectStore()
@@ -61,6 +63,9 @@ struct ContentView: View {
             AddProjectSheet { input in
                 try projectStore.addProject(from: input)
             }
+        }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            Task { @MainActor in refreshCurrentTab() }
         }
     }
 }

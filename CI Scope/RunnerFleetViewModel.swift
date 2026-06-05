@@ -15,6 +15,9 @@ final class RunnerFleetViewModel: ObservableObject {
     func load() async {
         isLoading = true
         snapshot = await service.loadSnapshot()
+
+        NotificationManager.shared.checkRunnerUpdates(runners: snapshot.runners)
+
         isLoading = false
     }
 }

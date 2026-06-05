@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 extension ContentView {
     var dashboardSurface: some View {
         VStack(spacing: 0) {

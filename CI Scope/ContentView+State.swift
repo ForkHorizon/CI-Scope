@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 
+@MainActor
 extension ContentView {
     var runnerDetail: String {
         let pid = viewModel.snapshot.runner.listenerPID ?? viewModel.snapshot.runner.servicePID
