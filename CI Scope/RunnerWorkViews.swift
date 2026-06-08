@@ -77,6 +77,18 @@ private struct RunnerWorkRow: View {
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    if let assemblerTitle = item.assemblerTitle {
+                        Text(assemblerTitle)
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .padding(.horizontal, 5)
+                            .frame(height: 16)
+                            .background(Color.accentColor.opacity(0.1))
+                            .foregroundStyle(Color.accentColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .help(item.assemblerScope ?? assemblerTitle)
+                    }
                 }
 
                 Text("\(item.workflowName) · \(item.jobName)")
@@ -219,7 +231,7 @@ struct RunnerEmptyState: View {
             Image(systemName: "server.rack")
                 .font(.title3)
                 .foregroundStyle(.secondary)
-            Text("No runners loaded")
+            Text("No runner loaded")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

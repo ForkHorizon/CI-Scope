@@ -3,27 +3,13 @@ import Foundation
 struct RunnerFleetService {
     let config: DashboardConfig
 
-    func loadSnapshot() async -> RunnerFleetSnapshot {
-        let indexed = await withTaskGroup(of: (Int, RunnerMonitorSnapshot).self) { group in
-            for pair in visibleRunnerConfigs.enumerated() {
-                group.addTask {
-                    let runner = await loadRunner(pair.element)
-                    return (pair.offset, runner)
-                }
-            }
-
-            var results: [(Int, RunnerMonitorSnapshot)] = []
-            for await result in group {
-                results.append(result)
-            }
-            return results.sorted { $0.0 < $1.0 }.map(\.1)
-        }
-        let broker = await LocalBrokerService(config: config).loadRunnerSnapshot()
+    func loadSnapshot(prepareBroker: Bool = true) async -> RunnerFleetSnapshot {
+        let broker = await LocalBrokerService(config: config).loadRunnerSnapshot(prepareBroker: prepareBroker)
 
         return RunnerFleetSnapshot(
-            runners: indexed + [broker],
+            runners: [broker],
             refreshedAt: Date(),
-            errors: (indexed + [broker]).compactMap(\.error)
+            errors: [broker].compactMap(\.error)
         )
     }
 

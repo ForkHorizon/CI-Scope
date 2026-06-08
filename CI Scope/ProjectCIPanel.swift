@@ -79,7 +79,7 @@ struct ProjectCIPanel: View {
                         LimitedStatusRow(
                             title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
                         LimitedStatusRow(
-                            title: "Local runner", value: localRunnerSummary, icon: "server.rack",
+                            title: "MacBook runner", value: localRunnerSummary, icon: "desktopcomputer",
                             state: snapshot?.localRunner.state ?? .unknown)
                         brokerAccessRow
                     }
@@ -121,10 +121,10 @@ struct ProjectCIPanel: View {
                 .frame(width: 18)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Local broker")
+                Text("MacBook runner")
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
-                Text(isBrokerManaged ? "Broker managed" : "No local broker access")
+                Text(isBrokerManaged ? "Broker managed" : "No MacBook runner access")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

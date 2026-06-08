@@ -30,7 +30,39 @@ extension LocalBrokerService {
         }
 
         _ = await ShellClient.run(kickstartCommand, timeout: 8, config: config)
+        await stopStandaloneRunnerLaunchAgents()
         return executableURL.path
+    }
+
+    private func stopStandaloneRunnerLaunchAgents() async {
+        for runnerConfig in config.actionsRunners {
+            guard let serviceLabel = standaloneServiceLabel(for: runnerConfig) else { continue }
+            guard serviceLabel != LocalBrokerConstants.serviceLabel else { continue }
+            _ = await ShellClient.run(
+                "launchctl bootout gui/$(id -u)/\(quoted(serviceLabel)) >/dev/null 2>&1 || true",
+                timeout: 5,
+                config: config
+            )
+        }
+    }
+
+    private func standaloneServiceLabel(for runnerConfig: ActionsRunnerConfig) -> String? {
+        if let serviceLabel = runnerConfig.serviceLabel {
+            return serviceLabel
+        }
+
+        let servicePath = runnerConfig.root + "/.service"
+        guard
+            let contents = try? String(contentsOfFile: servicePath, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            !contents.isEmpty
+        else {
+            return nil
+        }
+
+        return URL(fileURLWithPath: contents)
+            .deletingPathExtension()
+            .lastPathComponent
     }
 
     private func installBrokerExecutable() throws -> URL {
@@ -114,7 +146,7 @@ enum LocalBrokerError: LocalizedError {
         case .missingResource:
             "CI Scope Broker helper was not found in the app bundle."
         case .launchAgent(let output):
-            output.isEmpty ? "Could not start Local Mac Broker." : output
+            output.isEmpty ? "Could not start MacBook Runner broker." : output
         case .invalidRepository(let detail):
             detail
         }

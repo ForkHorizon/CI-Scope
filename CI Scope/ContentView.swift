@@ -59,12 +59,21 @@ struct ContentView: View {
                 viewModel.refresh()
             }
         }
+        .task {
+            runnerFleetViewModel.startLiveUpdates {
+                await refreshSelectedProjectRunnerStatusFromBroker()
+            }
+        }
+        .onDisappear {
+            runnerFleetViewModel.stopLiveUpdates()
+        }
         .sheet(isPresented: $isAddingProject) {
             AddProjectSheet { input in
                 try projectStore.addProject(from: input)
             }
         }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            guard workspaceTab != .runners else { return }
             Task { @MainActor in refreshCurrentTab() }
         }
     }

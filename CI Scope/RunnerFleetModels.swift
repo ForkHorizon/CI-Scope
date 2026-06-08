@@ -24,6 +24,10 @@ struct RunnerFleetSnapshot {
     var visibleRepositoryCount: Int {
         runners.reduce(0) { $0 + $1.visibleRepositoryCount }
     }
+
+    var subRunnerCount: Int {
+        runners.reduce(0) { $0 + $1.subRunners.count }
+    }
 }
 
 struct RunnerMonitorSnapshot: Identifiable {
@@ -47,7 +51,20 @@ struct RunnerMonitorSnapshot: Identifiable {
     var activeJobs: [RunnerWorkItem] = []
     var queuedJobs: [RunnerWorkItem] = []
     var visibleRepositoryCount = 0
+    var subRunners: [RunnerSubRunnerSnapshot] = []
     var error: String?
+}
+
+struct RunnerSubRunnerSnapshot: Identifiable {
+    let id: String
+    let title: String
+    let scope: String
+    let labels: [String]
+    var state: ServiceState
+    var visibleRepositoryCount: Int
+    var queuedJobCount: Int
+    var activeJobCount: Int
+    var lastError: String?
 }
 
 struct RunnerWorkItem: Identifiable {
@@ -61,6 +78,39 @@ struct RunnerWorkItem: Identifiable {
     let url: String
     let createdAt: String
     let labels: [String]
+    let assemblerID: String?
+    let assemblerTitle: String?
+    let assemblerScope: String?
+
+    init(
+        id: String,
+        repositorySlug: String,
+        workflowName: String,
+        title: String,
+        jobName: String,
+        headBranch: String,
+        status: String,
+        url: String,
+        createdAt: String,
+        labels: [String],
+        assemblerID: String? = nil,
+        assemblerTitle: String? = nil,
+        assemblerScope: String? = nil
+    ) {
+        self.id = id
+        self.repositorySlug = repositorySlug
+        self.workflowName = workflowName
+        self.title = title
+        self.jobName = jobName
+        self.headBranch = headBranch
+        self.status = status
+        self.url = url
+        self.createdAt = createdAt
+        self.labels = labels
+        self.assemblerID = assemblerID
+        self.assemblerTitle = assemblerTitle
+        self.assemblerScope = assemblerScope
+    }
 }
 
 struct RunnerLaunchStatus {

@@ -13,7 +13,28 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
+ORG_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope"]
+PRIVATE_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
+DEFAULT_PROFILES = [
+    {
+        "id": "forkhorizon-organization",
+        "title": "ForkHorizon organization",
+        "scope": "ForkHorizon organization",
+        "kind": "organization",
+        "organization": "ForkHorizon",
+        "labels": ORG_LABELS,
+        "enabled": True,
+    },
+    {
+        "id": "daliys-private",
+        "title": "Daliys private repositories",
+        "scope": "Daliys private repositories",
+        "kind": "privateRepositories",
+        "organization": None,
+        "labels": PRIVATE_LABELS,
+        "enabled": True,
+    },
+]
 POLL_SECONDS = 15
 MAX_RETRIES = 3
 ROOT = Path.home() / "Library/Application Support/CI Scope/Broker"
@@ -53,46 +74,95 @@ def main() -> int:
 
 def tick(state: dict) -> dict:
     registry = read_registry()
-    repos = [repo for repo in registry.get("repos", []) if repo.get("enabled", True)]
+    profiles = enabled_profiles(registry)
     retries = state.get("retries") or {}
     active = state.get("active")
 
     if active and active.get("pid") and process_alive(active["pid"]):
-        queue, statuses = collect_queue(repos)
-        return save_state(active, queue, statuses, None, retries)
+        queue, statuses = collect_queue(registry, profiles)
+        return save_state(active, queue, statuses, None, retries, profiles)
 
     if active:
         retries = update_retry(active, retries)
 
-    queue, statuses = collect_queue(repos)
+    queue, statuses = collect_queue(registry, profiles)
     dispatchable = [job for job in queue if retries.get(job["id"], 0) < MAX_RETRIES]
     if not dispatchable:
-        return save_state(None, queue, statuses, None, retries)
+        return save_state(None, queue, statuses, None, retries, profiles)
 
     job = dispatchable[0]
     process = start_runner(job)
     active_job = dict(job)
     active_job["pid"] = process.pid
-    write_state(save_state(active_job, queue, statuses, None, retries))
-    return wait_for_runner(process, active_job, statuses, retries)
+    write_state(save_state(active_job, queue, statuses, None, retries, profiles))
+    return wait_for_runner(process, active_job, statuses, retries, profiles)
 
 
-def collect_queue(repos: list[dict]) -> tuple[list[dict], list[dict]]:
+def collect_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
     jobs = []
     statuses = []
-    for repo in repos:
-        slug = repo["slug"]
+    for profile in profiles:
         try:
-            repo_jobs = queued_jobs(slug)
-            jobs.extend(repo_jobs)
-            statuses.append(repo_status(slug, "ok", len(repo_jobs), None))
+            repos = repositories_for_profile(profile, registry)
         except Exception as exc:
-            statuses.append(repo_status(slug, "warning", 0, str(exc)))
+            statuses.append(repo_status(profile.get("scope") or profile["title"], "warning", 0, str(exc), profile, profile_labels(profile)))
+            continue
+
+        for repo in repos:
+            slug = repo["slug"]
+            labels = repo.get("labels") or profile_labels(profile)
+            try:
+                repo_jobs = queued_jobs(slug, labels, profile)
+                jobs.extend(repo_jobs)
+                statuses.append(repo_status(slug, "ok", len(repo_jobs), None, profile, labels))
+            except Exception as exc:
+                statuses.append(repo_status(slug, "warning", 0, str(exc), profile, labels))
     jobs.sort(key=lambda item: item.get("createdAt", ""))
     return jobs, statuses
 
 
-def queued_jobs(slug: str) -> list[dict]:
+def repositories_for_profile(profile: dict, registry: dict) -> list[dict]:
+    labels = profile_labels(profile)
+    if profile.get("kind") == "organization":
+        organization = profile.get("organization")
+        if not organization:
+            raise RuntimeError(f"{profile.get('title') or 'Organization profile'} is missing organization.")
+        return [{"slug": slug, "labels": labels} for slug in organization_repositories(organization)]
+
+    repos = []
+    for repo in registry.get("repos", []):
+        if not repo.get("enabled", True):
+            continue
+        repos.append(
+            {
+                "slug": repo["slug"],
+                "labels": repo.get("labels") or labels,
+            }
+        )
+    return repos
+
+
+def organization_repositories(organization: str) -> list[str]:
+    command = [
+        "gh",
+        "repo",
+        "list",
+        organization,
+        "--limit",
+        "200",
+        "--json",
+        "nameWithOwner,isArchived",
+        "--jq",
+        "[.[] | select(.isArchived == false) | .nameWithOwner]",
+    ]
+    completed = subprocess.run(command, text=True, capture_output=True, timeout=60)
+    if completed.returncode != 0:
+        message = completed.stderr.strip() or completed.stdout.strip() or f"gh repo list failed: {organization}"
+        raise RuntimeError(message)
+    return json.loads(completed.stdout or "[]")
+
+
+def queued_jobs(slug: str, labels: list[str], profile: dict) -> list[dict]:
     runs = gh_json(f"repos/{slug}/actions/runs?status=queued&per_page=20")
     result = []
     for run in runs.get("workflow_runs", []):
@@ -100,10 +170,10 @@ def queued_jobs(slug: str) -> list[dict]:
         for job in jobs.get("jobs", []):
             if job.get("status") != "queued":
                 continue
-            labels = job.get("labels") or []
-            if not has_labels(labels):
+            job_labels = job.get("labels") or []
+            if not has_labels(job_labels, labels):
                 continue
-            result.append(job_payload(slug, run, job, labels))
+            result.append(job_payload(slug, run, job, labels, profile))
     return result
 
 
@@ -123,21 +193,21 @@ def start_runner(job: dict) -> subprocess.Popen:
     )
 
 
-def wait_for_runner(process: subprocess.Popen, active: dict, statuses: list[dict], retries: dict) -> dict:
+def wait_for_runner(process: subprocess.Popen, active: dict, statuses: list[dict], retries: dict, profiles: list[dict]) -> dict:
     exit_code = process.wait()
     active["exitCode"] = exit_code
     active["status"] = "completed" if exit_code == 0 else "failed"
     refreshed = refresh_run(active)
     if refreshed.get("status") == "queued":
         retries = update_retry(active, retries)
-    return save_state(None, [], statuses, refreshed.get("lastError"), retries)
+    return save_state(None, [], statuses, refreshed.get("lastError"), retries, profiles)
 
 
 def generate_jit_config(job: dict) -> str:
     payload = {
         "name": f"ci-scope-{safe_name(job['repositorySlug'])}-{job['runId']}-{job.get('jobId') or 'run'}",
         "runner_group_id": 1,
-        "labels": LABELS,
+        "labels": job.get("labels") or PRIVATE_LABELS,
         "work_folder": "_work",
     }
     output = gh_json(
@@ -196,7 +266,7 @@ def gh_json(endpoint: str, method: str = "GET", payload: dict | None = None) -> 
     return json.loads(completed.stdout or "{}")
 
 
-def job_payload(slug: str, run: dict, job: dict, labels: list[str]) -> dict:
+def job_payload(slug: str, run: dict, job: dict, labels: list[str], profile: dict) -> dict:
     job_id = job.get("id")
     run_id = run.get("id")
     return {
@@ -212,10 +282,13 @@ def job_payload(slug: str, run: dict, job: dict, labels: list[str]) -> dict:
         "labels": labels,
         "runId": run_id,
         "jobId": job_id,
+        "profileId": profile["id"],
+        "profileTitle": profile["title"],
+        "profileScope": profile["scope"],
     }
 
 
-def save_state(active, queue, statuses, error, retries) -> dict:
+def save_state(active, queue, statuses, error, retries, profiles) -> dict:
     state = {
         "version": 1,
         "updatedAt": now(),
@@ -223,6 +296,7 @@ def save_state(active, queue, statuses, error, retries) -> dict:
         "active": active,
         "queue": queue,
         "repos": statuses,
+        "profiles": profiles,
         "lastError": error,
         "retries": retries,
     }
@@ -232,8 +306,13 @@ def save_state(active, queue, statuses, error, retries) -> dict:
 
 def read_registry() -> dict:
     if not REGISTRY_PATH.exists():
-        return {"version": 1, "repos": []}
-    return json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+        return {"version": 1, "repos": [], "profiles": DEFAULT_PROFILES}
+    registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+    registry.setdefault("version", 1)
+    registry.setdefault("repos", [])
+    if not registry.get("profiles"):
+        registry["profiles"] = DEFAULT_PROFILES
+    return registry
 
 
 def read_state() -> dict:
@@ -257,19 +336,33 @@ def update_retry(job: dict, retries: dict) -> dict:
     return result
 
 
-def repo_status(slug: str, state: str, count: int, error: str | None) -> dict:
+def repo_status(slug: str, state: str, count: int, error: str | None, profile: dict, labels: list[str]) -> dict:
     return {
         "slug": slug,
         "state": state,
         "queuedCount": count,
         "lastCheckedAt": now(),
         "lastError": error,
+        "profileId": profile["id"],
+        "profileTitle": profile["title"],
+        "profileScope": profile["scope"],
+        "labels": labels,
     }
 
 
-def has_labels(labels: list[str]) -> bool:
+def has_labels(labels: list[str], required_labels: list[str]) -> bool:
     available = {label.lower() for label in labels}
-    return all(label.lower() in available for label in LABELS)
+    return all(label.lower() in available for label in required_labels)
+
+
+def profile_labels(profile: dict) -> list[str]:
+    labels = profile.get("labels") or []
+    return labels or PRIVATE_LABELS
+
+
+def enabled_profiles(registry: dict) -> list[dict]:
+    profiles = registry.get("profiles") or DEFAULT_PROFILES
+    return [profile for profile in profiles if profile.get("enabled", True)]
 
 
 def process_alive(pid: int) -> bool:

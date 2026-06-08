@@ -17,7 +17,7 @@ struct RunnersView: View {
                         RunnerEmptyState()
                     }
 
-                    ForEach(viewModel.snapshot.runners) { runner in
+                    if let runner = viewModel.snapshot.runners.first {
                         RunnerCard(runner: runner)
                     }
                 }
@@ -47,33 +47,33 @@ private struct RunnerFleetSummary: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 10) {
             RunnerSummaryTile(
-                title: "Runners",
-                value: isLoading && snapshot.runners.isEmpty ? "..." : "\(snapshot.runners.count)",
-                detail: stateText,
-                icon: "server.rack",
+                title: "Runner",
+                value: isLoading && snapshot.runners.isEmpty ? "..." : "\(min(snapshot.runners.count, 1))",
+                detail: snapshot.runners.isEmpty ? stateText : "MacBook",
+                icon: "desktopcomputer",
                 state: snapshot.state
             )
             RunnerSummaryTile(
                 title: "Running",
                 value: "\(snapshot.activeJobCount)",
-                detail: activeDetail,
+                detail: "serial execution",
                 icon: "play.circle",
                 state: snapshot.activeJobCount > 0 ? .warning : .online
             )
             RunnerSummaryTile(
                 title: "Queue",
                 value: "\(snapshot.queuedJobCount)",
-                detail: "visible jobs",
+                detail: "shared queue",
                 icon: "tray.full",
                 state: snapshot.queuedJobCount > 0 ? .warning : .online
             )
-            .help("GitHub shows queued workflow jobs by repository. This is the visible queue in each runner scope.")
+            .help("Unified queued workflow jobs from all sub-runners. The broker dispatches one job at a time.")
             RunnerSummaryTile(
-                title: "Scope",
-                value: "\(snapshot.visibleRepositoryCount)",
-                detail: "repositories",
-                icon: "books.vertical",
-                state: snapshot.visibleRepositoryCount > 0 ? .online : .unknown
+                title: "Sub-runners",
+                value: "\(snapshot.subRunnerCount)",
+                detail: "hidden settings",
+                icon: "slider.horizontal.3",
+                state: snapshot.subRunnerCount > 0 ? .online : .unknown
             )
         }
     }
@@ -83,7 +83,7 @@ private struct RunnerFleetSummary: View {
             GridItem(.flexible(), spacing: 10),
             GridItem(.flexible(), spacing: 10),
             GridItem(.flexible(), spacing: 10),
-            GridItem(.flexible(), spacing: 10)
+            GridItem(.flexible(), spacing: 10),
         ]
     }
 
@@ -91,9 +91,6 @@ private struct RunnerFleetSummary: View {
         snapshot.runners.isEmpty ? "not loaded" : snapshot.state.rawValue.lowercased()
     }
 
-    private var activeDetail: String {
-        snapshot.activeJobCount == 1 ? "active job" : "active jobs"
-    }
 }
 
 private struct RunnerSummaryTile: View {
@@ -140,7 +137,7 @@ private struct RunnerCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                RunnerIcon(icon: "server.rack", state: runner.state)
+                RunnerIcon(icon: "desktopcomputer", state: runner.state)
                     .frame(width: 38, height: 38)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -173,15 +170,24 @@ private struct RunnerCard: View {
             }
 
             LazyVGrid(columns: columns, spacing: 8) {
-                RunnerMetric(title: "Local", value: runner.launchctlState.capitalized, detail: localDetail, state: runner.localState)
-                RunnerMetric(title: "GitHub", value: runner.remoteStatus.capitalized, detail: runner.isBusy ? "busy" : "ready", state: runner.githubState)
-                RunnerMetric(title: "Running", value: "\(runner.activeJobs.count)", detail: activeSummary, state: runner.activeJobs.isEmpty ? .online : .warning)
-                RunnerMetric(title: "Queue", value: "\(runner.queuedJobs.count)", detail: "visible jobs", state: runner.queuedJobs.isEmpty ? .online : .warning)
-                    .help("Visible queued jobs that match this runner's required labels.")
+                RunnerMetric(title: "Broker", value: runner.launchctlState.capitalized, detail: localDetail, state: runner.localState)
+                RunnerMetric(
+                    title: "Dispatcher", value: runner.remoteStatus.capitalized, detail: "one job at a time", state: runner.githubState)
+                RunnerMetric(
+                    title: "Running", value: "\(runner.activeJobs.count)", detail: activeSummary,
+                    state: runner.activeJobs.isEmpty ? .online : .warning)
+                RunnerMetric(
+                    title: "Queue", value: "\(runner.queuedJobs.count)", detail: "shared jobs",
+                    state: runner.queuedJobs.isEmpty ? .online : .warning
+                )
+                .help("Queued jobs from organization and private sub-runners. Only one job is dispatched at a time.")
             }
 
-            RunnerWorkSection(title: "Running Now", emptyText: runner.isBusy ? "Busy, job not visible yet" : "Idle", items: runner.activeJobs)
+            RunnerWorkSection(
+                title: "Running Now", emptyText: runner.isBusy ? "Busy, job not visible yet" : "Idle", items: runner.activeJobs)
             RunnerWorkSection(title: "Queue", emptyText: "No queued jobs", items: runner.queuedJobs)
+
+            RunnerSubRunnerDisclosure(subRunners: runner.subRunners)
 
             if !runner.missingLabels.isEmpty {
                 RunnerWarningLine(text: "Missing labels: \(runner.missingLabels.joined(separator: ", "))")
@@ -203,7 +209,7 @@ private struct RunnerCard: View {
             GridItem(.flexible(), spacing: 8),
             GridItem(.flexible(), spacing: 8),
             GridItem(.flexible(), spacing: 8),
-            GridItem(.flexible(), spacing: 8)
+            GridItem(.flexible(), spacing: 8),
         ]
     }
 
@@ -223,38 +229,5 @@ private struct RunnerCard: View {
 
     private var runnerColor: Color {
         color(for: runner.state)
-    }
-}
-
-private struct RunnerMetric: View {
-    let title: String
-    let value: String
-    let detail: String
-    let state: ServiceState
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(color(for: state))
-                    .frame(width: 6, height: 6)
-                Text(title)
-                    .font(.caption2.weight(.semibold))
-                    .lineLimit(1)
-            }
-            Text(value)
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Text(detail)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
-        .padding(8)
-        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
     }
 }

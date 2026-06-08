@@ -1,34 +1,128 @@
 import Foundation
 
 extension LocalBrokerService {
-    func loadRunnerSnapshot() async -> RunnerMonitorSnapshot {
-        _ = try? await installOrUpdateLaunchAgent()
+    func loadRunnerSnapshot(prepareBroker: Bool = true) async -> RunnerMonitorSnapshot {
+        if prepareBroker {
+            _ = try? await installOrUpdateLaunchAgent()
+        }
         let registry = loadRegistry()
         let state = loadState()
         let launch = await launchStatus()
+        let staleWarning = staleStateWarning(for: state, launch: launch)
+        let profiles = registry.profiles.filter(\.enabled)
+        let subRunners = profiles.map { profile in
+            subRunnerSnapshot(profile: profile, registry: registry, state: state, launch: launch)
+        }
+        let activeJobs = state.active.map { [$0.workItem] } ?? []
+        let queuedJobs = state.queue.map(\.workItem)
+        let visibleRepositoryCount = subRunners.reduce(0) { $0 + $1.visibleRepositoryCount }
 
         var snapshot = RunnerMonitorSnapshot(
             id: "local-mac-broker",
-            title: "Local Mac Broker",
-            scope: "Daliys private repositories",
+            title: "MacBook Runner",
+            scope: "ForkHorizon organization + Daliys private repositories",
             root: brokerDirectory.path
         )
         snapshot.localState = launch.state
-        snapshot.githubState = state.lastError == nil ? .online : .warning
+        snapshot.githubState = dispatcherState(launch: launch, state: state)
         snapshot.launchctlState = launch.launchctlState
         snapshot.pid = launch.pid
         snapshot.uptime = launch.uptime
         snapshot.serviceLabel = LocalBrokerConstants.serviceLabel
-        snapshot.remoteName = "JIT runners"
-        snapshot.remoteStatus = "managed"
-        snapshot.registeredTo = "\(registry.repos.filter(\.enabled).count) managed repos"
-        snapshot.labels = LocalBrokerConstants.runnerLabels
-        snapshot.activeJobs = state.active.map { [$0.workItem] } ?? []
-        snapshot.queuedJobs = state.queue.map(\.workItem)
-        snapshot.visibleRepositoryCount = registry.repos.filter(\.enabled).count
-        snapshot.error = state.lastError
-        snapshot.state = brokerState(launch: launch, state: state)
+        snapshot.remoteName = "MacBook Controller"
+        snapshot.remoteStatus = "serial dispatcher"
+        snapshot.registeredTo = "\(subRunners.count) sub-runners"
+        snapshot.labels = uniqueLabels(profiles.flatMap(\.labels))
+        snapshot.activeJobs = activeJobs
+        snapshot.queuedJobs = queuedJobs
+        snapshot.visibleRepositoryCount = visibleRepositoryCount
+        snapshot.subRunners = subRunners
+        snapshot.error = [state.lastError, staleWarning].compactMap { $0 }.joined(separator: "\n").nilIfEmpty
+        snapshot.state = brokerState(launch: launch, state: state, subRunners: subRunners, staleWarning: staleWarning)
         return snapshot
+    }
+
+    private func subRunnerSnapshot(
+        profile: BrokerRunnerProfile,
+        registry: BrokerRegistry,
+        state: BrokerState,
+        launch: RunnerLaunchStatus
+    ) -> RunnerSubRunnerSnapshot {
+        let statuses = repositoryStatuses(for: profile, registry: registry, state: state)
+        let activeJobCount = state.active.map { jobMatchesProfile($0, profile: profile) ? 1 : 0 } ?? 0
+        let queuedJobCount = state.queue.filter { jobMatchesProfile($0, profile: profile) }.count
+        let visibleRepositoryCount = visibleRepositoryCount(for: profile, registry: registry, statuses: statuses)
+        let lastError = subRunnerLastError(statuses: statuses)
+        let runnerState = subRunnerState(
+            launch: launch,
+            statuses: statuses,
+            activeJobCount: activeJobCount,
+            queuedJobCount: queuedJobCount,
+            lastError: lastError
+        )
+
+        return RunnerSubRunnerSnapshot(
+            id: profile.id,
+            title: profile.title,
+            scope: profile.scope,
+            labels: profile.labels,
+            state: runnerState,
+            visibleRepositoryCount: visibleRepositoryCount,
+            queuedJobCount: queuedJobCount,
+            activeJobCount: activeJobCount,
+            lastError: lastError
+        )
+    }
+
+    private func repositoryStatuses(
+        for profile: BrokerRunnerProfile,
+        registry: BrokerRegistry,
+        state: BrokerState
+    ) -> [BrokerRepoStatus] {
+        state.repos.filter { repoStatus in
+            if let profileID = repoStatus.profileID {
+                return profileID == profile.id
+            }
+
+            guard profile.kind == .privateRepositories else { return false }
+            return registry.repos.contains {
+                $0.slug.caseInsensitiveCompare(repoStatus.slug) == .orderedSame
+            }
+        }
+    }
+
+    private func visibleRepositoryCount(
+        for profile: BrokerRunnerProfile,
+        registry: BrokerRegistry,
+        statuses: [BrokerRepoStatus]
+    ) -> Int {
+        switch profile.kind {
+        case .organization:
+            return statuses.count
+        case .privateRepositories:
+            return max(registry.repos.filter(\.enabled).count, statuses.count)
+        }
+    }
+
+    private func subRunnerLastError(statuses: [BrokerRepoStatus]) -> String? {
+        let statusErrors = statuses.compactMap { status -> String? in
+            guard let error = status.lastError, !error.isEmpty else { return nil }
+            return "\(status.slug): \(error)"
+        }
+        return statusErrors.joined(separator: "\n").nilIfEmpty
+    }
+
+    private func subRunnerState(
+        launch: RunnerLaunchStatus,
+        statuses: [BrokerRepoStatus],
+        activeJobCount: Int,
+        queuedJobCount: Int,
+        lastError: String?
+    ) -> ServiceState {
+        if launch.state == .offline { return .offline }
+        if lastError != nil || activeJobCount > 0 || queuedJobCount > 0 { return .warning }
+        if statuses.contains(where: { $0.state.lowercased() == "warning" }) { return .warning }
+        return launch.state
     }
 
     private func launchStatus() async -> RunnerLaunchStatus {
@@ -58,10 +152,69 @@ extension LocalBrokerService {
         )
     }
 
-    private func brokerState(launch: RunnerLaunchStatus, state: BrokerState) -> ServiceState {
+    private func brokerState(
+        launch: RunnerLaunchStatus,
+        state: BrokerState,
+        subRunners: [RunnerSubRunnerSnapshot],
+        staleWarning: String?
+    ) -> ServiceState {
         if launch.state == .offline { return .offline }
-        if state.lastError != nil || state.active != nil || !state.queue.isEmpty { return .warning }
+        if subRunners.contains(where: { $0.state == .offline }) { return .offline }
+        if state.lastError != nil || staleWarning != nil || state.active != nil || !state.queue.isEmpty { return .warning }
+        if subRunners.contains(where: { $0.state == .warning }) { return .warning }
         return launch.state
+    }
+
+    private func dispatcherState(launch: RunnerLaunchStatus, state: BrokerState) -> ServiceState {
+        if launch.state == .offline { return .offline }
+        if state.lastError != nil { return .warning }
+        return launch.state
+    }
+
+    private func staleStateWarning(for state: BrokerState, launch: RunnerLaunchStatus) -> String? {
+        guard launch.state != .offline else { return nil }
+        guard !state.updatedAt.isEmpty else {
+            return "Broker state has not been written yet."
+        }
+        guard let updatedAt = brokerStateDate(from: state.updatedAt) else {
+            return "Broker state timestamp is not readable."
+        }
+
+        let age = Date().timeIntervalSince(updatedAt)
+        guard age > LocalBrokerConstants.stateStaleAfterSeconds else { return nil }
+        return "Broker state is stale. Last update was \(Int(age))s ago."
+    }
+
+    private func brokerStateDate(from value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) {
+            return date
+        }
+
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
+    }
+
+    private func jobMatchesProfile(_ job: BrokerJob, profile: BrokerRunnerProfile) -> Bool {
+        if let profileID = job.profileID {
+            return profileID == profile.id
+        }
+
+        let availableLabels = Set(job.labels.map { $0.lowercased() })
+        return profile.labels.allSatisfy { availableLabels.contains($0.lowercased()) }
+    }
+
+    private func uniqueLabels(_ labels: [String]) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for label in labels {
+            let key = label.lowercased()
+            guard !seen.contains(key) else { continue }
+            seen.insert(key)
+            result.append(label)
+        }
+        return result
     }
 
     private func processUptime(pid: Int?) async -> String {
@@ -81,5 +234,11 @@ extension LocalBrokerService {
 
     private func intMatch(in text: String, pattern: String) -> Int? {
         firstMatch(in: text, pattern: pattern).flatMap(Int.init)
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

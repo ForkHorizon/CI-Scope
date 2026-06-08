@@ -22,7 +22,7 @@ struct AutomationScriptInstaller {
             project: project,
             variableValues: variableValues,
             defaultBranch: defaultBranch,
-            runnerLabelsOverride: mode.runnerLabels(for: script)
+            runnerLabelsOverride: runnerLabels(for: mode, script: script, project: project)
         )
         try renderer.validate()
 
