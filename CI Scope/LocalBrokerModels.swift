@@ -63,7 +63,7 @@ struct BrokerRunnerProfile: Identifiable, Codable, Equatable {
             organization: nil,
             labels: LocalBrokerConstants.runnerLabels,
             enabled: true
-        )
+        ),
     ]
 }
 

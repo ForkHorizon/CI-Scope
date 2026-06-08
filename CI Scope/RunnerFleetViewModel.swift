@@ -197,7 +197,7 @@ private final class BrokerStateMonitor {
             queueIDs,
             repoStatuses,
             profiles,
-            repos
+            repos,
         ].joined(separator: "|")
     }
 }

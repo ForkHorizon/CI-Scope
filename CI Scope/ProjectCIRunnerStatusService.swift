@@ -253,7 +253,8 @@ extension ProjectCIService {
             }
             return false
         }) {
-            return "Attach \(project.repositorySlug) to MacBook Runner. Private sub-runner labels: \(LocalBrokerConstants.runnerLabels.joined(separator: ", "))."
+            return
+                "Attach \(project.repositorySlug) to MacBook Runner. Private sub-runner labels: \(LocalBrokerConstants.runnerLabels.joined(separator: ", "))."
         }
 
         if let localRunner = localRunners.first {

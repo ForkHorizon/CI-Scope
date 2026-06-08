@@ -61,7 +61,7 @@ struct DashboardConfig {
                 scope: .personalAccount("Daliys"),
                 requiredLabels: actionsRunnerRequiredLabels,
                 serviceLabel: nil
-            )
+            ),
         ]
     }
 
@@ -81,7 +81,7 @@ struct DashboardConfig {
             "/sbin",
             "/Library/Apple/usr/bin",
             "/opt/homebrew/opt/openjdk@17/bin",
-            "/Users/daliys/.local/bin"
+            "/Users/daliys/.local/bin",
         ].joined(separator: ":")
     }
 }

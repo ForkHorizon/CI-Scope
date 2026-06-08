@@ -48,7 +48,38 @@ extension LocalBrokerService {
         state: BrokerState,
         launch: RunnerLaunchStatus
     ) -> RunnerSubRunnerSnapshot {
-        let statuses = state.repos.filter { repoStatus in
+        let statuses = repositoryStatuses(for: profile, registry: registry, state: state)
+        let activeJobCount = state.active.map { jobMatchesProfile($0, profile: profile) ? 1 : 0 } ?? 0
+        let queuedJobCount = state.queue.filter { jobMatchesProfile($0, profile: profile) }.count
+        let visibleRepositoryCount = visibleRepositoryCount(for: profile, registry: registry, statuses: statuses)
+        let lastError = subRunnerLastError(statuses: statuses)
+        let runnerState = subRunnerState(
+            launch: launch,
+            statuses: statuses,
+            activeJobCount: activeJobCount,
+            queuedJobCount: queuedJobCount,
+            lastError: lastError
+        )
+
+        return RunnerSubRunnerSnapshot(
+            id: profile.id,
+            title: profile.title,
+            scope: profile.scope,
+            labels: profile.labels,
+            state: runnerState,
+            visibleRepositoryCount: visibleRepositoryCount,
+            queuedJobCount: queuedJobCount,
+            activeJobCount: activeJobCount,
+            lastError: lastError
+        )
+    }
+
+    private func repositoryStatuses(
+        for profile: BrokerRunnerProfile,
+        registry: BrokerRegistry,
+        state: BrokerState
+    ) -> [BrokerRepoStatus] {
+        state.repos.filter { repoStatus in
             if let profileID = repoStatus.profileID {
                 return profileID == profile.id
             }
@@ -58,41 +89,40 @@ extension LocalBrokerService {
                 $0.slug.caseInsensitiveCompare(repoStatus.slug) == .orderedSame
             }
         }
-        let activeJobCount = state.active.map { jobMatchesProfile($0, profile: profile) ? 1 : 0 } ?? 0
-        let queuedJobCount = state.queue.filter { jobMatchesProfile($0, profile: profile) }.count
-        let visibleRepositoryCount: Int
+    }
+
+    private func visibleRepositoryCount(
+        for profile: BrokerRunnerProfile,
+        registry: BrokerRegistry,
+        statuses: [BrokerRepoStatus]
+    ) -> Int {
         switch profile.kind {
         case .organization:
-            visibleRepositoryCount = statuses.count
+            return statuses.count
         case .privateRepositories:
-            visibleRepositoryCount = max(registry.repos.filter(\.enabled).count, statuses.count)
+            return max(registry.repos.filter(\.enabled).count, statuses.count)
         }
+    }
+
+    private func subRunnerLastError(statuses: [BrokerRepoStatus]) -> String? {
         let statusErrors = statuses.compactMap { status -> String? in
             guard let error = status.lastError, !error.isEmpty else { return nil }
             return "\(status.slug): \(error)"
         }
-        let lastError = statusErrors.joined(separator: "\n").nilIfEmpty
-        let state: ServiceState =
-            if launch.state == .offline {
-                .offline
-            } else if lastError != nil || activeJobCount > 0 || queuedJobCount > 0
-                || statuses.contains(where: { $0.state.lowercased() == "warning" }) {
-                .warning
-            } else {
-                launch.state
-            }
+        return statusErrors.joined(separator: "\n").nilIfEmpty
+    }
 
-        return RunnerSubRunnerSnapshot(
-            id: profile.id,
-            title: profile.title,
-            scope: profile.scope,
-            labels: profile.labels,
-            state: state,
-            visibleRepositoryCount: visibleRepositoryCount,
-            queuedJobCount: queuedJobCount,
-            activeJobCount: activeJobCount,
-            lastError: lastError
-        )
+    private func subRunnerState(
+        launch: RunnerLaunchStatus,
+        statuses: [BrokerRepoStatus],
+        activeJobCount: Int,
+        queuedJobCount: Int,
+        lastError: String?
+    ) -> ServiceState {
+        if launch.state == .offline { return .offline }
+        if lastError != nil || activeJobCount > 0 || queuedJobCount > 0 { return .warning }
+        if statuses.contains(where: { $0.state.lowercased() == "warning" }) { return .warning }
+        return launch.state
     }
 
     private func launchStatus() async -> RunnerLaunchStatus {
