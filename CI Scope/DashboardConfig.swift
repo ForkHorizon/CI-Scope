@@ -48,7 +48,7 @@ struct DashboardConfig {
         [
             ActionsRunnerConfig(
                 id: "forkhorizon-org",
-                title: "ForkHorizon organization runner",
+                title: "ForkHorizon organization sub-runner",
                 root: "/Users/daliys/actions-runners/forkhorizon-org-ci",
                 scope: .organization("ForkHorizon"),
                 requiredLabels: actionsRunnerRequiredLabels,
@@ -56,7 +56,7 @@ struct DashboardConfig {
             ),
             ActionsRunnerConfig(
                 id: "daliys-personal",
-                title: "Daliys personal repo runner",
+                title: "Daliys private sub-runner",
                 root: "/Users/daliys/actions-runner/moodling",
                 scope: .personalAccount("Daliys"),
                 requiredLabels: actionsRunnerRequiredLabels,

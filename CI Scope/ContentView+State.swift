@@ -80,7 +80,7 @@ extension ContentView {
         case .projects:
             selectedProject?.repositorySlug ?? "No project selected"
         case .runners:
-            "Runners · \(runnerFleetViewModel.snapshot.runners.count) configured"
+            "Runner · MacBook"
         case .localTools:
             viewModel.snapshot.errors.isEmpty ? "Configured local services" : "\(viewModel.snapshot.errors.count) issue(s)"
         case .scripts:
@@ -165,6 +165,11 @@ extension ContentView {
         Task {
             await projectCIViewModel.load(selectedProject)
         }
+    }
+
+    func refreshSelectedProjectRunnerStatusFromBroker() async {
+        guard let selectedProject else { return }
+        await projectCIViewModel.refreshLocalRunnerFromBroker(selectedProject)
     }
 
     func isBrokerManaged(_ project: CIProject) -> Bool {

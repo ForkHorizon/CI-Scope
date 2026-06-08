@@ -14,6 +14,17 @@ struct LocalBrokerService {
     func attach(project: CIProject) async throws {
         try ensureDirectories()
         var registry = loadRegistry()
+        if registry.profiles.contains(where: { profile in
+            guard profile.enabled, profile.kind == .organization, let organization = profile.organization else {
+                return false
+            }
+            return project.repositoryOwner.caseInsensitiveCompare(organization) == .orderedSame
+        }) {
+            try writeRegistry(registry)
+            _ = try? await installOrUpdateLaunchAgent()
+            return
+        }
+
         let slug = project.repositorySlug
         let repo = BrokerManagedRepo(
             slug: slug,
@@ -33,8 +44,18 @@ struct LocalBrokerService {
     }
 
     func isManaged(project: CIProject) -> Bool {
-        loadRegistry().repos.contains {
+        let registry = loadRegistry()
+        if registry.repos.contains(where: {
             $0.enabled && $0.slug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame
+        }) {
+            return true
+        }
+
+        return registry.profiles.contains { profile in
+            guard profile.enabled, profile.kind == .organization, let organization = profile.organization else {
+                return false
+            }
+            return project.repositoryOwner.caseInsensitiveCompare(organization) == .orderedSame
         }
     }
 

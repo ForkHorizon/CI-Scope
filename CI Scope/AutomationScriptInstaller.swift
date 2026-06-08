@@ -22,7 +22,7 @@ struct AutomationScriptInstaller {
             project: project,
             variableValues: variableValues,
             defaultBranch: defaultBranch,
-            runnerLabelsOverride: mode.runnerLabels(for: script)
+            runnerLabelsOverride: runnerLabels(for: mode, script: script, project: project)
         )
         try renderer.validate()
 
@@ -53,6 +53,34 @@ struct AutomationScriptInstaller {
         )
         try await attachBrokerIfNeeded(mode: mode, project: project)
         return readyResult(script, pullRequestURL: pullRequestURL)
+    }
+
+    private func runnerLabels(
+        for mode: AutomationScriptInstallMode,
+        script: AutomationScript,
+        project: CIProject
+    ) -> [String] {
+        guard mode == .localBroker else {
+            return mode.runnerLabels(for: script)
+        }
+
+        let registry = LocalBrokerService(config: config).loadRegistry()
+        if let organizationProfile = registry.profiles.first(where: { profile in
+            guard profile.enabled, profile.kind == .organization, let organization = profile.organization else {
+                return false
+            }
+            return project.repositoryOwner.caseInsensitiveCompare(organization) == .orderedSame
+        }) {
+            return organizationProfile.labels
+        }
+
+        if let repo = registry.repos.first(where: {
+            $0.enabled && $0.slug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame
+        }), !repo.labels.isEmpty {
+            return repo.labels
+        }
+
+        return LocalBrokerConstants.runnerLabels
     }
 
     private func renderAndStageInstall(

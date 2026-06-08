@@ -1,9 +1,9 @@
 import Foundation
 
 extension ProjectCIService {
-    func loadLocalRunner(for project: CIProject) async -> ProjectLocalRunnerStatus {
+    func loadLocalRunner(for project: CIProject, prepareBroker: Bool = true) async -> ProjectLocalRunnerStatus {
         if LocalBrokerService(config: config).isManaged(project: project) {
-            return await brokerRunnerStatus(for: project)
+            return await brokerRunnerStatus(for: project, prepareBroker: prepareBroker)
         }
 
         let localRunners = config.actionsRunners.compactMap(readLocalRunner)
@@ -17,8 +17,8 @@ extension ProjectCIService {
         )
     }
 
-    func brokerRunnerStatus(for project: CIProject) async -> ProjectLocalRunnerStatus {
-        let broker = await LocalBrokerService(config: config).loadRunnerSnapshot()
+    func brokerRunnerStatus(for project: CIProject, prepareBroker: Bool = true) async -> ProjectLocalRunnerStatus {
+        let broker = await LocalBrokerService(config: config).loadRunnerSnapshot(prepareBroker: prepareBroker)
         let active = broker.activeJobs.first { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
         let queued = broker.queuedJobs.filter { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
         let summary =
@@ -29,7 +29,7 @@ extension ProjectCIService {
             } else {
                 "Broker managed"
             }
-        let detail = active?.title ?? (queued.first?.title ?? "Local Mac Broker · \(broker.uptime)")
+        let detail = active?.title ?? (queued.first?.title ?? "MacBook Runner · \(broker.uptime)")
 
         return ProjectLocalRunnerStatus(
             state: broker.state,
@@ -244,24 +244,24 @@ extension ProjectCIService {
             }
             return false
         }) {
-            return "Install \(orgRunner.title) with labels: \(orgRunner.requiredLabels.joined(separator: ", "))."
+            return "Use MacBook Runner for \(orgRunner.scope.description) with labels: \(orgRunner.requiredLabels.joined(separator: ", "))."
         }
 
-        if let personalRunner = config.actionsRunners.first(where: { runnerConfig in
+        if config.actionsRunners.contains(where: { runnerConfig in
             if case .personalAccount(let account) = runnerConfig.scope {
                 return project.repositoryOwner.caseInsensitiveCompare(account) == .orderedSame
             }
             return false
         }) {
-            return "Attach \(project.repositorySlug) to Local Mac Broker. Current runner is \(personalRunner.title)."
+            return "Attach \(project.repositorySlug) to MacBook Runner. Private sub-runner labels: \(LocalBrokerConstants.runnerLabels.joined(separator: ", "))."
         }
 
         if let localRunner = localRunners.first {
             return
-                "Local runner is registered to \(localRunner.repositorySlug ?? localRunner.owner ?? localRunner.config.scope.description)."
+                "Standalone runner is registered to \(localRunner.repositorySlug ?? localRunner.owner ?? localRunner.config.scope.description)."
         }
 
-        return "No configured local runner scope matches \(project.repositorySlug)."
+        return "No configured MacBook runner scope matches \(project.repositorySlug)."
     }
 
     func remoteRunner(matching runner: LocalRunnerInfo) async -> GitHubActionsRunner? {

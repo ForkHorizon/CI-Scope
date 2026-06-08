@@ -11,11 +11,11 @@ extension AutomationScriptInstaller {
         guard let data = output.data(using: .utf8),
             let repo = try? JSONDecoder().decode(BrokerRepositoryAccess.self, from: data)
         else {
-            throw LocalBrokerError.invalidRepository("Could not read repository permission for Local Mac Broker.")
+            throw LocalBrokerError.invalidRepository("Could not read repository permission for MacBook Runner.")
         }
         guard repo.viewerPermission == "ADMIN" else {
             throw LocalBrokerError.invalidRepository(
-                "Local Mac Broker needs admin access to create JIT runners for \(project.repositorySlug).")
+                "MacBook Runner needs admin access to create JIT runners for \(project.repositorySlug).")
         }
     }
 

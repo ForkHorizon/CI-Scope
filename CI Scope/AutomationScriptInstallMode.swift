@@ -10,7 +10,7 @@ enum AutomationScriptInstallMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .localBroker: "Local Mac Broker"
+        case .localBroker: "MacBook Runner"
         case .githubHosted: "GitHub hosted"
         }
     }
@@ -21,7 +21,7 @@ enum AutomationScriptInstallMode: String, CaseIterable, Identifiable {
 
     func detail(for script: AutomationScript?) -> String {
         switch self {
-        case .localBroker: "Runs jobs on this Mac through Local Mac Broker."
+        case .localBroker: "Runs jobs on this Mac through the serial broker."
         case .githubHosted:
             if script?.requiresMacGitHubHostedRunner == true {
                 "Uses GitHub-hosted macOS runners for Swift/Xcode scripts."
