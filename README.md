@@ -4,6 +4,20 @@ CI Scope is a local macOS dashboard for watching GitHub Actions repositories and
 
 It is built for situations where GitHub workflows run on a local Mac and the important state is split across GitHub, `launchctl`, runner logs, Ollama, Unity, and local validation scripts. The app brings that state into one focused SwiftUI interface so a developer can see whether a repository has Actions, whether a local runner is registered to it, what the latest runs look like, and what local tooling is available.
 
+## Status
+
+Personal/internal tool in active development. The source is public for reference and reuse, but local tooling configuration is currently machine-specific and lives in `CI Scope/DashboardConfig.swift`.
+
+APIs, project settings, and release packaging may change before a reusable public app release.
+
+## Screenshot / Demo
+
+The repository currently includes the app icon used for public presentation:
+
+![CI Scope app icon](app-icon.png)
+
+A dashboard screenshot/GIF is planned for a future documentation update.
+
 ## What It Does
 
 - Manages a local list of GitHub repositories.
@@ -175,6 +189,10 @@ xcodebuild \
   -destination "platform=macOS" \
   build
 ```
+
+## License
+
+No open-source license has been declared yet. Until a license file is added, the public source should be treated as visible reference code rather than reusable licensed software.
 
 ## Architecture
 
