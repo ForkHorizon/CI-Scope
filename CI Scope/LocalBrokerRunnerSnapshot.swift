@@ -37,6 +37,7 @@ extension LocalBrokerService {
         snapshot.queuedJobs = queuedJobs
         snapshot.visibleRepositoryCount = visibleRepositoryCount
         snapshot.subRunners = subRunners
+        snapshot.webhook = state.webhook
         snapshot.error = [state.lastError, staleWarning].compactMap { $0 }.joined(separator: "\n").nilIfEmpty
         snapshot.state = brokerState(launch: launch, state: state, subRunners: subRunners, staleWarning: staleWarning)
         return snapshot

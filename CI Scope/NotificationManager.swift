@@ -1,15 +1,20 @@
 import Foundation
+import Combine
 import UserNotifications
 
 @MainActor
-final class NotificationManager {
+final class NotificationManager: ObservableObject {
     static let shared = NotificationManager()
+
+    @Published private(set) var activeJobNotification: JobArrivalNotification?
 
     private var previousRuns: [String: String] = [:]
     private var previousRunners: [String: ServiceState] = [:]
+    private var previousWorkItemIDs: Set<String> = []
     private var hasRequestedPermission = false
     private var fetchedProjects: Set<String> = []
     private var fetchedRunnerSnapshots = false
+    private var fetchedWorkSnapshot = false
 
     private init() {
         Task {
@@ -45,6 +50,36 @@ final class NotificationManager {
         }
 
         fetchedProjects.insert(projectSlug)
+    }
+
+    func checkWorkUpdates(snapshot: RunnerFleetSnapshot) {
+        let activeJobs = uniqueWorkItems(snapshot.runners.flatMap(\.activeJobs))
+        let activeIDs = Set(activeJobs.map(\.id))
+        let queuedJobs = uniqueWorkItems(snapshot.runners.flatMap(\.queuedJobs))
+            .filter { !activeIDs.contains($0.id) }
+        let visibleJobs = activeJobs + queuedJobs
+        let currentIDs = Set(visibleJobs.map(\.id))
+        let newJobs = visibleJobs.filter { !previousWorkItemIDs.contains($0.id) }
+
+        defer {
+            previousWorkItemIDs = currentIDs
+            fetchedWorkSnapshot = true
+        }
+
+        guard !newJobs.isEmpty else { return }
+
+        let notification = JobArrivalNotification(
+            newJobs: newJobs,
+            runningJob: activeJobs.first,
+            queuedJobs: queuedJobs
+        )
+        activeJobNotification = notification
+        sendJobNotification(notification)
+    }
+
+    func dismissJobNotification(id: String) {
+        guard activeJobNotification?.id == id else { return }
+        activeJobNotification = nil
     }
 
     func checkRunnerUpdates(runners: [RunnerMonitorSnapshot]) {
@@ -88,6 +123,28 @@ final class NotificationManager {
         UNUserNotificationCenter.current().add(request)
     }
 
+    private func sendJobNotification(_ notification: JobArrivalNotification) {
+        guard let firstJob = notification.newJobs.first else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title =
+            notification.newJobs.count == 1
+            ? "New CI job"
+            : "\(notification.newJobs.count) new CI jobs"
+        content.subtitle = firstJob.repositorySlug
+
+        if notification.newJobs.count == 1 {
+            content.body = "\(firstJob.workflowName): \(firstJob.jobName)"
+        } else {
+            content.body = "\(firstJob.workflowName): \(firstJob.jobName) and \(notification.newJobs.count - 1) more"
+        }
+        content.sound = UNNotificationSound.default
+
+        let identifier = "job-\(notification.createdAt.timeIntervalSince1970)"
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+
     private func sendRunnerNotification(runnerName: String, state: ServiceState) {
         let content = UNMutableNotificationContent()
 
@@ -98,5 +155,16 @@ final class NotificationManager {
         let identifier = "runner-\(runnerName)-\(Date().timeIntervalSince1970)"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
+    }
+
+    private func uniqueWorkItems(_ items: [RunnerWorkItem]) -> [RunnerWorkItem] {
+        var seen: Set<String> = []
+        var result: [RunnerWorkItem] = []
+        for item in items {
+            guard !seen.contains(item.id) else { continue }
+            seen.insert(item.id)
+            result.append(item)
+        }
+        return result
     }
 }
