@@ -19,8 +19,6 @@ extension ContentView {
         case .runners:
             RunnersView(viewModel: runnerFleetViewModel)
                 .padding(14)
-        case .localTools:
-            localToolsDashboardContent
         case .scripts:
             ScriptsView(
                 store: scriptStore,
@@ -67,17 +65,6 @@ extension ContentView {
             }
             .padding(14)
         }
-    }
-
-    var localToolsDashboardContent: some View {
-        VStack(spacing: 12) {
-            LocalToolsHeader()
-            statusGrid
-            CommandStrip(runner: viewModel.commandRunner)
-            sectionPicker
-            contentPanel
-        }
-        .padding(14)
     }
 
     var header: some View {
@@ -144,84 +131,5 @@ extension ContentView {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(.thinMaterial)
-    }
-
-    var statusGrid: some View {
-        LazyVGrid(
-            columns: [
-                GridItem(.flexible(), spacing: 10),
-                GridItem(.flexible(), spacing: 10),
-            ], spacing: 10
-        ) {
-            StatusTile(
-                title: "Runner",
-                value: viewModel.snapshot.runner.launchctlState.capitalized,
-                detail: runnerDetail,
-                icon: "server.rack",
-                state: viewModel.snapshot.runner.state
-            )
-            StatusTile(
-                title: "Ollama",
-                value: viewModel.snapshot.ollama.loadedModels.first?.name ?? "Idle",
-                detail: ollamaDetail,
-                icon: "cpu",
-                state: viewModel.snapshot.ollama.state
-            )
-            StatusTile(
-                title: "Unity Server",
-                value: viewModel.snapshot.nexusUnity.status?.state ?? "Unknown",
-                detail: unityDetail,
-                icon: "cube.transparent",
-                state: viewModel.snapshot.nexusUnity.state
-            )
-            StatusTile(
-                title: "GitHub",
-                value: viewModel.snapshot.runs.first?.compactConclusion.capitalized ?? "No runs",
-                detail: viewModel.snapshot.runs.first?.headBranch ?? "Refresh to load",
-                icon: "checkmark.seal",
-                state: latestRunState
-            )
-        }
-    }
-
-    var sectionPicker: some View {
-        HStack(spacing: 6) {
-            ForEach(DashboardSection.allCases) { item in
-                Button {
-                    section = item
-                } label: {
-                    Label(item.title, systemImage: item.icon)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
-                        .background(section == item ? Color.accentColor.opacity(0.16) : Color.clear)
-                        .foregroundStyle(section == item ? Color.accentColor : Color.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(4)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.secondary.opacity(0.14))
-        )
-    }
-
-    @ViewBuilder
-    var contentPanel: some View {
-        switch section {
-        case .runs:
-            CompactRunsPanel(runs: viewModel.snapshot.runs)
-        case .logs:
-            CompactLogsPanel(viewModel: viewModel)
-        case .scripts:
-            CompactStagesPanel(stages: viewModel.snapshot.stages)
-        case .console:
-            CompactConsolePanel(runner: viewModel.commandRunner)
-        }
     }
 }

@@ -3,33 +3,6 @@ import SwiftUI
 
 @MainActor
 extension ContentView {
-    var runnerDetail: String {
-        let pid = viewModel.snapshot.runner.listenerPID ?? viewModel.snapshot.runner.servicePID
-        return "PID \(pid.map(String.init) ?? "-") · \(viewModel.snapshot.runner.uptime)"
-    }
-
-    var ollamaDetail: String {
-        guard let model = viewModel.snapshot.ollama.loadedModels.first else {
-            return "\(viewModel.snapshot.ollama.availableModels.count) models"
-        }
-
-        let bytes = model.sizeVRAM ?? model.size ?? 0
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory)
-    }
-
-    var unityDetail: String {
-        let pid = viewModel.snapshot.nexusUnity.status?.processId.map(String.init) ?? "-"
-        let version = viewModel.snapshot.nexusUnity.status?.unityVersion ?? "-"
-        return "PID \(pid) · \(version)"
-    }
-
-    var latestRunState: ServiceState {
-        guard let run = viewModel.snapshot.runs.first else { return .unknown }
-        if run.conclusion == "success" { return .online }
-        if run.status != "completed" { return .warning }
-        return .offline
-    }
-
     var selectedProject: CIProject? {
         projectStore.selectedProject
     }
@@ -41,8 +14,6 @@ extension ContentView {
             return projectCIViewModel.loadingProjectID == selectedProject.id
         case .runners:
             return runnerFleetViewModel.isLoading
-        case .localTools:
-            return viewModel.isRefreshing
         case .scripts:
             return false
         }
@@ -55,8 +26,6 @@ extension ContentView {
             return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt
         case .runners:
             return runnerFleetViewModel.snapshot.refreshedAt
-        case .localTools:
-            return viewModel.snapshot.refreshedAt
         case .scripts:
             return nil
         }
@@ -67,8 +36,6 @@ extension ContentView {
         case .projects:
             selectedProject != nil
         case .runners:
-            true
-        case .localTools:
             true
         case .scripts:
             false
@@ -81,8 +48,6 @@ extension ContentView {
             selectedProject?.repositorySlug ?? "No project selected"
         case .runners:
             "Runner · MacBook"
-        case .localTools:
-            viewModel.snapshot.errors.isEmpty ? "Configured local services" : "\(viewModel.snapshot.errors.count) issue(s)"
         case .scripts:
             "\(scriptStore.scripts.count) installable scripts"
         }
@@ -94,8 +59,6 @@ extension ContentView {
             selectedProject?.title ?? "Projects"
         case .runners:
             "Runners"
-        case .localTools:
-            "Local Tools"
         case .scripts:
             "Scripts"
         }
@@ -107,8 +70,6 @@ extension ContentView {
             "square.grid.2x2"
         case .runners:
             "server.rack"
-        case .localTools:
-            "desktopcomputer"
         case .scripts:
             "curlybraces.square"
         }
@@ -121,23 +82,9 @@ extension ContentView {
             return state(for: selectedProject)
         case .runners:
             return runnerFleetViewModel.snapshot.state
-        case .localTools:
-            return localToolsState
         case .scripts:
             return scriptStore.scripts.isEmpty ? .unknown : .online
         }
-    }
-
-    var localToolsState: ServiceState {
-        let states = [
-            viewModel.snapshot.runner.state,
-            viewModel.snapshot.ollama.state,
-            viewModel.snapshot.nexusUnity.state,
-        ]
-        if states.contains(.offline) { return .offline }
-        if states.contains(.warning) { return .warning }
-        if states.contains(.unknown) { return .unknown }
-        return .online
     }
 
     func state(for project: CIProject) -> ServiceState {
@@ -192,8 +139,6 @@ extension ContentView {
             Task {
                 await runnerFleetViewModel.load()
             }
-        case .localTools:
-            viewModel.refresh()
         case .scripts:
             break
         }
