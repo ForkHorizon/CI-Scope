@@ -10,7 +10,6 @@ final class NotificationManager {
     private var hasRequestedPermission = false
     private var fetchedProjects: Set<String> = []
     private var fetchedRunnerSnapshots = false
-    private var fetchedDashboardRunner = false
 
     private init() {
         Task {
@@ -61,20 +60,6 @@ final class NotificationManager {
             previousRunners[runner.id] = runner.state
         }
         fetchedRunnerSnapshots = true
-    }
-
-    func checkDashboardRunnerUpdate(runner: RunnerStatus) {
-        let runnerId = "local-runner"
-        let previousState = previousRunners[runnerId]
-
-        if fetchedDashboardRunner {
-            if previousState == .online && runner.state == .offline {
-                sendRunnerNotification(runnerName: "Local Runner", state: runner.state)
-            }
-        }
-
-        previousRunners[runnerId] = runner.state
-        fetchedDashboardRunner = true
     }
 
     private func sendRunNotification(projectSlug: String, run: GitHubRun) {

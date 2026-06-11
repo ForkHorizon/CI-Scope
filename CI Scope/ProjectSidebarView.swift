@@ -8,8 +8,6 @@ struct ProjectMenuPanel: View {
     let stateForProject: (CIProject) -> ServiceState
     let runnerState: ServiceState
     let runnerCount: Int
-    let localToolsState: ServiceState
-    let localToolsIssueCount: Int
     let scriptState: ServiceState
     let scriptCount: Int
     let onSelect: (CIProject) -> Void
@@ -30,30 +28,12 @@ struct ProjectMenuPanel: View {
 
             VStack(spacing: 7) {
                 WorkspaceMenuRow(
-                    tab: .projects,
-                    state: aggregateState,
-                    count: projects.count,
-                    isActive: workspaceTab == .projects
-                ) {
-                    workspaceTab = .projects
-                }
-
-                WorkspaceMenuRow(
                     tab: .runners,
                     state: runnerState,
                     count: runnerCount,
                     isActive: workspaceTab == .runners
                 ) {
                     workspaceTab = .runners
-                }
-
-                WorkspaceMenuRow(
-                    tab: .localTools,
-                    state: localToolsState,
-                    count: localToolsIssueCount,
-                    isActive: workspaceTab == .localTools
-                ) {
-                    workspaceTab = .localTools
                 }
 
                 WorkspaceMenuRow(
@@ -151,8 +131,6 @@ struct ProjectMenuPanel: View {
             aggregateState
         case .runners:
             runnerState
-        case .localTools:
-            localToolsState
         case .scripts:
             scriptState
         }
@@ -164,9 +142,6 @@ struct ProjectMenuPanel: View {
             projects.isEmpty ? "No projects" : aggregateState.rawValue
         case .runners:
             runnerCount == 0 ? "Runners not loaded" : "\(runnerCount) runners · \(runnerState.rawValue)"
-        case .localTools:
-            localToolsIssueCount == 0
-                ? "Local tools · \(localToolsState.rawValue)" : "\(localToolsIssueCount) issues · \(localToolsState.rawValue)"
         case .scripts:
             scriptCount == 0 ? "No scripts" : "\(scriptCount) scripts · \(scriptState.rawValue)"
         }
@@ -228,8 +203,6 @@ struct WorkspaceMenuRow: View {
             count == 1 ? "1 project" : "\(count) projects"
         case .runners:
             count == 0 ? "Load runner status" : "\(count) configured"
-        case .localTools:
-            count == 0 ? "Machine services" : "\(count) issues"
         case .scripts:
             count == 1 ? "1 script" : "\(count) scripts"
         }

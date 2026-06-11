@@ -4,14 +4,12 @@ import SwiftUI
 
 @MainActor
 struct ContentView: View {
-    @StateObject var viewModel = DashboardViewModel()
     @StateObject var projectStore = ProjectStore()
     @StateObject var projectCIViewModel = ProjectCIViewModel()
     @StateObject var scriptStore = AutomationScriptStore()
     @StateObject var scriptInstallViewModel = AutomationScriptInstallViewModel()
     @StateObject var runnerFleetViewModel = RunnerFleetViewModel()
     @State var workspaceTab: WorkspaceTab = .projects
-    @State var section: DashboardSection = .runs
     @State var isProjectMenuOpen = true
     @State var isAddingProject = false
 
@@ -25,8 +23,6 @@ struct ContentView: View {
                     stateForProject: state(for:),
                     runnerState: runnerFleetViewModel.snapshot.state,
                     runnerCount: runnerFleetViewModel.snapshot.runners.count,
-                    localToolsState: localToolsState,
-                    localToolsIssueCount: viewModel.snapshot.errors.count,
                     scriptState: scriptStore.scripts.isEmpty ? .unknown : .online,
                     scriptCount: scriptStore.scripts.count,
                     onSelect: selectProject,
@@ -55,8 +51,6 @@ struct ContentView: View {
         .task(id: workspaceTab) {
             if workspaceTab == .runners {
                 await runnerFleetViewModel.load()
-            } else if workspaceTab == .localTools {
-                viewModel.refresh()
             }
         }
         .task {
