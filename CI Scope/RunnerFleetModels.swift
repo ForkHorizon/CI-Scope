@@ -30,6 +30,27 @@ struct RunnerFleetSnapshot {
     }
 }
 
+struct JobArrivalNotification: Identifiable {
+    let id: String
+    let newJobs: [RunnerWorkItem]
+    let runningJob: RunnerWorkItem?
+    let queuedJobs: [RunnerWorkItem]
+    let createdAt: Date
+
+    init(
+        newJobs: [RunnerWorkItem],
+        runningJob: RunnerWorkItem?,
+        queuedJobs: [RunnerWorkItem],
+        createdAt: Date = Date()
+    ) {
+        self.id = "\(createdAt.timeIntervalSince1970)-\(newJobs.map(\.id).joined(separator: ","))"
+        self.newJobs = newJobs
+        self.runningJob = runningJob
+        self.queuedJobs = queuedJobs
+        self.createdAt = createdAt
+    }
+}
+
 struct RunnerMonitorSnapshot: Identifiable {
     let id: String
     let title: String
@@ -52,6 +73,7 @@ struct RunnerMonitorSnapshot: Identifiable {
     var queuedJobs: [RunnerWorkItem] = []
     var visibleRepositoryCount = 0
     var subRunners: [RunnerSubRunnerSnapshot] = []
+    var webhook: BrokerWebhookStatus?
     var error: String?
 }
 
@@ -110,6 +132,30 @@ struct RunnerWorkItem: Identifiable {
         self.assemblerID = assemblerID
         self.assemblerTitle = assemblerTitle
         self.assemblerScope = assemblerScope
+    }
+}
+
+struct BrokerWebhookStatus: Codable, Equatable {
+    var enabled: Bool
+    var port: Int?
+    var path: String?
+    var lastDeliveryAt: String?
+    var lastDeliveryID: String?
+    var lastAction: String?
+    var lastRepository: String?
+    var lastJob: String?
+    var lastError: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case enabled
+        case port
+        case path
+        case lastDeliveryAt
+        case lastDeliveryID = "lastDeliveryId"
+        case lastAction
+        case lastRepository
+        case lastJob
+        case lastError
     }
 }
 

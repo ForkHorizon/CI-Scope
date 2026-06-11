@@ -183,6 +183,8 @@ private struct RunnerCard: View {
                 .help("Queued jobs from organization and private sub-runners. Only one job is dispatched at a time.")
             }
 
+            RunnerWebhookStrip(webhook: runner.webhook)
+
             RunnerWorkSection(
                 title: "Running Now", emptyText: runner.isBusy ? "Busy, job not visible yet" : "Idle", items: runner.activeJobs)
             RunnerWorkSection(title: "Queue", emptyText: "No queued jobs", items: runner.queuedJobs)

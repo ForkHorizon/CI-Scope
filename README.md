@@ -1,46 +1,31 @@
 # CI Scope
 
-CI Scope is a local macOS dashboard for watching GitHub Actions repositories and the machine-side tools that support a self-hosted CI workflow.
+CI Scope is a local macOS dashboard for watching GitHub Actions repositories, self-hosted runner health, and installable CI automation scripts.
 
-It is built for situations where GitHub workflows run on a local Mac and the important state is split across GitHub, `launchctl`, runner logs, Ollama, Unity, and local validation scripts. The app brings that state into one focused SwiftUI interface so a developer can see whether a repository has Actions, whether a local runner is registered to it, what the latest runs look like, and what local tooling is available.
+It is built for situations where GitHub workflows run on a local Mac and the important state is split across GitHub, local runner registration, queued jobs, and reusable workflow templates. The app brings that state into one focused SwiftUI interface so a developer can see repository CI status, runner availability, and the scripts that can be installed into a project.
 
 ## Status
 
-Personal/internal tool in active development. The source is public for reference and reuse, but local tooling configuration is currently machine-specific and lives in `CI Scope/DashboardConfig.swift`.
+Personal/internal tool in active development. The source is public for reference and reuse, but local runner configuration is currently machine-specific and lives in `CI Scope/DashboardConfig.swift`.
 
 APIs, project settings, and release packaging may change before a reusable public app release.
-
-## Screenshot / Demo
-
-The repository currently includes the app icon used for public presentation:
-
-![CI Scope app icon](app-icon.png)
-
-A dashboard screenshot/GIF is planned for a future documentation update.
 
 ## What It Does
 
 - Manages a local list of GitHub repositories.
 - Loads GitHub Actions workflows and recent runs through the GitHub CLI.
 - Detects which repository the configured local GitHub runner is registered to.
+- Shows runner fleet status, runner labels, active work, and queued work.
+- Manages installable automation scripts for CI workflows.
+- Installs scripts into selected projects through generated pull requests.
 - Shows repository status without treating any repository as special.
 - Provides repository actions such as copying the SSH URL and opening GitHub.
 - Supports right-click and ellipsis context menus for project actions, including removing projects.
 - Shows a clean empty state when there are no saved projects.
-- Shows optional local tooling in a separate workspace-level Local Tools view.
-
-For the currently configured local setup, CI Scope can also show:
-
-- `launchctl` runner status, PID, and uptime.
-- Runner stdout/stderr and latest runner/worker diagnostic logs.
-- Ollama loaded models and available model tags.
-- Unity/Nexus local server status through `get_server_status`.
-- Parsed local validation stages from `validate.yml` and `prepush-validate.sh`.
-- Buttons for local validation commands: static, quick, checklist AI, quality AI, and Unity smoke.
 
 ## Project Model
 
-Projects are normal saved repositories. NexusUnity is not protected, seeded, or treated as a primary project by the app.
+Projects are normal saved repositories. No repository is protected, seeded, or treated as a primary project by the app.
 
 Project data is stored locally in `UserDefaults`:
 
@@ -58,13 +43,27 @@ owner/repo
 
 Removing a project deletes only the local saved entry. It does not delete files, clone repositories, unregister runners, or change anything on GitHub.
 
-## Local Tooling Behavior
+## Automation Scripts
 
-Every selected repository uses the same CI detail screen.
+Scripts are reusable CI workflow templates. The Scripts workspace shows the script library as a list, expands the selected script inline for install options, and opens the editor in a sheet when a script needs to be changed.
 
-Local tooling is not embedded into any project page. It lives in the Local Tools workspace tab and uses `DashboardConfig` for the machine-specific runner, repository path, logs, services, and local command presets.
+Default scripts are bundled in:
 
-The local configuration is currently hardcoded in:
+```text
+CI Scope/AutomationScriptSeeds
+```
+
+User-created or edited scripts are stored locally in Application Support:
+
+```text
+~/Library/Application Support/CI Scope/Scripts
+```
+
+Installing a script renders its files into the target repository, commits the changes on a branch, pushes that branch, and opens a pull request. The current install mode uses the local Mac runner broker so projects can target the configured self-hosted runner labels.
+
+## Local Configuration
+
+The local runner configuration is currently hardcoded in:
 
 ```text
 CI Scope/DashboardConfig.swift
@@ -72,15 +71,10 @@ CI Scope/DashboardConfig.swift
 
 That file defines:
 
-- GitHub repository owner/name used for local tool matching.
-- Local package/repository path.
-- GitHub runner root and launch service label.
-- Runner stdout/stderr log paths.
-- Ollama base URL.
-- Unity/Nexus JSON-RPC URL.
-- Unity editor path.
-- AI model used by local validation commands.
-- Shell `PATH` used when launching local commands.
+- GitHub runner roots and scopes.
+- Required runner labels.
+- Optional launch service labels.
+- Shell `PATH` used when running local commands.
 
 Future work should move this from one hardcoded config into per-project settings.
 
@@ -95,13 +89,9 @@ gh auth status -h github.com
 ```
 
 - Git installed for workflow fallback detection.
-- Optional local services for the full local-tools panel:
-  - GitHub self-hosted runner configured on this Mac.
-  - Ollama running on the configured URL.
-  - Unity editor installed at the configured path.
-  - Nexus/Unity local server running on the configured JSON-RPC endpoint.
+- GitHub self-hosted runner configured on this Mac for runner and script-install workflows.
 
-The app can still show repository and GitHub Actions information without the optional local services.
+The app can still show repository and GitHub Actions information without an online local runner.
 
 ## Runner Model
 
@@ -114,13 +104,6 @@ Both runners should run on this Mac and include these labels:
 
 ```text
 self-hosted, macOS, ARM64, ci-scope
-```
-
-The current Mac runner setup also preserves compatibility labels:
-
-```text
-ForkHorizon org runner: nexus-doc-ai, nexus-unity-ci
-Daliys personal runner: moodling, ollama
 ```
 
 The portable AI readability workflow targets those labels:
@@ -171,6 +154,24 @@ Allow the runner group for the repositories that should use this Mac. Personal r
 Repository -> Settings -> Actions -> Runners
 ```
 
+### Job Notifications
+
+CI Scope shows job arrivals through an in-app Liquid Glass notification banner and also sends a native macOS notification when notification permission is available. The banner self-dismisses after five seconds and can be dismissed manually.
+
+The MacBook Runner broker now supports a free webhook-first path for faster queue updates:
+
+```text
+POST http://127.0.0.1:8765/github/workflow-job
+```
+
+GitHub cannot call a private localhost URL directly, so expose that local endpoint through a free HTTPS tunnel or relay when you want near-live webhook delivery. Configure a GitHub repository or organization webhook with:
+
+- Event: `workflow_job`
+- Content type: `application/json`
+- Secret: the contents of `~/Library/Application Support/CI Scope/Broker/webhook-secret`
+
+The webhook secret is generated automatically when CI Scope installs or updates the broker launch agent. If no webhook deliveries arrive, the broker keeps using its existing GitHub CLI polling fallback; once webhooks are active, polling slows down and acts as reconciliation for missed deliveries.
+
 ## Build
 
 Open the project in Xcode:
@@ -196,24 +197,25 @@ No open-source license has been declared yet. Until a license file is added, the
 
 ## Architecture
 
-- `ContentView.swift` contains the SwiftUI shell, sidebar, project details, context menus, empty states, local tool panels, and file-open controls.
+- `ContentView.swift` contains the SwiftUI shell, sidebar, project details, context menus, empty states, and workspace routing.
 - `ProjectStore.swift` owns saved repository data, selection, add/remove behavior, duplicate prevention, and git URL parsing.
 - `ProjectCIService.swift` loads GitHub workflows/runs, GitHub auth diagnostics, and repo-aware local runner status.
 - `ProjectCIViewModel.swift` caches per-project CI snapshots and invalidates removed projects.
-- `DashboardService.swift` loads optional local tool snapshots: runner, Ollama, Unity server, logs, and parsed script stages.
-- `LocalCommandRunner.swift` executes local validation command presets and streams output into the UI.
-- `DashboardConfig.swift` is the current single source of local machine configuration.
+- `RunnerFleetService.swift` loads runner fleet status, labels, active work, and queued work.
+- `AutomationScriptStore.swift` owns the local script library and default script seeding.
+- `AutomationScriptInstaller.swift` renders script files, commits changes, pushes branches, and creates pull requests.
+- `LocalBrokerService.swift` manages the local runner broker registry and launch agent support.
+- `DashboardConfig.swift` is the current single source of local runner configuration.
 - `Models.swift` contains shared status and snapshot models.
 - `ShellClient.swift` runs local shell commands with timeouts and configured environment.
 
-The app has no backend service. It reads local files, runs local shell commands, calls local HTTP endpoints, and uses the GitHub CLI from the Mac where the app is running.
+The app has no backend service. It reads local files, runs local shell commands, and uses the GitHub CLI from the Mac where the app is running.
 
 ## Safety Notes
 
 - Repository add/remove operations affect only local app state.
 - GitHub Actions data is read through `gh`; CI Scope does not trigger remote workflow runs.
-- Local command buttons do execute shell commands from the configured repository root.
-- File buttons reveal existing local log/script files in Finder.
+- Script installation writes files into the selected repository, commits them on a new branch, pushes that branch, and opens a pull request.
 - GitHub CLI auth output is sanitized before being shown in error details.
 
 ## Current Limitations
@@ -222,7 +224,7 @@ The app has no backend service. It reads local files, runs local shell commands,
 - New projects are not cloned automatically.
 - GitHub Actions access depends on the current `gh` authentication and repository permissions.
 - Workflow file detection falls back to a temporary sparse clone only when the GitHub CLI workflow API path fails.
-- The local Unity/Nexus status panel depends on the configured JSON-RPC server shape.
+- Script installation depends on local Git and GitHub CLI access to the target repository.
 
 ## Intended Audience
 
@@ -234,4 +236,4 @@ When modifying it, preserve these product principles:
 - Keep local machine integrations explicit and configurable.
 - Prefer clear empty states over raw errors when a repository has no Actions.
 - Keep destructive actions local-only unless the UI explicitly says otherwise.
-- Do not hide long-running local command output; the dashboard exists to make CI behavior visible.
+- Keep script install behavior explicit: generated changes should go through a branch and pull request.

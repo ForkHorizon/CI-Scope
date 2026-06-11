@@ -1,10 +1,12 @@
 import Foundation
+import Security
 
 extension LocalBrokerService {
     func installOrUpdateLaunchAgent() async throws -> String {
         try ensureDirectories()
         let executableURL = try installBrokerExecutable()
-        let plist = launchAgentPlist(executableURL: executableURL)
+        let secretURL = try ensureWebhookSecret()
+        let plist = launchAgentPlist(executableURL: executableURL, secretURL: secretURL)
         try fileManager.createDirectory(
             at: launchAgentURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -88,6 +90,28 @@ extension LocalBrokerService {
             .safelyAppendingPathComponent("LaunchAgents/\(LocalBrokerConstants.serviceLabel).plist")
     }
 
+    var webhookSecretURL: URL {
+        try! brokerDirectory.safelyAppendingPathComponent("webhook-secret")
+    }
+
+    private func ensureWebhookSecret() throws -> URL {
+        if !fileManager.fileExists(atPath: webhookSecretURL.path) {
+            try randomSecret().write(to: webhookSecretURL, atomically: true, encoding: .utf8)
+        }
+        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: webhookSecretURL.path)
+        return webhookSecretURL
+    }
+
+    private func randomSecret() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        if status == errSecSuccess {
+            return bytes.map { String(format: "%02x", $0) }.joined()
+        }
+
+        return "\(UUID().uuidString)-\(UUID().uuidString)"
+    }
+
     private func launchAgentIsLoaded() async -> Bool {
         let result = await ShellClient.run(
             "launchctl print gui/$(id -u)/\(LocalBrokerConstants.serviceLabel)",
@@ -105,7 +129,7 @@ extension LocalBrokerService {
         "launchctl kickstart -k gui/$(id -u)/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
     }
 
-    private func launchAgentPlist(executableURL: URL) -> String {
+    private func launchAgentPlist(executableURL: URL, secretURL: URL) -> String {
         """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -125,6 +149,12 @@ extension LocalBrokerService {
           <dict>
             <key>PATH</key>
             <string>\(config.shellPath)</string>
+            <key>CI_SCOPE_WEBHOOK_PORT</key>
+            <string>\(LocalBrokerConstants.webhookPort)</string>
+            <key>CI_SCOPE_WEBHOOK_SECRET_PATH</key>
+            <string>\(secretURL.path)</string>
+            <key>CI_SCOPE_WEBHOOK_PATH</key>
+            <string>\(LocalBrokerConstants.webhookPath)</string>
           </dict>
           <key>StandardOutPath</key>
           <string>\(try! logsDirectory.safelyAppendingPathComponent("broker.out.log").path)</string>
