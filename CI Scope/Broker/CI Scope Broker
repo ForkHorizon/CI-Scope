@@ -55,6 +55,7 @@ WEBHOOK_RECONCILE_SECONDS = 75
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
 MAX_ACTIVE_SECONDS = int(os.environ.get("CI_SCOPE_MAX_ACTIVE_SECONDS", "3600"))
+MAX_CONCURRENT_JOBS = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_JOBS", "2")))
 MAX_WEBHOOK_BODY_BYTES = 2_000_000
 ROOT = Path.home() / "Library/Application Support/CI Scope/Broker"
 REGISTRY_PATH = ROOT / "managed-repos.json"
@@ -72,7 +73,7 @@ UNSET = object()
 
 def main() -> int:
     if "--help" in sys.argv or "-h" in sys.argv:
-        print("CI Scope Broker: polls managed GitHub repos, receives workflow_job webhooks, and runs one JIT runner job at a time.")
+        print(f"CI Scope Broker: polls managed GitHub repos, receives workflow_job webhooks, and runs up to {MAX_CONCURRENT_JOBS} JIT runner job(s) concurrently.")
         return 0
     os.environ["PATH"] = ":".join(
         [
@@ -113,65 +114,69 @@ def tick(state: dict, should_poll: bool) -> dict:
     profiles = enabled_profiles(registry)
     retries = state.get("retries") or {}
     webhook = webhook_status(state.get("webhook"))
-    active = state.get("active")
+    actives = list(state.get("actives") or [])
     queue = list(state.get("queue") or [])
     statuses = list(state.get("repos") or [])
-    last_error = state.get("lastError")
+    last_error = None
 
-    if active and active.get("pid") and active_is_running(active):
-        if should_poll and active_completed_remotely(active):
-            terminate_active_process(active)
-            retries, last_error = finish_active(active, retries)
-            active = None
-        elif active_timed_out(active):
-            terminate_active_process(active)
-            cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
-            retries = update_retry(active, retries)
-            ACTIVE_PROCESSES.pop(active.get("pid"), None)
-            last_error = f"Stopped {active.get('id')}: runner ran past {MAX_ACTIVE_SECONDS // 60} min without completing."
-            active = None
+    surviving = []
+    for active in actives:
+        if active.get("pid") and active_is_running(active):
+            if should_poll and active_completed_remotely(active):
+                terminate_active_process(active)
+                retries, error = finish_active(active, retries)
+                last_error = error or last_error
+            elif active_timed_out(active):
+                terminate_active_process(active)
+                cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+                retries = update_retry(active, retries)
+                ACTIVE_PROCESSES.pop(active.get("pid"), None)
+                last_error = f"Stopped {active.get('id')}: runner ran past {MAX_ACTIVE_SECONDS // 60} min without completing."
+            else:
+                surviving.append(active)
         else:
-            if should_poll:
-                polled_queue, statuses = collect_queue(registry, profiles)
-                queue = merge_jobs(queue, polled_queue)
-                retries = prune_retries(retries, queue, active)
-            queue = remove_job(queue, active["id"])
-            return save_state(active, queue, statuses, None, retries, profiles, webhook)
-
-    if active:
-        retries, last_error = finish_active(active, retries)
-        active = None
+            retries, error = finish_active(active, retries)
+            last_error = error or last_error
+    actives = surviving
 
     if should_poll:
         polled_queue, statuses = collect_queue(registry, profiles)
         queue = merge_jobs(queue, polled_queue)
-        retries = prune_retries(retries, queue, active)
+        retries = prune_retries(retries, queue, actives)
 
     queue = merge_jobs(queue, [])
+    active_ids = {active.get("id") for active in actives}
+    queue = [job for job in queue if job.get("id") not in active_ids]
+
+    free_slots = MAX_CONCURRENT_JOBS - len(actives)
     dispatchable = [job for job in queue if retries.get(job["id"], 0) < MAX_RETRIES]
-    if dispatchable:
-        job = dispatchable[0]
+    dispatched = False
+    for job in dispatchable[:max(free_slots, 0)]:
         try:
             process = start_runner(job)
         except Exception as exc:
             retries = update_retry(job, retries)
-            return save_state(None, queue, statuses, f"Could not start {job.get('id', 'queued job')}: {exc}", retries, profiles, webhook)
+            last_error = f"Could not start {job.get('id', 'queued job')}: {exc}"
+            continue
 
         active = dict(job)
         active["pid"] = process.pid
         active["status"] = "in_progress"
         active["dispatchedAt"] = time.time()
         ACTIVE_PROCESSES[process.pid] = process
+        actives.append(active)
+        active_ids.add(job["id"])
         queue = remove_job(queue, job["id"])
+        dispatched = True
+
+    if dispatched:
         last_error = None
-    elif queue:
+    elif not last_error and not actives and queue:
         exhausted = [job for job in queue if retries.get(job["id"], 0) >= MAX_RETRIES]
         if exhausted:
-            last_error = last_error or f"Retry limit reached for {len(exhausted)} queued job(s)."
-    else:
-        last_error = None
+            last_error = f"Retry limit reached for {len(exhausted)} queued job(s)."
 
-    return save_state(active, queue, statuses, last_error, retries, profiles, webhook)
+    return save_state(actives, queue, statuses, last_error, retries, profiles, webhook)
 
 
 def poll_interval(state: dict) -> int:
@@ -665,7 +670,7 @@ def apply_workflow_job_event(payload: dict, delivery_id: str) -> None:
 
     with STATE_LOCK:
         state = read_state()
-        active = state.get("active")
+        actives = list(state.get("actives") or [])
         queue = list(state.get("queue") or [])
         statuses = list(state.get("repos") or [])
         retries = state.get("retries") or {}
@@ -684,23 +689,23 @@ def apply_workflow_job_event(payload: dict, delivery_id: str) -> None:
             queue = merge_jobs(queue, [job])
         elif job and action == "in_progress":
             queue = remove_job(queue, job["id"])
-            if active and active.get("id") == job["id"]:
-                active = {**active, "status": action}
+            actives = [{**a, "status": action} if a.get("id") == job["id"] else a for a in actives]
         elif job and action == "completed":
             queue = remove_job(queue, job["id"])
-            if active and active.get("id") == job["id"]:
+            match = next((a for a in actives if a.get("id") == job["id"]), None)
+            if match is not None:
                 conclusion = job.get("conclusion")
-                active = {**active, "status": action, "conclusion": conclusion}
-                active["exitCode"] = 0 if conclusion == "success" else 1
-                if active.get("pid") and active_is_running(active):
-                    terminate_active_process(active)
-                retries, last_error = finish_active(active, retries)
-                active = None
+                match = {**match, "status": action, "conclusion": conclusion}
+                match["exitCode"] = 0 if conclusion == "success" else 1
+                if match.get("pid") and active_is_running(match):
+                    terminate_active_process(match)
+                retries, last_error = finish_active(match, retries)
+                actives = [a for a in actives if a.get("id") != job["id"]]
 
         if job and profile is not None:
             statuses = upsert_repo_status(statuses, queue, job["repositorySlug"], profile, labels)
 
-        save_state(active, queue, statuses, last_error, retries, profiles, webhook)
+        save_state(actives, queue, statuses, last_error, retries, profiles, webhook)
 
 
 def record_webhook_status(enabled: bool, last_error: str | None) -> None:
@@ -790,15 +795,17 @@ def labels_for_repository(slug: str, profile: dict, registry: dict) -> list[str]
     return None
 
 
-def save_state(active, queue, statuses, error, retries, profiles, webhook) -> dict:
+def save_state(actives, queue, statuses, error, retries, profiles, webhook) -> dict:
     queue = merge_jobs(queue, [])
-    if active:
-        queue = remove_job(queue, active["id"])
+    actives = list(actives or [])
+    active_ids = {active.get("id") for active in actives}
+    queue = [job for job in queue if job.get("id") not in active_ids]
     state = {
         "version": 1,
         "updatedAt": now(),
         "servicePID": os.getpid(),
-        "active": active,
+        "actives": actives,
+        "active": actives[0] if actives else None,
         "queue": queue,
         "repos": statuses,
         "profiles": profiles,
@@ -823,15 +830,18 @@ def read_registry() -> dict:
 
 def read_state() -> dict:
     if not STATE_PATH.exists():
-        return {"version": 1, "queue": [], "repos": [], "retries": {}, "webhook": webhook_status(None)}
+        return {"version": 1, "actives": [], "queue": [], "repos": [], "retries": {}, "webhook": webhook_status(None)}
     try:
         state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return {"version": 1, "queue": [], "repos": [], "retries": {}, "webhook": webhook_status(None)}
+        return {"version": 1, "actives": [], "queue": [], "repos": [], "retries": {}, "webhook": webhook_status(None)}
     state.setdefault("version", 1)
     state.setdefault("queue", [])
     state.setdefault("repos", [])
     state.setdefault("retries", {})
+    if state.get("actives") is None:
+        legacy = state.get("active")
+        state["actives"] = [legacy] if legacy else []
     state["webhook"] = webhook_status(state.get("webhook"))
     return state
 
@@ -856,10 +866,11 @@ def clear_retry(job_id: str | None, retries: dict) -> dict:
     return result
 
 
-def prune_retries(retries: dict, queue: list[dict], active: dict | None = None) -> dict:
+def prune_retries(retries: dict, queue: list[dict], actives: list[dict] | None = None) -> dict:
     keep = {job.get("id") for job in queue if job.get("id")}
-    if active and active.get("id"):
-        keep.add(active["id"])
+    for active in actives or []:
+        if active.get("id"):
+            keep.add(active["id"])
     return {job_id: count for job_id, count in retries.items() if job_id in keep}
 
 

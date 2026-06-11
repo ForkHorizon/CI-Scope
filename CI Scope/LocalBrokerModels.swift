@@ -112,6 +112,7 @@ struct BrokerState: Codable, Equatable {
     var updatedAt: String
     var servicePID: Int?
     var active: BrokerJob?
+    var actives: [BrokerJob]?
     var queue: [BrokerJob]
     var repos: [BrokerRepoStatus]
     var profiles: [BrokerRunnerProfile]?
@@ -119,11 +120,20 @@ struct BrokerState: Codable, Equatable {
     var lastError: String?
     var retries: [String: Int]?
 
+    /// All jobs the broker is running right now. Prefers the parallel `actives`
+    /// list and falls back to the legacy single `active` field for older state files.
+    var activeJobs: [BrokerJob] {
+        if let actives { return actives }
+        if let active { return [active] }
+        return []
+    }
+
     static let empty = BrokerState(
         version: 1,
         updatedAt: "",
         servicePID: nil,
         active: nil,
+        actives: nil,
         queue: [],
         repos: [],
         profiles: nil,

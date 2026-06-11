@@ -181,7 +181,7 @@ private final class BrokerStateMonitor {
     private func currentSignature() -> String {
         let registry = service.loadRegistry()
         let state = service.loadState()
-        let activeID = state.active?.id ?? "-"
+        let activeID = state.activeJobs.isEmpty ? "-" : state.activeJobs.map(\.id).sorted().joined(separator: ",")
         let queueIDs = state.queue.map(\.id).joined(separator: ",")
         let webhook =
             state.webhook.map { status in
