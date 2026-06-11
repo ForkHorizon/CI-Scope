@@ -54,6 +54,7 @@ POLL_SECONDS = 15
 WEBHOOK_RECONCILE_SECONDS = 75
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
+MAX_ACTIVE_SECONDS = int(os.environ.get("CI_SCOPE_MAX_ACTIVE_SECONDS", "3600"))
 MAX_WEBHOOK_BODY_BYTES = 2_000_000
 ROOT = Path.home() / "Library/Application Support/CI Scope/Broker"
 REGISTRY_PATH = ROOT / "managed-repos.json"
@@ -122,10 +123,18 @@ def tick(state: dict, should_poll: bool) -> dict:
             terminate_active_process(active)
             retries, last_error = finish_active(active, retries)
             active = None
+        elif active_timed_out(active):
+            terminate_active_process(active)
+            cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+            retries = update_retry(active, retries)
+            ACTIVE_PROCESSES.pop(active.get("pid"), None)
+            last_error = f"Stopped {active.get('id')}: runner ran past {MAX_ACTIVE_SECONDS // 60} min without completing."
+            active = None
         else:
             if should_poll:
                 polled_queue, statuses = collect_queue(registry, profiles)
                 queue = merge_jobs(queue, polled_queue)
+                retries = prune_retries(retries, queue, active)
             queue = remove_job(queue, active["id"])
             return save_state(active, queue, statuses, None, retries, profiles, webhook)
 
@@ -136,6 +145,7 @@ def tick(state: dict, should_poll: bool) -> dict:
     if should_poll:
         polled_queue, statuses = collect_queue(registry, profiles)
         queue = merge_jobs(queue, polled_queue)
+        retries = prune_retries(retries, queue, active)
 
     queue = merge_jobs(queue, [])
     dispatchable = [job for job in queue if retries.get(job["id"], 0) < MAX_RETRIES]
@@ -150,6 +160,7 @@ def tick(state: dict, should_poll: bool) -> dict:
         active = dict(job)
         active["pid"] = process.pid
         active["status"] = "in_progress"
+        active["dispatchedAt"] = time.time()
         ACTIVE_PROCESSES[process.pid] = process
         queue = remove_job(queue, job["id"])
         last_error = None
@@ -254,10 +265,12 @@ def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
         active["exitCode"] = exit_code
     active["status"] = "completed" if exit_code in (0, None) else "failed"
 
-    refreshed = refresh_run(active)
+    refreshed = job_remote_status(active)
     cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
     if refreshed.get("status") == "queued":
         retries = update_retry(active, retries)
+    else:
+        retries = clear_retry(active.get("id"), retries)
     return retries, refreshed.get("lastError")
 
 
@@ -469,6 +482,28 @@ def download_runner_archive() -> Path:
         tmp.write_bytes(response.read())
     tmp.replace(destination)
     return destination
+
+
+def job_remote_status(active: dict) -> dict:
+    job_id = active.get("jobId")
+    slug = active.get("repositorySlug")
+    if job_id and slug:
+        try:
+            job = gh_json(f"repos/{slug}/actions/jobs/{job_id}")
+            return {"status": job.get("status"), "conclusion": job.get("conclusion"), "lastError": None}
+        except Exception:
+            pass
+    return refresh_run(active)
+
+
+def active_timed_out(active: dict) -> bool:
+    dispatched = active.get("dispatchedAt")
+    if not dispatched:
+        return False
+    try:
+        return (time.time() - float(dispatched)) > MAX_ACTIVE_SECONDS
+    except (TypeError, ValueError):
+        return False
 
 
 def refresh_run(job: dict) -> dict:
@@ -811,6 +846,21 @@ def update_retry(job: dict, retries: dict) -> dict:
     result = dict(retries)
     result[job["id"]] = result.get(job["id"], 0) + 1
     return result
+
+
+def clear_retry(job_id: str | None, retries: dict) -> dict:
+    if not job_id or job_id not in retries:
+        return retries
+    result = dict(retries)
+    result.pop(job_id, None)
+    return result
+
+
+def prune_retries(retries: dict, queue: list[dict], active: dict | None = None) -> dict:
+    keep = {job.get("id") for job in queue if job.get("id")}
+    if active and active.get("id"):
+        keep.add(active["id"])
+    return {job_id: count for job_id, count in retries.items() if job_id in keep}
 
 
 def repo_status(slug: str, state: str, count: int, error: str | None, profile: dict, labels: list[str]) -> dict:
