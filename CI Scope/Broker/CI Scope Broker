@@ -150,7 +150,11 @@ def tick(state: dict, should_poll: bool) -> dict:
 
     if should_poll:
         polled_queue, statuses = collect_queue(registry, profiles)
-        queue = merge_jobs(queue, polled_queue)
+        # The poll lists every job currently queued across all managed repos, so
+        # it is authoritative: replace the queue rather than unioning it, or jobs
+        # that left GitHub's queue (completed/cancelled) without the broker
+        # dispatching them would linger forever and inflate the shared count.
+        queue = polled_queue
         retries = prune_retries(retries, queue, actives)
 
     queue = merge_jobs(queue, [])
