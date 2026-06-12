@@ -56,6 +56,7 @@ WEBHOOK_RECONCILE_SECONDS = 75
 ORG_REPO_CACHE_SECONDS = int(os.environ.get("CI_SCOPE_ORG_REPO_CACHE_SECONDS", "90"))
 POLL_MAX_WORKERS = max(1, int(os.environ.get("CI_SCOPE_POLL_WORKERS", "12")))
 WEBHOOK_FRESH_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_FRESH_SECONDS", "300"))
+WEBHOOK_QUEUE_GRACE_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_QUEUE_GRACE", "120"))
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
 RETRY_RESET_SECONDS = int(os.environ.get("CI_SCOPE_RETRY_RESET_SECONDS", "300"))
@@ -79,6 +80,10 @@ STATE_LOCK = threading.RLock()
 ACTIVE_PROCESSES: dict[int, subprocess.Popen] = {}
 RETRY_RESET_AT = time.monotonic()
 ORG_REPO_CACHE: dict[str, tuple[float, list[str]]] = {}
+# job id -> time.monotonic() when a webhook queued it. Touched only under
+# STATE_LOCK (webhook handler + tick publish). Lets the publish keep a webhook
+# arrival that landed after the poll snapshot, until the next poll confirms it.
+WEBHOOK_QUEUED_AT: dict[str, float] = {}
 UNSET = object()
 
 
@@ -251,7 +256,22 @@ def tick(polled: tuple | None) -> dict:
         final_actives.extend(dispatched_actives)
 
         if polled is not None:
-            queue = polled_queue
+            # polled is authoritative, but the poll snapshot predates any webhook
+            # that arrived while we did I/O lock-free. Union those still-fresh
+            # webhook arrivals so an instant 'queued' isn't dropped until the next
+            # poll. The grace window expires them, so completed/stale jobs don't
+            # pile back up — the poll stays authoritative otherwise.
+            prune_webhook_queued()
+            final_ids = {active.get("id") for active in final_actives}
+            polled_ids = {job.get("id") for job in polled_queue}
+            preserved = [
+                job
+                for job in (fresh.get("queue") or [])
+                if job.get("id") in WEBHOOK_QUEUED_AT
+                and job.get("id") not in polled_ids
+                and job.get("id") not in final_ids
+            ]
+            queue = merge_jobs(polled_queue, preserved)
             statuses = polled_statuses
         else:
             queue = list(fresh.get("queue") or [])
@@ -298,6 +318,13 @@ def terminate_active_process(active: dict) -> None:
         return
 
     process = ACTIVE_PROCESSES.get(pid)
+    if process is None:
+        # Not a runner this broker instance started (e.g. an active restored
+        # from state after a restart). The OS may have recycled the pid, so
+        # killing it could hit an unrelated process group. Leave it — the
+        # caller still deregisters our runner on GitHub by name, and the old
+        # ephemeral runner exits on its own.
+        return
     try:
         os.killpg(pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -485,14 +512,16 @@ def runner_name_for(job: dict) -> str:
     return f"ci-scope-{job_id}-{int(time.time()) % 100000:05d}"
 
 
+def list_repo_runners(slug: str) -> list[dict]:
+    try:
+        return gh_json(f"repos/{slug}/actions/runners?per_page=100").get("runners") or []
+    except Exception:
+        return []
+
+
 def cleanup_stale_runners(job: dict) -> None:
     prefix = f"ci-scope-{job.get('jobId') or job.get('runId') or 'run'}-"
-    try:
-        runners = gh_json(f"repos/{job['repositorySlug']}/actions/runners?per_page=100").get("runners") or []
-    except Exception:
-        return
-
-    for runner in runners:
+    for runner in list_repo_runners(job["repositorySlug"]):
         name = str(runner.get("name") or "")
         if not name.startswith(prefix):
             continue
@@ -512,11 +541,7 @@ def runner_is_idle(active: dict) -> bool:
     name = active.get("runnerName")
     if not slug or not name:
         return False
-    try:
-        runners = gh_json(f"repos/{slug}/actions/runners?per_page=100").get("runners") or []
-    except Exception:
-        return False
-    for runner in runners:
+    for runner in list_repo_runners(slug):
         if runner.get("name") == name:
             return not runner.get("busy", False)
     return False
@@ -525,12 +550,7 @@ def runner_is_idle(active: dict) -> bool:
 def cleanup_runner_by_name(repository_slug: str | None, runner_name: str | None) -> None:
     if not repository_slug or not runner_name:
         return
-    try:
-        runners = gh_json(f"repos/{repository_slug}/actions/runners?per_page=100").get("runners") or []
-    except Exception:
-        return
-
-    for runner in runners:
+    for runner in list_repo_runners(repository_slug):
         if runner.get("name") != runner_name or runner.get("busy"):
             continue
         try:
@@ -627,7 +647,7 @@ def job_remote_status(active: dict) -> dict:
     if job_id and slug:
         try:
             job = gh_json(f"repos/{slug}/actions/jobs/{job_id}")
-            return {"status": job.get("status"), "conclusion": job.get("conclusion"), "lastError": None}
+            return {"status": job.get("status"), "lastError": None}
         except Exception:
             pass
     return refresh_run(active)
@@ -654,7 +674,7 @@ def active_older_than(active: dict, seconds: int) -> bool:
 def refresh_run(job: dict) -> dict:
     try:
         run = gh_json(f"repos/{job['repositorySlug']}/actions/runs/{job['runId']}")
-        return {"status": run.get("status"), "conclusion": run.get("conclusion"), "lastError": None}
+        return {"status": run.get("status"), "lastError": None}
     except Exception as exc:
         return {"status": "unknown", "lastError": str(exc)}
 
@@ -723,7 +743,6 @@ def webhook_job_payload(payload: dict, registry: dict, profiles: list[dict]) -> 
         "jobName": workflow_job.get("name") or "Workflow job",
         "headBranch": workflow_job.get("head_branch") or workflow_run.get("head_branch") or "-",
         "status": workflow_job.get("status") or payload.get("action") or "queued",
-        "conclusion": workflow_job.get("conclusion"),
         "url": workflow_job.get("html_url") or workflow_run.get("html_url") or "",
         "createdAt": workflow_job.get("created_at") or workflow_run.get("created_at") or now(),
         "labels": job_labels or labels,
@@ -806,6 +825,12 @@ def verify_signature(body: bytes, signature: str, secret: str) -> bool:
     return hmac.compare_digest(expected, signature)
 
 
+def prune_webhook_queued() -> None:
+    cutoff = time.monotonic() - WEBHOOK_QUEUE_GRACE_SECONDS
+    for job_id in [jid for jid, at in WEBHOOK_QUEUED_AT.items() if at < cutoff]:
+        WEBHOOK_QUEUED_AT.pop(job_id, None)
+
+
 def apply_workflow_job_event(payload: dict, delivery_id: str) -> None:
     action = payload.get("action") or ""
     registry = read_registry()
@@ -831,14 +856,17 @@ def apply_workflow_job_event(payload: dict, delivery_id: str) -> None:
 
         if job and action == "queued":
             queue = merge_jobs(queue, [job])
+            WEBHOOK_QUEUED_AT[job["id"]] = time.monotonic()
         elif job and action == "in_progress":
             queue = remove_job(queue, job["id"])
             actives = [{**a, "status": action} if a.get("id") == job["id"] else a for a in actives]
+            WEBHOOK_QUEUED_AT.pop(job["id"], None)
         elif job and action == "completed":
             # Just drop the finished job from the queue. Do NOT kill or remove a
             # runner by job id — ephemeral runners can be running a different
             # (swapped) job. tick() reaps each runner when its process exits.
             queue = remove_job(queue, job["id"])
+            WEBHOOK_QUEUED_AT.pop(job["id"], None)
 
         if job and profile is not None:
             statuses = upsert_repo_status(statuses, queue, job["repositorySlug"], profile, labels)
