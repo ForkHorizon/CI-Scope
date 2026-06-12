@@ -13,6 +13,7 @@ import sys
 import tarfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -53,6 +54,7 @@ DEFAULT_PROFILES = [
 POLL_SECONDS = max(1, int(os.environ.get("CI_SCOPE_POLL_SECONDS", "4")))
 WEBHOOK_RECONCILE_SECONDS = 75
 ORG_REPO_CACHE_SECONDS = int(os.environ.get("CI_SCOPE_ORG_REPO_CACHE_SECONDS", "90"))
+POLL_MAX_WORKERS = max(1, int(os.environ.get("CI_SCOPE_POLL_WORKERS", "12")))
 WEBHOOK_FRESH_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_FRESH_SECONDS", "300"))
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
@@ -305,7 +307,7 @@ def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
 
 
 def collect_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
-    jobs = []
+    tasks = []
     statuses = []
     for profile in profiles:
         try:
@@ -317,12 +319,22 @@ def collect_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], lis
         for repo in repos:
             slug = repo["slug"]
             labels = repo.get("labels") or profile_labels(profile)
-            try:
-                repo_jobs = queued_jobs(slug, labels, profile)
-                jobs.extend(repo_jobs)
-                statuses.append(repo_status(slug, "ok", len(repo_jobs), None, profile, labels))
-            except Exception as exc:
-                statuses.append(repo_status(slug, "warning", 0, str(exc), profile, labels))
+            tasks.append((slug, labels, profile))
+
+    # Poll each repo's queue concurrently — done sequentially this is ~2s per
+    # repo and dominates the loop. repositories_for_profile (above) stays
+    # sequential so the cached org-repo list is never touched from threads.
+    jobs = []
+    if tasks:
+        with ThreadPoolExecutor(max_workers=min(len(tasks), POLL_MAX_WORKERS)) as pool:
+            pending = {pool.submit(queued_jobs, slug, labels, profile): (slug, labels, profile) for slug, labels, profile in tasks}
+            for future, (slug, labels, profile) in pending.items():
+                try:
+                    repo_jobs = future.result()
+                    jobs.extend(repo_jobs)
+                    statuses.append(repo_status(slug, "ok", len(repo_jobs), None, profile, labels))
+                except Exception as exc:
+                    statuses.append(repo_status(slug, "warning", 0, str(exc), profile, labels))
     return merge_jobs(jobs, []), statuses
 
 
