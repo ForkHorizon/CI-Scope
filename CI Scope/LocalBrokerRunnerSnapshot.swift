@@ -13,7 +13,7 @@ extension LocalBrokerService {
         let subRunners = profiles.map { profile in
             subRunnerSnapshot(profile: profile, registry: registry, state: state, launch: launch)
         }
-        let activeJobs = state.active.map { [$0.workItem] } ?? []
+        let activeJobs = state.activeJobs.map(\.workItem)
         let queuedJobs = state.queue.map(\.workItem)
         let visibleRepositoryCount = subRunners.reduce(0) { $0 + $1.visibleRepositoryCount }
 
@@ -30,13 +30,14 @@ extension LocalBrokerService {
         snapshot.uptime = launch.uptime
         snapshot.serviceLabel = LocalBrokerConstants.serviceLabel
         snapshot.remoteName = "MacBook Controller"
-        snapshot.remoteStatus = "serial dispatcher"
+        snapshot.remoteStatus = "parallel dispatcher"
         snapshot.registeredTo = "\(subRunners.count) sub-runners"
         snapshot.labels = uniqueLabels(profiles.flatMap(\.labels))
         snapshot.activeJobs = activeJobs
         snapshot.queuedJobs = queuedJobs
         snapshot.visibleRepositoryCount = visibleRepositoryCount
         snapshot.subRunners = subRunners
+        snapshot.webhook = state.webhook
         snapshot.error = [state.lastError, staleWarning].compactMap { $0 }.joined(separator: "\n").nilIfEmpty
         snapshot.state = brokerState(launch: launch, state: state, subRunners: subRunners, staleWarning: staleWarning)
         return snapshot
@@ -49,7 +50,7 @@ extension LocalBrokerService {
         launch: RunnerLaunchStatus
     ) -> RunnerSubRunnerSnapshot {
         let statuses = repositoryStatuses(for: profile, registry: registry, state: state)
-        let activeJobCount = state.active.map { jobMatchesProfile($0, profile: profile) ? 1 : 0 } ?? 0
+        let activeJobCount = state.activeJobs.filter { jobMatchesProfile($0, profile: profile) }.count
         let queuedJobCount = state.queue.filter { jobMatchesProfile($0, profile: profile) }.count
         let visibleRepositoryCount = visibleRepositoryCount(for: profile, registry: registry, statuses: statuses)
         let lastError = subRunnerLastError(statuses: statuses)
@@ -160,7 +161,7 @@ extension LocalBrokerService {
     ) -> ServiceState {
         if launch.state == .offline { return .offline }
         if subRunners.contains(where: { $0.state == .offline }) { return .offline }
-        if state.lastError != nil || staleWarning != nil || state.active != nil || !state.queue.isEmpty { return .warning }
+        if state.lastError != nil || staleWarning != nil || !state.activeJobs.isEmpty || !state.queue.isEmpty { return .warning }
         if subRunners.contains(where: { $0.state == .warning }) { return .warning }
         return launch.state
     }

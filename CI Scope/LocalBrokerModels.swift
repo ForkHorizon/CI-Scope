@@ -3,10 +3,14 @@ import Foundation
 enum LocalBrokerConstants {
     static let serviceLabel = "com.ci-scope.local-mac-broker"
     static let organizationProfileID = "forkhorizon-organization"
+    static let organizationBrokerProfileID = "forkhorizon-organization-broker"
     static let privateProfileID = "daliys-private"
     static let organizationRunnerLabels = ["self-hosted", "macOS", "ARM64", "ci-scope"]
+    static let organizationBrokerRunnerLabels = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
     static let runnerLabels = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
     static let stateStaleAfterSeconds: TimeInterval = 75
+    static let webhookPort = 8765
+    static let webhookPath = "/github/workflow-job"
 }
 
 struct BrokerRegistry: Codable, Equatable {
@@ -56,6 +60,15 @@ struct BrokerRunnerProfile: Identifiable, Codable, Equatable {
             enabled: true
         ),
         BrokerRunnerProfile(
+            id: LocalBrokerConstants.organizationBrokerProfileID,
+            title: "ForkHorizon broker workflows",
+            scope: "ForkHorizon organization",
+            kind: .organization,
+            organization: "ForkHorizon",
+            labels: LocalBrokerConstants.organizationBrokerRunnerLabels,
+            enabled: true
+        ),
+        BrokerRunnerProfile(
             id: LocalBrokerConstants.privateProfileID,
             title: "Daliys private repositories",
             scope: "Daliys private repositories",
@@ -99,20 +112,32 @@ struct BrokerState: Codable, Equatable {
     var updatedAt: String
     var servicePID: Int?
     var active: BrokerJob?
+    var actives: [BrokerJob]?
     var queue: [BrokerJob]
     var repos: [BrokerRepoStatus]
     var profiles: [BrokerRunnerProfile]?
+    var webhook: BrokerWebhookStatus?
     var lastError: String?
     var retries: [String: Int]?
+
+    /// All jobs the broker is running right now. Prefers the parallel `actives`
+    /// list and falls back to the legacy single `active` field for older state files.
+    var activeJobs: [BrokerJob] {
+        if let actives { return actives }
+        if let active { return [active] }
+        return []
+    }
 
     static let empty = BrokerState(
         version: 1,
         updatedAt: "",
         servicePID: nil,
         active: nil,
+        actives: nil,
         queue: [],
         repos: [],
         profiles: nil,
+        webhook: nil,
         lastError: nil,
         retries: [:]
     )

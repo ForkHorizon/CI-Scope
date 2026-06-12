@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import glob
+import hashlib
+import hmac
 import json
 import os
 import shutil
@@ -9,11 +11,15 @@ import signal
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.request import urlopen
 
 ORG_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope"]
+ORG_BROKER_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
 PRIVATE_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
 DEFAULT_PROFILES = [
     {
@@ -26,6 +32,15 @@ DEFAULT_PROFILES = [
         "enabled": True,
     },
     {
+        "id": "forkhorizon-organization-broker",
+        "title": "ForkHorizon broker workflows",
+        "scope": "ForkHorizon organization",
+        "kind": "organization",
+        "organization": "ForkHorizon",
+        "labels": ORG_BROKER_LABELS,
+        "enabled": True,
+    },
+    {
         "id": "daliys-private",
         "title": "Daliys private repositories",
         "scope": "Daliys private repositories",
@@ -35,18 +50,38 @@ DEFAULT_PROFILES = [
         "enabled": True,
     },
 ]
-POLL_SECONDS = 15
+POLL_SECONDS = max(1, int(os.environ.get("CI_SCOPE_POLL_SECONDS", "4")))
+WEBHOOK_RECONCILE_SECONDS = 75
+ORG_REPO_CACHE_SECONDS = int(os.environ.get("CI_SCOPE_ORG_REPO_CACHE_SECONDS", "90"))
+WEBHOOK_FRESH_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_FRESH_SECONDS", "300"))
+SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
+RETRY_RESET_SECONDS = int(os.environ.get("CI_SCOPE_RETRY_RESET_SECONDS", "300"))
+MAX_ACTIVE_SECONDS = int(os.environ.get("CI_SCOPE_MAX_ACTIVE_SECONDS", "3600"))
+MAX_CONCURRENT_JOBS = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_JOBS", "2")))
+MAX_CONCURRENT_HEAVY = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_HEAVY", "1")))
+HEAVY_LABEL = os.environ.get("CI_SCOPE_HEAVY_LABEL", "ci-scope-heavy").lower()
+MAX_WEBHOOK_BODY_BYTES = 2_000_000
 ROOT = Path.home() / "Library/Application Support/CI Scope/Broker"
 REGISTRY_PATH = ROOT / "managed-repos.json"
 STATE_PATH = ROOT / "broker-state.json"
 JOBS_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/jobs"
+RUNNER_TEMPLATE_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/runner-template"
 LOG_DIR = Path.home() / "Library/Logs/CI Scope/Broker"
+WEBHOOK_PORT = int(os.environ.get("CI_SCOPE_WEBHOOK_PORT", "8765"))
+WEBHOOK_PATH = os.environ.get("CI_SCOPE_WEBHOOK_PATH", "/github/workflow-job")
+WEBHOOK_SECRET_PATH = Path(os.environ.get("CI_SCOPE_WEBHOOK_SECRET_PATH", ROOT / "webhook-secret"))
+
+STATE_LOCK = threading.RLock()
+ACTIVE_PROCESSES: dict[int, subprocess.Popen] = {}
+RETRY_RESET_AT = time.monotonic()
+ORG_REPO_CACHE: dict[str, tuple[float, list[str]]] = {}
+UNSET = object()
 
 
 def main() -> int:
     if "--help" in sys.argv or "-h" in sys.argv:
-        print("CI Scope Broker: polls managed GitHub repos and runs one JIT runner job at a time.")
+        print(f"CI Scope Broker: polls managed GitHub repos, receives workflow_job webhooks, and runs up to {MAX_CONCURRENT_JOBS} JIT runner job(s) concurrently (at most {MAX_CONCURRENT_HEAVY} labelled '{HEAVY_LABEL}').")
         return 0
     os.environ["PATH"] = ":".join(
         [
@@ -61,41 +96,186 @@ def main() -> int:
         ]
     )
     ensure_dirs()
-    state = read_state()
+    start_webhook_server()
+
+    last_poll = 0.0
     while True:
         try:
-            state = tick(state)
+            with STATE_LOCK:
+                state = read_state()
+                should_poll = time.monotonic() - last_poll >= poll_interval(state)
+                state = tick(state, should_poll)
+                if should_poll:
+                    last_poll = time.monotonic()
         except Exception as exc:
-            state["lastError"] = str(exc)
-            state["updatedAt"] = now()
-            write_state(state)
-        time.sleep(POLL_SECONDS)
+            with STATE_LOCK:
+                state = read_state()
+                state["lastError"] = str(exc)
+                state["updatedAt"] = now()
+                state["webhook"] = webhook_status(state.get("webhook"))
+                write_state(state)
+        time.sleep(SCHEDULER_SECONDS)
 
 
-def tick(state: dict) -> dict:
+def tick(state: dict, should_poll: bool) -> dict:
     registry = read_registry()
     profiles = enabled_profiles(registry)
-    retries = state.get("retries") or {}
-    active = state.get("active")
+    retries = reset_stale_retries(state.get("retries") or {})
+    webhook = webhook_status(state.get("webhook"))
+    actives = list(state.get("actives") or [])
+    queue = list(state.get("queue") or [])
+    statuses = list(state.get("repos") or [])
+    last_error = None
 
-    if active and active.get("pid") and process_alive(active["pid"]):
-        queue, statuses = collect_queue(registry, profiles)
-        return save_state(active, queue, statuses, None, retries, profiles)
+    surviving = []
+    for active in actives:
+        if active.get("pid") and active_is_running(active):
+            # Ephemeral JIT runners pick up whichever queued job matches their
+            # labels, so the process the broker started for one job may be
+            # running another. Never kill a live runner based on a remote job's
+            # status — only the watchdog may stop a genuinely stuck one. A slot
+            # frees when the runner process exits on its own (the else branch).
+            if active_timed_out(active):
+                terminate_active_process(active)
+                cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+                retries = update_retry(active, retries)
+                ACTIVE_PROCESSES.pop(active.get("pid"), None)
+                last_error = f"Stopped {active.get('id')}: runner ran past {MAX_ACTIVE_SECONDS // 60} min without completing."
+            else:
+                surviving.append(active)
+        else:
+            retries, error = finish_active(active, retries)
+            last_error = error or last_error
+    actives = surviving
 
-    if active:
-        retries = update_retry(active, retries)
+    if should_poll:
+        polled_queue, statuses = collect_queue(registry, profiles)
+        queue = merge_jobs(queue, polled_queue)
+        retries = prune_retries(retries, queue, actives)
 
-    queue, statuses = collect_queue(registry, profiles)
+    queue = merge_jobs(queue, [])
+    active_ids = {active.get("id") for active in actives}
+    queue = [job for job in queue if job.get("id") not in active_ids]
+
+    heavy_running = sum(1 for active in actives if job_is_heavy(active))
     dispatchable = [job for job in queue if retries.get(job["id"], 0) < MAX_RETRIES]
-    if not dispatchable:
-        return save_state(None, queue, statuses, None, retries, profiles)
+    dispatched = False
+    for job in dispatchable:
+        if len(actives) >= MAX_CONCURRENT_JOBS:
+            break
+        heavy = job_is_heavy(job)
+        if heavy and heavy_running >= MAX_CONCURRENT_HEAVY:
+            continue
+        try:
+            process = start_runner(job)
+        except Exception as exc:
+            retries = update_retry(job, retries)
+            last_error = f"Could not start {job.get('id', 'queued job')}: {exc}"
+            continue
 
-    job = dispatchable[0]
-    process = start_runner(job)
-    active_job = dict(job)
-    active_job["pid"] = process.pid
-    write_state(save_state(active_job, queue, statuses, None, retries, profiles))
-    return wait_for_runner(process, active_job, statuses, retries, profiles)
+        active = dict(job)
+        active["pid"] = process.pid
+        active["status"] = "in_progress"
+        active["dispatchedAt"] = time.time()
+        ACTIVE_PROCESSES[process.pid] = process
+        actives.append(active)
+        active_ids.add(job["id"])
+        queue = remove_job(queue, job["id"])
+        if heavy:
+            heavy_running += 1
+        dispatched = True
+
+    if dispatched:
+        last_error = None
+    elif not last_error and not actives and queue:
+        exhausted = [job for job in queue if retries.get(job["id"], 0) >= MAX_RETRIES]
+        if exhausted:
+            last_error = f"Retry limit reached for {len(exhausted)} queued job(s)."
+
+    return save_state(actives, queue, statuses, last_error, retries, profiles, webhook)
+
+
+def poll_interval(state: dict) -> int:
+    webhook = state.get("webhook") or {}
+    if webhook.get("enabled") and webhook_delivery_is_fresh(webhook.get("lastDeliveryAt")):
+        return WEBHOOK_RECONCILE_SECONDS
+    return POLL_SECONDS
+
+
+def webhook_delivery_is_fresh(last_delivery_at: str | None) -> bool:
+    if not last_delivery_at:
+        return False
+    try:
+        delivered = datetime.fromisoformat(last_delivery_at)
+    except (TypeError, ValueError):
+        return False
+    if delivered.tzinfo is None:
+        delivered = delivered.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - delivered).total_seconds() < WEBHOOK_FRESH_SECONDS
+
+
+def active_is_running(active: dict) -> bool:
+    pid = active.get("pid")
+    if not pid:
+        return False
+
+    process = ACTIVE_PROCESSES.get(pid)
+    if process is not None:
+        return process.poll() is None
+
+    return process_alive(pid)
+
+
+def terminate_active_process(active: dict) -> None:
+    pid = active.get("pid")
+    if not pid:
+        return
+
+    process = ACTIVE_PROCESSES.get(pid)
+    try:
+        os.killpg(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    except OSError:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            return
+
+    if process is not None:
+        try:
+            process.wait(timeout=5)
+            return
+        except subprocess.TimeoutExpired:
+            pass
+
+    time.sleep(1)
+    if not process_alive(pid):
+        return
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except OSError:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            return
+
+
+def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
+    pid = active.get("pid")
+    process = ACTIVE_PROCESSES.pop(pid, None) if pid else None
+    exit_code = process.poll() if process is not None else active.get("exitCode")
+    if exit_code is not None:
+        active["exitCode"] = exit_code
+    active["status"] = "completed" if exit_code in (0, None) else "failed"
+
+    refreshed = job_remote_status(active)
+    cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+    if refreshed.get("status") == "queued":
+        retries = update_retry(active, retries)
+    else:
+        retries = clear_retry(active.get("id"), retries)
+    return retries, refreshed.get("lastError")
 
 
 def collect_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -117,8 +297,7 @@ def collect_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], lis
                 statuses.append(repo_status(slug, "ok", len(repo_jobs), None, profile, labels))
             except Exception as exc:
                 statuses.append(repo_status(slug, "warning", 0, str(exc), profile, labels))
-    jobs.sort(key=lambda item: item.get("createdAt", ""))
-    return jobs, statuses
+    return merge_jobs(jobs, []), statuses
 
 
 def repositories_for_profile(profile: dict, registry: dict) -> list[dict]:
@@ -143,6 +322,10 @@ def repositories_for_profile(profile: dict, registry: dict) -> list[dict]:
 
 
 def organization_repositories(organization: str) -> list[str]:
+    cached = ORG_REPO_CACHE.get(organization)
+    if cached and (time.time() - cached[0]) < ORG_REPO_CACHE_SECONDS:
+        return cached[1]
+
     command = [
         "gh",
         "repo",
@@ -157,9 +340,13 @@ def organization_repositories(organization: str) -> list[str]:
     ]
     completed = subprocess.run(command, text=True, capture_output=True, timeout=60)
     if completed.returncode != 0:
+        if cached:
+            return cached[1]
         message = completed.stderr.strip() or completed.stdout.strip() or f"gh repo list failed: {organization}"
         raise RuntimeError(message)
-    return json.loads(completed.stdout or "[]")
+    repos = json.loads(completed.stdout or "[]")
+    ORG_REPO_CACHE[organization] = (time.time(), repos)
+    return repos
 
 
 def queued_jobs(slug: str, labels: list[str], profile: dict) -> list[dict]:
@@ -193,19 +380,12 @@ def start_runner(job: dict) -> subprocess.Popen:
     )
 
 
-def wait_for_runner(process: subprocess.Popen, active: dict, statuses: list[dict], retries: dict, profiles: list[dict]) -> dict:
-    exit_code = process.wait()
-    active["exitCode"] = exit_code
-    active["status"] = "completed" if exit_code == 0 else "failed"
-    refreshed = refresh_run(active)
-    if refreshed.get("status") == "queued":
-        retries = update_retry(active, retries)
-    return save_state(None, [], statuses, refreshed.get("lastError"), retries, profiles)
-
-
 def generate_jit_config(job: dict) -> str:
+    cleanup_stale_runners(job)
+    runner_name = runner_name_for(job)
+    job["runnerName"] = runner_name
     payload = {
-        "name": f"ci-scope-{safe_name(job['repositorySlug'])}-{job['runId']}-{job.get('jobId') or 'run'}",
+        "name": runner_name,
         "runner_group_id": 1,
         "labels": job.get("labels") or PRIVATE_LABELS,
         "work_folder": "_work",
@@ -221,14 +401,87 @@ def generate_jit_config(job: dict) -> str:
     return encoded
 
 
-def prepare_runner_dir(job: dict) -> Path:
+def runner_name_for(job: dict) -> str:
+    # GitHub runner names must be <= 64 chars. The job id is globally unique;
+    # a short time suffix disambiguates re-dispatches. Including the repo slug
+    # and run id overflowed the limit for longer repo names (e.g. NexusUnity).
+    job_id = job.get("jobId") or job.get("runId") or "run"
+    return f"ci-scope-{job_id}-{int(time.time()) % 100000:05d}"
+
+
+def cleanup_stale_runners(job: dict) -> None:
+    prefix = f"ci-scope-{job.get('jobId') or job.get('runId') or 'run'}-"
+    try:
+        runners = gh_json(f"repos/{job['repositorySlug']}/actions/runners?per_page=100").get("runners") or []
+    except Exception:
+        return
+
+    for runner in runners:
+        name = str(runner.get("name") or "")
+        if not name.startswith(prefix):
+            continue
+        if runner.get("busy"):
+            continue
+        try:
+            gh_json(f"repos/{job['repositorySlug']}/actions/runners/{runner['id']}", method="DELETE")
+        except Exception:
+            continue
+
+
+def cleanup_runner_by_name(repository_slug: str | None, runner_name: str | None) -> None:
+    if not repository_slug or not runner_name:
+        return
+    try:
+        runners = gh_json(f"repos/{repository_slug}/actions/runners?per_page=100").get("runners") or []
+    except Exception:
+        return
+
+    for runner in runners:
+        if runner.get("name") != runner_name or runner.get("busy"):
+            continue
+        try:
+            gh_json(f"repos/{repository_slug}/actions/runners/{runner['id']}", method="DELETE")
+        except Exception:
+            continue
+
+
+def ensure_runner_template() -> Path:
     archive = find_runner_archive()
+    marker = RUNNER_TEMPLATE_DIR.parent / "runner-template.archive"
+    current = str(archive)
+    if (
+        RUNNER_TEMPLATE_DIR.exists()
+        and (RUNNER_TEMPLATE_DIR / "run.sh").exists()
+        and marker.exists()
+        and marker.read_text(encoding="utf-8").strip() == current
+    ):
+        return RUNNER_TEMPLATE_DIR
+
+    if RUNNER_TEMPLATE_DIR.exists():
+        shutil.rmtree(RUNNER_TEMPLATE_DIR)
+    RUNNER_TEMPLATE_DIR.mkdir(parents=True)
+    with tarfile.open(archive) as tar:
+        tar.extractall(RUNNER_TEMPLATE_DIR)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(current, encoding="utf-8")
+    return RUNNER_TEMPLATE_DIR
+
+
+def prepare_runner_dir(job: dict) -> Path:
+    template = ensure_runner_template()
     runner_dir = JOBS_DIR / safe_name(job["id"])
     if runner_dir.exists():
         shutil.rmtree(runner_dir)
-    runner_dir.mkdir(parents=True)
-    with tarfile.open(archive) as tar:
-        tar.extractall(runner_dir)
+
+    # Near-instant APFS copy-on-write clone of the pre-extracted template,
+    # falling back to a fresh extract if cloning is unavailable.
+    clone = subprocess.run(["cp", "-cRp", str(template), str(runner_dir)], capture_output=True, text=True)
+    if clone.returncode != 0 or not (runner_dir / "run.sh").exists():
+        if runner_dir.exists():
+            shutil.rmtree(runner_dir)
+        runner_dir.mkdir(parents=True)
+        with tarfile.open(find_runner_archive()) as tar:
+            tar.extractall(runner_dir)
     return runner_dir
 
 
@@ -236,19 +489,70 @@ def find_runner_archive() -> Path:
     patterns = [
         "~/actions-runner*/**/actions-runner-osx-arm64-*.tar.gz",
         "~/actions-runners*/**/actions-runner-osx-arm64-*.tar.gz",
+        str(ROOT / "actions-runner-osx-arm64-*.tar.gz"),
     ]
     matches = []
     for pattern in patterns:
         matches.extend(glob.glob(os.path.expanduser(pattern), recursive=True))
     if not matches:
-        raise RuntimeError("No cached actions-runner-osx-arm64 archive was found.")
+        return download_runner_archive()
     return Path(max(matches, key=lambda path: Path(path).stat().st_mtime))
+
+
+def download_runner_archive() -> Path:
+    release = gh_json("repos/actions/runner/releases/latest")
+    assets = release.get("assets") or []
+    asset = next(
+        (
+            item
+            for item in assets
+            if str(item.get("name", "")).startswith("actions-runner-osx-arm64-")
+            and str(item.get("name", "")).endswith(".tar.gz")
+        ),
+        None,
+    )
+    if not asset:
+        raise RuntimeError("Could not find the latest macOS ARM64 GitHub Actions runner archive.")
+
+    url = asset.get("browser_download_url")
+    name = asset.get("name")
+    if not url or not name:
+        raise RuntimeError("GitHub runner release asset did not include a download URL.")
+
+    destination = ROOT / name
+    tmp = destination.with_suffix(".tmp")
+    with urlopen(url, timeout=120) as response:
+        tmp.write_bytes(response.read())
+    tmp.replace(destination)
+    return destination
+
+
+def job_remote_status(active: dict) -> dict:
+    job_id = active.get("jobId")
+    slug = active.get("repositorySlug")
+    if job_id and slug:
+        try:
+            job = gh_json(f"repos/{slug}/actions/jobs/{job_id}")
+            return {"status": job.get("status"), "conclusion": job.get("conclusion"), "lastError": None}
+        except Exception:
+            pass
+    return refresh_run(active)
+
+
+def active_timed_out(active: dict) -> bool:
+    dispatched = active.get("dispatchedAt")
+    if not dispatched:
+        return False
+    try:
+        return (time.time() - float(dispatched)) > MAX_ACTIVE_SECONDS
+    except (TypeError, ValueError):
+        return False
 
 
 def refresh_run(job: dict) -> dict:
     try:
         run = gh_json(f"repos/{job['repositorySlug']}/actions/runs/{job['runId']}")
-        return {"status": run.get("status"), "lastError": None}
+        return {"status": run.get("status"), "conclusion": run.get("conclusion"), "lastError": None}
     except Exception as exc:
         return {"status": "unknown", "lastError": str(exc)}
 
@@ -266,6 +570,10 @@ def gh_json(endpoint: str, method: str = "GET", payload: dict | None = None) -> 
     return json.loads(completed.stdout or "{}")
 
 
+def job_is_heavy(job: dict) -> bool:
+    return HEAVY_LABEL in {str(label).lower() for label in (job.get("labels") or [])}
+
+
 def job_payload(slug: str, run: dict, job: dict, labels: list[str], profile: dict) -> dict:
     job_id = job.get("id")
     run_id = run.get("id")
@@ -279,7 +587,7 @@ def job_payload(slug: str, run: dict, job: dict, labels: list[str], profile: dic
         "status": job.get("status") or run.get("status") or "queued",
         "url": job.get("html_url") or run.get("html_url") or "",
         "createdAt": job.get("created_at") or run.get("created_at") or now(),
-        "labels": labels,
+        "labels": job.get("labels") or labels,
         "runId": run_id,
         "jobId": job_id,
         "profileId": profile["id"],
@@ -288,15 +596,256 @@ def job_payload(slug: str, run: dict, job: dict, labels: list[str], profile: dic
     }
 
 
-def save_state(active, queue, statuses, error, retries, profiles) -> dict:
+def webhook_job_payload(payload: dict, registry: dict, profiles: list[dict]) -> tuple[dict | None, dict | None, list[str], str | None]:
+    workflow_job = payload.get("workflow_job") or {}
+    repository = payload.get("repository") or {}
+    workflow_run = payload.get("workflow_run") or {}
+    workflow = payload.get("workflow") or {}
+    slug = repository.get("full_name") or workflow_job.get("repository_full_name") or ""
+    run_id = workflow_job.get("run_id") or workflow_run.get("id")
+    job_id = workflow_job.get("id")
+    if not slug or not run_id or not job_id:
+        return None, None, [], "Webhook payload did not include repository, run id, and job id."
+
+    job_labels = workflow_job.get("labels") or []
+    match = matching_profile(slug, job_labels, registry, profiles)
+    if match is None:
+        return None, None, [], f"Webhook job did not match any enabled CI Scope runner profile: {slug}"
+
+    profile, labels = match
+    job = {
+        "id": f"{slug}:{run_id}:{job_id}",
+        "repositorySlug": slug,
+        "workflowName": workflow_job.get("workflow_name") or workflow_run.get("name") or workflow.get("name") or "Workflow",
+        "title": workflow_run.get("display_title") or workflow_job.get("name") or workflow_run.get("name") or "Workflow run",
+        "jobName": workflow_job.get("name") or "Workflow job",
+        "headBranch": workflow_job.get("head_branch") or workflow_run.get("head_branch") or "-",
+        "status": workflow_job.get("status") or payload.get("action") or "queued",
+        "conclusion": workflow_job.get("conclusion"),
+        "url": workflow_job.get("html_url") or workflow_run.get("html_url") or "",
+        "createdAt": workflow_job.get("created_at") or workflow_run.get("created_at") or now(),
+        "labels": job_labels or labels,
+        "runId": run_id,
+        "jobId": job_id,
+        "profileId": profile["id"],
+        "profileTitle": profile["title"],
+        "profileScope": profile["scope"],
+    }
+    return job, profile, labels, None
+
+
+def start_webhook_server() -> None:
+    try:
+        secret = ensure_webhook_secret()
+        server = ThreadingHTTPServer(("127.0.0.1", WEBHOOK_PORT), GitHubWebhookHandler)
+        server.secret = secret
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        record_webhook_status(enabled=True, last_error=None)
+    except Exception as exc:
+        record_webhook_status(enabled=False, last_error=f"Webhook listener could not start: {exc}")
+
+
+class GitHubWebhookHandler(BaseHTTPRequestHandler):
+    server_version = "CI Scope Broker"
+
+    def do_POST(self) -> None:
+        if self.path != WEBHOOK_PATH:
+            self.respond(404, "not found")
+            return
+
+        length_text = self.headers.get("Content-Length") or "0"
+        try:
+            length = int(length_text)
+        except ValueError:
+            self.respond(400, "invalid content length")
+            return
+        if length > MAX_WEBHOOK_BODY_BYTES:
+            self.respond(413, "payload too large")
+            return
+
+        body = self.rfile.read(length)
+        event = self.headers.get("X-GitHub-Event") or ""
+        if event != "workflow_job":
+            self.respond(202, "ignored")
+            return
+        if not verify_signature(body, self.headers.get("X-Hub-Signature-256") or "", self.server.secret):
+            self.respond(401, "invalid signature")
+            return
+
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except json.JSONDecodeError:
+            record_webhook_status(enabled=True, last_error="Webhook delivery was not valid JSON.")
+            self.respond(400, "invalid json")
+            return
+
+        delivery_id = self.headers.get("X-GitHub-Delivery") or ""
+        apply_workflow_job_event(payload, delivery_id)
+        self.respond(202, "accepted")
+
+    def respond(self, status: int, text: str) -> None:
+        data = text.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def log_message(self, format: str, *args) -> None:
+        return
+
+
+def verify_signature(body: bytes, signature: str, secret: str) -> bool:
+    if not signature.startswith("sha256="):
+        return False
+    digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    expected = f"sha256={digest}"
+    return hmac.compare_digest(expected, signature)
+
+
+def apply_workflow_job_event(payload: dict, delivery_id: str) -> None:
+    action = payload.get("action") or ""
+    registry = read_registry()
+    profiles = enabled_profiles(registry)
+    job, profile, labels, error = webhook_job_payload(payload, registry, profiles)
+
+    with STATE_LOCK:
+        state = read_state()
+        actives = list(state.get("actives") or [])
+        queue = list(state.get("queue") or [])
+        statuses = list(state.get("repos") or [])
+        retries = state.get("retries") or {}
+        last_error = None
+        webhook = webhook_status(
+            state.get("webhook"),
+            enabled=True,
+            last_delivery_id=delivery_id,
+            last_action=action,
+            last_repository=job.get("repositorySlug") if job else None,
+            last_job=job.get("jobName") if job else None,
+            last_error=error,
+        )
+
+        if job and action == "queued":
+            queue = merge_jobs(queue, [job])
+        elif job and action == "in_progress":
+            queue = remove_job(queue, job["id"])
+            actives = [{**a, "status": action} if a.get("id") == job["id"] else a for a in actives]
+        elif job and action == "completed":
+            # Just drop the finished job from the queue. Do NOT kill or remove a
+            # runner by job id — ephemeral runners can be running a different
+            # (swapped) job. tick() reaps each runner when its process exits.
+            queue = remove_job(queue, job["id"])
+
+        if job and profile is not None:
+            statuses = upsert_repo_status(statuses, queue, job["repositorySlug"], profile, labels)
+
+        save_state(actives, queue, statuses, last_error, retries, profiles, webhook)
+
+
+def record_webhook_status(enabled: bool, last_error: str | None) -> None:
+    with STATE_LOCK:
+        state = read_state()
+        state["webhook"] = webhook_status(state.get("webhook"), enabled=enabled, last_error=last_error)
+        state["updatedAt"] = now()
+        write_state(state)
+
+
+def webhook_status(
+    existing: dict | None,
+    enabled: bool | None = None,
+    last_delivery_id: str | None = None,
+    last_action: str | None = None,
+    last_repository: str | None = None,
+    last_job: str | None = None,
+    last_error=UNSET,
+) -> dict:
+    status = dict(existing or {})
+    status["enabled"] = bool(status.get("enabled", False) if enabled is None else enabled)
+    status["port"] = WEBHOOK_PORT
+    status["path"] = WEBHOOK_PATH
+    if last_delivery_id is not None:
+        status["lastDeliveryAt"] = now()
+        status["lastDeliveryId"] = last_delivery_id
+    if last_action is not None:
+        status["lastAction"] = last_action
+    if last_repository is not None:
+        status["lastRepository"] = last_repository
+    if last_job is not None:
+        status["lastJob"] = last_job
+    if last_error is not UNSET:
+        status["lastError"] = last_error
+    return status
+
+
+def merge_jobs(existing: list[dict], incoming: list[dict]) -> list[dict]:
+    jobs: dict[str, dict] = {}
+    for job in existing + incoming:
+        job_id = job.get("id")
+        if not job_id:
+            continue
+        jobs[job_id] = job
+    return sorted(jobs.values(), key=lambda item: item.get("createdAt", ""))
+
+
+def remove_job(queue: list[dict], job_id: str) -> list[dict]:
+    return [job for job in queue if job.get("id") != job_id]
+
+
+def upsert_repo_status(statuses: list[dict], queue: list[dict], slug: str, profile: dict, labels: list[str]) -> list[dict]:
+    count = sum(1 for job in queue if job.get("repositorySlug") == slug and job.get("profileId") == profile["id"])
+    result = [
+        status
+        for status in statuses
+        if not (status.get("slug", "").lower() == slug.lower() and status.get("profileId") == profile["id"])
+    ]
+    result.append(repo_status(slug, "ok", count, None, profile, labels))
+    return result
+
+
+def matching_profile(slug: str, job_labels: list[str], registry: dict, profiles: list[dict]) -> tuple[dict, list[str]] | None:
+    for profile in profiles:
+        labels = labels_for_repository(slug, profile, registry)
+        if labels is None:
+            continue
+        if has_labels(job_labels, labels):
+            return profile, labels
+    return None
+
+
+def labels_for_repository(slug: str, profile: dict, registry: dict) -> list[str] | None:
+    labels = profile_labels(profile)
+    if profile.get("kind") == "organization":
+        organization = profile.get("organization")
+        owner = slug.split("/", 1)[0] if "/" in slug else ""
+        if organization and owner.lower() == organization.lower():
+            return labels
+        return None
+
+    for repo in registry.get("repos", []):
+        if not repo.get("enabled", True):
+            continue
+        if repo.get("slug", "").lower() == slug.lower():
+            return repo.get("labels") or labels
+    return None
+
+
+def save_state(actives, queue, statuses, error, retries, profiles, webhook) -> dict:
+    queue = merge_jobs(queue, [])
+    actives = list(actives or [])
+    active_ids = {active.get("id") for active in actives}
+    queue = [job for job in queue if job.get("id") not in active_ids]
     state = {
         "version": 1,
         "updatedAt": now(),
         "servicePID": os.getpid(),
-        "active": active,
+        "actives": actives,
+        "active": actives[0] if actives else None,
         "queue": queue,
         "repos": statuses,
         "profiles": profiles,
+        "webhook": webhook_status(webhook),
         "lastError": error,
         "retries": retries,
     }
@@ -317,11 +866,20 @@ def read_registry() -> dict:
 
 def read_state() -> dict:
     if not STATE_PATH.exists():
-        return {"version": 1, "queue": [], "repos": [], "retries": {}}
+        return {"version": 1, "actives": [], "queue": [], "repos": [], "retries": {}, "webhook": webhook_status(None)}
     try:
-        return json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return {"version": 1, "queue": [], "repos": [], "retries": {}}
+        return {"version": 1, "actives": [], "queue": [], "repos": [], "retries": {}, "webhook": webhook_status(None)}
+    state.setdefault("version", 1)
+    state.setdefault("queue", [])
+    state.setdefault("repos", [])
+    state.setdefault("retries", {})
+    if state.get("actives") is None:
+        legacy = state.get("active")
+        state["actives"] = [legacy] if legacy else []
+    state["webhook"] = webhook_status(state.get("webhook"))
+    return state
 
 
 def write_state(state: dict) -> None:
@@ -334,6 +892,34 @@ def update_retry(job: dict, retries: dict) -> dict:
     result = dict(retries)
     result[job["id"]] = result.get(job["id"], 0) + 1
     return result
+
+
+def reset_stale_retries(retries: dict) -> dict:
+    # Periodically forget retry counters so a job abandoned during a transient
+    # outage (e.g. a DNS blip that broke runner startup) gets another chance
+    # once conditions recover, instead of staying wedged at MAX_RETRIES forever.
+    global RETRY_RESET_AT
+    if time.monotonic() - RETRY_RESET_AT >= RETRY_RESET_SECONDS:
+        RETRY_RESET_AT = time.monotonic()
+        if retries:
+            return {}
+    return retries
+
+
+def clear_retry(job_id: str | None, retries: dict) -> dict:
+    if not job_id or job_id not in retries:
+        return retries
+    result = dict(retries)
+    result.pop(job_id, None)
+    return result
+
+
+def prune_retries(retries: dict, queue: list[dict], actives: list[dict] | None = None) -> dict:
+    keep = {job.get("id") for job in queue if job.get("id")}
+    for active in actives or []:
+        if active.get("id"):
+            keep.add(active["id"])
+    return {job_id: count for job_id, count in retries.items() if job_id in keep}
 
 
 def repo_status(slug: str, state: str, count: int, error: str | None, profile: dict, labels: list[str]) -> dict:
@@ -351,7 +937,7 @@ def repo_status(slug: str, state: str, count: int, error: str | None, profile: d
 
 
 def has_labels(labels: list[str], required_labels: list[str]) -> bool:
-    available = {label.lower() for label in labels}
+    available = {str(label).lower() for label in labels}
     return all(label.lower() in available for label in required_labels)
 
 
@@ -387,6 +973,18 @@ def ensure_dirs() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def ensure_webhook_secret() -> str:
+    WEBHOOK_SECRET_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if not WEBHOOK_SECRET_PATH.exists():
+        WEBHOOK_SECRET_PATH.write_text(os.urandom(32).hex(), encoding="utf-8")
+    os.chmod(WEBHOOK_SECRET_PATH, 0o600)
+    return WEBHOOK_SECRET_PATH.read_text(encoding="utf-8").strip()
+
+
+def shutdown(*_) -> None:
+    sys.exit(0)
+
+
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    signal.signal(signal.SIGTERM, shutdown)
     raise SystemExit(main())

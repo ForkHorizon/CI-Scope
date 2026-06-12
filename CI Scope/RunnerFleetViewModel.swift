@@ -24,6 +24,7 @@ final class RunnerFleetViewModel: ObservableObject {
         isLoading = true
         snapshot = await service.loadSnapshot()
 
+        NotificationManager.shared.checkWorkUpdates(snapshot: snapshot)
         NotificationManager.shared.checkRunnerUpdates(runners: snapshot.runners)
 
         isLoading = false
@@ -63,6 +64,7 @@ final class RunnerFleetViewModel: ObservableObject {
             let nextSnapshot = await service.loadSnapshot(prepareBroker: false)
             snapshot = nextSnapshot
             lastAppliedBrokerSignature = nextSignature
+            NotificationManager.shared.checkWorkUpdates(snapshot: nextSnapshot)
             NotificationManager.shared.checkRunnerUpdates(runners: nextSnapshot.runners)
             await onBrokerChange()
         }
@@ -179,8 +181,21 @@ private final class BrokerStateMonitor {
     private func currentSignature() -> String {
         let registry = service.loadRegistry()
         let state = service.loadState()
-        let activeID = state.active?.id ?? "-"
+        let activeID = state.activeJobs.isEmpty ? "-" : state.activeJobs.map(\.id).sorted().joined(separator: ",")
         let queueIDs = state.queue.map(\.id).joined(separator: ",")
+        let webhook =
+            state.webhook.map { status in
+                [
+                    status.enabled.description,
+                    status.port.map(String.init) ?? "-",
+                    status.lastDeliveryAt ?? "-",
+                    status.lastDeliveryID ?? "-",
+                    status.lastAction ?? "-",
+                    status.lastRepository ?? "-",
+                    status.lastJob ?? "-",
+                    status.lastError ?? "-",
+                ].joined(separator: ":")
+            } ?? "-"
         let repoStatuses = state.repos
             .map { "\($0.profileID ?? "-"):\($0.slug):\($0.state):\($0.queuedCount):\($0.lastError ?? "-")" }
             .joined(separator: ",")
@@ -195,6 +210,7 @@ private final class BrokerStateMonitor {
             state.updatedAt,
             activeID,
             queueIDs,
+            webhook,
             repoStatuses,
             profiles,
             repos,

@@ -9,6 +9,7 @@ struct ContentView: View {
     @StateObject var scriptStore = AutomationScriptStore()
     @StateObject var scriptInstallViewModel = AutomationScriptInstallViewModel()
     @StateObject var runnerFleetViewModel = RunnerFleetViewModel()
+    @StateObject var notificationManager = NotificationManager.shared
     @State var workspaceTab: WorkspaceTab = .projects
     @State var isProjectMenuOpen = true
     @State var isAddingProject = false
@@ -43,7 +44,12 @@ struct ContentView: View {
             idealHeight: 624
         )
         .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(alignment: .topTrailing) {
+            JobNotificationOverlay(manager: notificationManager)
+                .allowsHitTesting(notificationManager.activeJobNotification != nil)
+        }
         .animation(.easeInOut(duration: 0.18), value: isProjectMenuOpen)
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: notificationManager.activeJobNotification?.id)
         .task(id: selectedProject?.id) {
             guard let selectedProject else { return }
             await projectCIViewModel.load(selectedProject)
