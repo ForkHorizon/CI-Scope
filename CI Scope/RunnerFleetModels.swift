@@ -33,19 +33,22 @@ struct RunnerFleetSnapshot {
 struct JobArrivalNotification: Identifiable {
     let id: String
     let newJobs: [RunnerWorkItem]
-    let runningJob: RunnerWorkItem?
+    let runningJobs: [RunnerWorkItem]
     let queuedJobs: [RunnerWorkItem]
     let createdAt: Date
 
     init(
         newJobs: [RunnerWorkItem],
-        runningJob: RunnerWorkItem?,
+        runningJobs: [RunnerWorkItem],
         queuedJobs: [RunnerWorkItem],
         createdAt: Date = Date()
     ) {
-        self.id = "\(createdAt.timeIntervalSince1970)-\(newJobs.map(\.id).joined(separator: ","))"
+        // Unique per notification so two arrivals in the same instant don't
+        // share a UNNotificationRequest identifier (which would replace, not
+        // add, the second banner).
+        self.id = UUID().uuidString
         self.newJobs = newJobs
-        self.runningJob = runningJob
+        self.runningJobs = runningJobs
         self.queuedJobs = queuedJobs
         self.createdAt = createdAt
     }
