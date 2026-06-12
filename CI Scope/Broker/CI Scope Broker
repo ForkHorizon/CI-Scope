@@ -50,17 +50,23 @@ DEFAULT_PROFILES = [
         "enabled": True,
     },
 ]
-POLL_SECONDS = 15
+POLL_SECONDS = max(1, int(os.environ.get("CI_SCOPE_POLL_SECONDS", "4")))
 WEBHOOK_RECONCILE_SECONDS = 75
+ORG_REPO_CACHE_SECONDS = int(os.environ.get("CI_SCOPE_ORG_REPO_CACHE_SECONDS", "90"))
+WEBHOOK_FRESH_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_FRESH_SECONDS", "300"))
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
+RETRY_RESET_SECONDS = int(os.environ.get("CI_SCOPE_RETRY_RESET_SECONDS", "300"))
 MAX_ACTIVE_SECONDS = int(os.environ.get("CI_SCOPE_MAX_ACTIVE_SECONDS", "3600"))
 MAX_CONCURRENT_JOBS = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_JOBS", "2")))
+MAX_CONCURRENT_HEAVY = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_HEAVY", "1")))
+HEAVY_LABEL = os.environ.get("CI_SCOPE_HEAVY_LABEL", "ci-scope-heavy").lower()
 MAX_WEBHOOK_BODY_BYTES = 2_000_000
 ROOT = Path.home() / "Library/Application Support/CI Scope/Broker"
 REGISTRY_PATH = ROOT / "managed-repos.json"
 STATE_PATH = ROOT / "broker-state.json"
 JOBS_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/jobs"
+RUNNER_TEMPLATE_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/runner-template"
 LOG_DIR = Path.home() / "Library/Logs/CI Scope/Broker"
 WEBHOOK_PORT = int(os.environ.get("CI_SCOPE_WEBHOOK_PORT", "8765"))
 WEBHOOK_PATH = os.environ.get("CI_SCOPE_WEBHOOK_PATH", "/github/workflow-job")
@@ -68,12 +74,14 @@ WEBHOOK_SECRET_PATH = Path(os.environ.get("CI_SCOPE_WEBHOOK_SECRET_PATH", ROOT /
 
 STATE_LOCK = threading.RLock()
 ACTIVE_PROCESSES: dict[int, subprocess.Popen] = {}
+RETRY_RESET_AT = time.monotonic()
+ORG_REPO_CACHE: dict[str, tuple[float, list[str]]] = {}
 UNSET = object()
 
 
 def main() -> int:
     if "--help" in sys.argv or "-h" in sys.argv:
-        print(f"CI Scope Broker: polls managed GitHub repos, receives workflow_job webhooks, and runs up to {MAX_CONCURRENT_JOBS} JIT runner job(s) concurrently.")
+        print(f"CI Scope Broker: polls managed GitHub repos, receives workflow_job webhooks, and runs up to {MAX_CONCURRENT_JOBS} JIT runner job(s) concurrently (at most {MAX_CONCURRENT_HEAVY} labelled '{HEAVY_LABEL}').")
         return 0
     os.environ["PATH"] = ":".join(
         [
@@ -112,7 +120,7 @@ def main() -> int:
 def tick(state: dict, should_poll: bool) -> dict:
     registry = read_registry()
     profiles = enabled_profiles(registry)
-    retries = state.get("retries") or {}
+    retries = reset_stale_retries(state.get("retries") or {})
     webhook = webhook_status(state.get("webhook"))
     actives = list(state.get("actives") or [])
     queue = list(state.get("queue") or [])
@@ -122,11 +130,12 @@ def tick(state: dict, should_poll: bool) -> dict:
     surviving = []
     for active in actives:
         if active.get("pid") and active_is_running(active):
-            if should_poll and active_completed_remotely(active):
-                terminate_active_process(active)
-                retries, error = finish_active(active, retries)
-                last_error = error or last_error
-            elif active_timed_out(active):
+            # Ephemeral JIT runners pick up whichever queued job matches their
+            # labels, so the process the broker started for one job may be
+            # running another. Never kill a live runner based on a remote job's
+            # status — only the watchdog may stop a genuinely stuck one. A slot
+            # frees when the runner process exits on its own (the else branch).
+            if active_timed_out(active):
                 terminate_active_process(active)
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
                 retries = update_retry(active, retries)
@@ -148,10 +157,15 @@ def tick(state: dict, should_poll: bool) -> dict:
     active_ids = {active.get("id") for active in actives}
     queue = [job for job in queue if job.get("id") not in active_ids]
 
-    free_slots = MAX_CONCURRENT_JOBS - len(actives)
+    heavy_running = sum(1 for active in actives if job_is_heavy(active))
     dispatchable = [job for job in queue if retries.get(job["id"], 0) < MAX_RETRIES]
     dispatched = False
-    for job in dispatchable[:max(free_slots, 0)]:
+    for job in dispatchable:
+        if len(actives) >= MAX_CONCURRENT_JOBS:
+            break
+        heavy = job_is_heavy(job)
+        if heavy and heavy_running >= MAX_CONCURRENT_HEAVY:
+            continue
         try:
             process = start_runner(job)
         except Exception as exc:
@@ -167,6 +181,8 @@ def tick(state: dict, should_poll: bool) -> dict:
         actives.append(active)
         active_ids.add(job["id"])
         queue = remove_job(queue, job["id"])
+        if heavy:
+            heavy_running += 1
         dispatched = True
 
     if dispatched:
@@ -181,9 +197,21 @@ def tick(state: dict, should_poll: bool) -> dict:
 
 def poll_interval(state: dict) -> int:
     webhook = state.get("webhook") or {}
-    if webhook.get("enabled") and webhook.get("lastDeliveryAt"):
+    if webhook.get("enabled") and webhook_delivery_is_fresh(webhook.get("lastDeliveryAt")):
         return WEBHOOK_RECONCILE_SECONDS
     return POLL_SECONDS
+
+
+def webhook_delivery_is_fresh(last_delivery_at: str | None) -> bool:
+    if not last_delivery_at:
+        return False
+    try:
+        delivered = datetime.fromisoformat(last_delivery_at)
+    except (TypeError, ValueError):
+        return False
+    if delivered.tzinfo is None:
+        delivered = delivered.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - delivered).total_seconds() < WEBHOOK_FRESH_SECONDS
 
 
 def active_is_running(active: dict) -> bool:
@@ -196,35 +224,6 @@ def active_is_running(active: dict) -> bool:
         return process.poll() is None
 
     return process_alive(pid)
-
-
-def active_completed_remotely(active: dict) -> bool:
-    job_id = active.get("jobId")
-    repository_slug = active.get("repositorySlug")
-    if job_id and repository_slug:
-        try:
-            job = gh_json(f"repos/{repository_slug}/actions/jobs/{job_id}")
-            status = job.get("status")
-            if status:
-                active["status"] = status
-            if status == "completed":
-                conclusion = job.get("conclusion")
-                active["conclusion"] = conclusion
-                active["exitCode"] = 0 if conclusion == "success" else 1
-                return True
-            return False
-        except Exception:
-            pass
-
-    refreshed = refresh_run(active)
-    if refreshed.get("status"):
-        active["status"] = refreshed["status"]
-    if refreshed.get("status") == "completed":
-        conclusion = refreshed.get("conclusion")
-        active["conclusion"] = conclusion
-        active["exitCode"] = 0 if conclusion == "success" else 1
-        return True
-    return False
 
 
 def terminate_active_process(active: dict) -> None:
@@ -323,6 +322,10 @@ def repositories_for_profile(profile: dict, registry: dict) -> list[dict]:
 
 
 def organization_repositories(organization: str) -> list[str]:
+    cached = ORG_REPO_CACHE.get(organization)
+    if cached and (time.time() - cached[0]) < ORG_REPO_CACHE_SECONDS:
+        return cached[1]
+
     command = [
         "gh",
         "repo",
@@ -337,9 +340,13 @@ def organization_repositories(organization: str) -> list[str]:
     ]
     completed = subprocess.run(command, text=True, capture_output=True, timeout=60)
     if completed.returncode != 0:
+        if cached:
+            return cached[1]
         message = completed.stderr.strip() or completed.stdout.strip() or f"gh repo list failed: {organization}"
         raise RuntimeError(message)
-    return json.loads(completed.stdout or "[]")
+    repos = json.loads(completed.stdout or "[]")
+    ORG_REPO_CACHE[organization] = (time.time(), repos)
+    return repos
 
 
 def queued_jobs(slug: str, labels: list[str], profile: dict) -> list[dict]:
@@ -436,14 +443,43 @@ def cleanup_runner_by_name(repository_slug: str | None, runner_name: str | None)
             continue
 
 
-def prepare_runner_dir(job: dict) -> Path:
+def ensure_runner_template() -> Path:
     archive = find_runner_archive()
+    marker = RUNNER_TEMPLATE_DIR.parent / "runner-template.archive"
+    current = str(archive)
+    if (
+        RUNNER_TEMPLATE_DIR.exists()
+        and (RUNNER_TEMPLATE_DIR / "run.sh").exists()
+        and marker.exists()
+        and marker.read_text(encoding="utf-8").strip() == current
+    ):
+        return RUNNER_TEMPLATE_DIR
+
+    if RUNNER_TEMPLATE_DIR.exists():
+        shutil.rmtree(RUNNER_TEMPLATE_DIR)
+    RUNNER_TEMPLATE_DIR.mkdir(parents=True)
+    with tarfile.open(archive) as tar:
+        tar.extractall(RUNNER_TEMPLATE_DIR)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(current, encoding="utf-8")
+    return RUNNER_TEMPLATE_DIR
+
+
+def prepare_runner_dir(job: dict) -> Path:
+    template = ensure_runner_template()
     runner_dir = JOBS_DIR / safe_name(job["id"])
     if runner_dir.exists():
         shutil.rmtree(runner_dir)
-    runner_dir.mkdir(parents=True)
-    with tarfile.open(archive) as tar:
-        tar.extractall(runner_dir)
+
+    # Near-instant APFS copy-on-write clone of the pre-extracted template,
+    # falling back to a fresh extract if cloning is unavailable.
+    clone = subprocess.run(["cp", "-cRp", str(template), str(runner_dir)], capture_output=True, text=True)
+    if clone.returncode != 0 or not (runner_dir / "run.sh").exists():
+        if runner_dir.exists():
+            shutil.rmtree(runner_dir)
+        runner_dir.mkdir(parents=True)
+        with tarfile.open(find_runner_archive()) as tar:
+            tar.extractall(runner_dir)
     return runner_dir
 
 
@@ -532,6 +568,10 @@ def gh_json(endpoint: str, method: str = "GET", payload: dict | None = None) -> 
     return json.loads(completed.stdout or "{}")
 
 
+def job_is_heavy(job: dict) -> bool:
+    return HEAVY_LABEL in {str(label).lower() for label in (job.get("labels") or [])}
+
+
 def job_payload(slug: str, run: dict, job: dict, labels: list[str], profile: dict) -> dict:
     job_id = job.get("id")
     run_id = run.get("id")
@@ -545,7 +585,7 @@ def job_payload(slug: str, run: dict, job: dict, labels: list[str], profile: dic
         "status": job.get("status") or run.get("status") or "queued",
         "url": job.get("html_url") or run.get("html_url") or "",
         "createdAt": job.get("created_at") or run.get("created_at") or now(),
-        "labels": labels,
+        "labels": job.get("labels") or labels,
         "runId": run_id,
         "jobId": job_id,
         "profileId": profile["id"],
@@ -582,7 +622,7 @@ def webhook_job_payload(payload: dict, registry: dict, profiles: list[dict]) -> 
         "conclusion": workflow_job.get("conclusion"),
         "url": workflow_job.get("html_url") or workflow_run.get("html_url") or "",
         "createdAt": workflow_job.get("created_at") or workflow_run.get("created_at") or now(),
-        "labels": labels,
+        "labels": job_labels or labels,
         "runId": run_id,
         "jobId": job_id,
         "profileId": profile["id"],
@@ -691,16 +731,10 @@ def apply_workflow_job_event(payload: dict, delivery_id: str) -> None:
             queue = remove_job(queue, job["id"])
             actives = [{**a, "status": action} if a.get("id") == job["id"] else a for a in actives]
         elif job and action == "completed":
+            # Just drop the finished job from the queue. Do NOT kill or remove a
+            # runner by job id — ephemeral runners can be running a different
+            # (swapped) job. tick() reaps each runner when its process exits.
             queue = remove_job(queue, job["id"])
-            match = next((a for a in actives if a.get("id") == job["id"]), None)
-            if match is not None:
-                conclusion = job.get("conclusion")
-                match = {**match, "status": action, "conclusion": conclusion}
-                match["exitCode"] = 0 if conclusion == "success" else 1
-                if match.get("pid") and active_is_running(match):
-                    terminate_active_process(match)
-                retries, last_error = finish_active(match, retries)
-                actives = [a for a in actives if a.get("id") != job["id"]]
 
         if job and profile is not None:
             statuses = upsert_repo_status(statuses, queue, job["repositorySlug"], profile, labels)
@@ -856,6 +890,18 @@ def update_retry(job: dict, retries: dict) -> dict:
     result = dict(retries)
     result[job["id"]] = result.get(job["id"], 0) + 1
     return result
+
+
+def reset_stale_retries(retries: dict) -> dict:
+    # Periodically forget retry counters so a job abandoned during a transient
+    # outage (e.g. a DNS blip that broke runner startup) gets another chance
+    # once conditions recover, instead of staying wedged at MAX_RETRIES forever.
+    global RETRY_RESET_AT
+    if time.monotonic() - RETRY_RESET_AT >= RETRY_RESET_SECONDS:
+        RETRY_RESET_AT = time.monotonic()
+        if retries:
+            return {}
+    return retries
 
 
 def clear_retry(job_id: str | None, retries: dict) -> dict:
