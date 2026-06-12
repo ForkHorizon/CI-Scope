@@ -53,6 +53,7 @@ DEFAULT_PROFILES = [
 POLL_SECONDS = max(1, int(os.environ.get("CI_SCOPE_POLL_SECONDS", "4")))
 WEBHOOK_RECONCILE_SECONDS = 75
 ORG_REPO_CACHE_SECONDS = int(os.environ.get("CI_SCOPE_ORG_REPO_CACHE_SECONDS", "90"))
+WEBHOOK_FRESH_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_FRESH_SECONDS", "300"))
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
 MAX_ACTIVE_SECONDS = int(os.environ.get("CI_SCOPE_MAX_ACTIVE_SECONDS", "3600"))
@@ -184,9 +185,21 @@ def tick(state: dict, should_poll: bool) -> dict:
 
 def poll_interval(state: dict) -> int:
     webhook = state.get("webhook") or {}
-    if webhook.get("enabled") and webhook.get("lastDeliveryAt"):
+    if webhook.get("enabled") and webhook_delivery_is_fresh(webhook.get("lastDeliveryAt")):
         return WEBHOOK_RECONCILE_SECONDS
     return POLL_SECONDS
+
+
+def webhook_delivery_is_fresh(last_delivery_at: str | None) -> bool:
+    if not last_delivery_at:
+        return False
+    try:
+        delivered = datetime.fromisoformat(last_delivery_at)
+    except (TypeError, ValueError):
+        return False
+    if delivered.tzinfo is None:
+        delivered = delivered.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - delivered).total_seconds() < WEBHOOK_FRESH_SECONDS
 
 
 def active_is_running(active: dict) -> bool:
