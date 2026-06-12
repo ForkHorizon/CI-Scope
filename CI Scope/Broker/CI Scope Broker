@@ -13,6 +13,7 @@ import sys
 import tarfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -53,11 +54,13 @@ DEFAULT_PROFILES = [
 POLL_SECONDS = max(1, int(os.environ.get("CI_SCOPE_POLL_SECONDS", "4")))
 WEBHOOK_RECONCILE_SECONDS = 75
 ORG_REPO_CACHE_SECONDS = int(os.environ.get("CI_SCOPE_ORG_REPO_CACHE_SECONDS", "90"))
+POLL_MAX_WORKERS = max(1, int(os.environ.get("CI_SCOPE_POLL_WORKERS", "12")))
 WEBHOOK_FRESH_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_FRESH_SECONDS", "300"))
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
 RETRY_RESET_SECONDS = int(os.environ.get("CI_SCOPE_RETRY_RESET_SECONDS", "300"))
 MAX_ACTIVE_SECONDS = int(os.environ.get("CI_SCOPE_MAX_ACTIVE_SECONDS", "3600"))
+IDLE_RUNNER_SECONDS = int(os.environ.get("CI_SCOPE_IDLE_RUNNER_SECONDS", "150"))
 MAX_CONCURRENT_JOBS = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_JOBS", "2")))
 MAX_CONCURRENT_HEAVY = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_HEAVY", "1")))
 HEAVY_LABEL = os.environ.get("CI_SCOPE_HEAVY_LABEL", "ci-scope-heavy").lower()
@@ -102,11 +105,23 @@ def main() -> int:
     while True:
         try:
             with STATE_LOCK:
+                should_poll = time.monotonic() - last_poll >= poll_interval(read_state())
+            # Poll GitHub WITHOUT holding STATE_LOCK: collect_queue makes one
+            # request per managed repo (several seconds), and the webhook handler
+            # needs the lock to reply before GitHub's delivery timeout. Holding
+            # it across the poll starved webhooks (EOF) and stalled the loop.
+            polled = None
+            if should_poll:
+                try:
+                    registry = read_registry()
+                    profiles = enabled_profiles(registry)
+                    polled = collect_queue(registry, profiles)
+                except Exception:
+                    polled = None
+                last_poll = time.monotonic()
+            with STATE_LOCK:
                 state = read_state()
-                should_poll = time.monotonic() - last_poll >= poll_interval(state)
-                state = tick(state, should_poll)
-                if should_poll:
-                    last_poll = time.monotonic()
+                tick(state, polled)
         except Exception as exc:
             with STATE_LOCK:
                 state = read_state()
@@ -117,7 +132,7 @@ def main() -> int:
         time.sleep(SCHEDULER_SECONDS)
 
 
-def tick(state: dict, should_poll: bool) -> dict:
+def tick(state: dict, polled: tuple | None) -> dict:
     registry = read_registry()
     profiles = enabled_profiles(registry)
     retries = reset_stale_retries(state.get("retries") or {})
@@ -141,6 +156,14 @@ def tick(state: dict, should_poll: bool) -> dict:
                 retries = update_retry(active, retries)
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
                 last_error = f"Stopped {active.get('id')}: runner ran past {MAX_ACTIVE_SECONDS // 60} min without completing."
+            elif polled is not None and active_idle_too_long(active) and runner_is_idle(active):
+                # The runner connected but GitHub never handed it a job (its job
+                # was already serviced by another runner). Reap it now instead of
+                # squatting a slot until the watchdog fires — no retry, since the
+                # job is done; if it weren't, the next poll re-queues it.
+                terminate_active_process(active)
+                cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+                ACTIVE_PROCESSES.pop(active.get("pid"), None)
             else:
                 surviving.append(active)
         else:
@@ -148,9 +171,14 @@ def tick(state: dict, should_poll: bool) -> dict:
             last_error = error or last_error
     actives = surviving
 
-    if should_poll:
-        polled_queue, statuses = collect_queue(registry, profiles)
-        queue = merge_jobs(queue, polled_queue)
+    if polled is not None:
+        # collect_queue ran outside STATE_LOCK (network I/O); apply its result.
+        # The poll lists every job currently queued across all managed repos, so
+        # it is authoritative: replace the queue rather than unioning it, or jobs
+        # that left GitHub's queue (completed/cancelled) without the broker
+        # dispatching them would linger forever and inflate the shared count.
+        polled_queue, statuses = polled
+        queue = polled_queue
         retries = prune_retries(retries, queue, actives)
 
     queue = merge_jobs(queue, [])
@@ -279,7 +307,7 @@ def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
 
 
 def collect_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
-    jobs = []
+    tasks = []
     statuses = []
     for profile in profiles:
         try:
@@ -291,12 +319,22 @@ def collect_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], lis
         for repo in repos:
             slug = repo["slug"]
             labels = repo.get("labels") or profile_labels(profile)
-            try:
-                repo_jobs = queued_jobs(slug, labels, profile)
-                jobs.extend(repo_jobs)
-                statuses.append(repo_status(slug, "ok", len(repo_jobs), None, profile, labels))
-            except Exception as exc:
-                statuses.append(repo_status(slug, "warning", 0, str(exc), profile, labels))
+            tasks.append((slug, labels, profile))
+
+    # Poll each repo's queue concurrently — done sequentially this is ~2s per
+    # repo and dominates the loop. repositories_for_profile (above) stays
+    # sequential so the cached org-repo list is never touched from threads.
+    jobs = []
+    if tasks:
+        with ThreadPoolExecutor(max_workers=min(len(tasks), POLL_MAX_WORKERS)) as pool:
+            pending = {pool.submit(queued_jobs, slug, labels, profile): (slug, labels, profile) for slug, labels, profile in tasks}
+            for future, (slug, labels, profile) in pending.items():
+                try:
+                    repo_jobs = future.result()
+                    jobs.extend(repo_jobs)
+                    statuses.append(repo_status(slug, "ok", len(repo_jobs), None, profile, labels))
+                except Exception as exc:
+                    statuses.append(repo_status(slug, "warning", 0, str(exc), profile, labels))
     return merge_jobs(jobs, []), statuses
 
 
@@ -428,6 +466,24 @@ def cleanup_stale_runners(job: dict) -> None:
             continue
 
 
+def runner_is_idle(active: dict) -> bool:
+    # True only if the runner is registered on GitHub but not running a job —
+    # it connected and is "Listening for Jobs" with nothing to do. A busy runner
+    # (or one not yet registered) is left alone.
+    slug = active.get("repositorySlug")
+    name = active.get("runnerName")
+    if not slug or not name:
+        return False
+    try:
+        runners = gh_json(f"repos/{slug}/actions/runners?per_page=100").get("runners") or []
+    except Exception:
+        return False
+    for runner in runners:
+        if runner.get("name") == name:
+            return not runner.get("busy", False)
+    return False
+
+
 def cleanup_runner_by_name(repository_slug: str | None, runner_name: str | None) -> None:
     if not repository_slug or not runner_name:
         return
@@ -540,11 +596,19 @@ def job_remote_status(active: dict) -> dict:
 
 
 def active_timed_out(active: dict) -> bool:
+    return active_older_than(active, MAX_ACTIVE_SECONDS)
+
+
+def active_idle_too_long(active: dict) -> bool:
+    return active_older_than(active, IDLE_RUNNER_SECONDS)
+
+
+def active_older_than(active: dict, seconds: int) -> bool:
     dispatched = active.get("dispatchedAt")
     if not dispatched:
         return False
     try:
-        return (time.time() - float(dispatched)) > MAX_ACTIVE_SECONDS
+        return (time.time() - float(dispatched)) > seconds
     except (TypeError, ValueError):
         return False
 
