@@ -58,6 +58,8 @@ SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
 MAX_ACTIVE_SECONDS = int(os.environ.get("CI_SCOPE_MAX_ACTIVE_SECONDS", "3600"))
 MAX_CONCURRENT_JOBS = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_JOBS", "2")))
+MAX_CONCURRENT_HEAVY = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_HEAVY", "1")))
+HEAVY_LABEL = os.environ.get("CI_SCOPE_HEAVY_LABEL", "ci-scope-heavy").lower()
 MAX_WEBHOOK_BODY_BYTES = 2_000_000
 ROOT = Path.home() / "Library/Application Support/CI Scope/Broker"
 REGISTRY_PATH = ROOT / "managed-repos.json"
@@ -77,7 +79,7 @@ UNSET = object()
 
 def main() -> int:
     if "--help" in sys.argv or "-h" in sys.argv:
-        print(f"CI Scope Broker: polls managed GitHub repos, receives workflow_job webhooks, and runs up to {MAX_CONCURRENT_JOBS} JIT runner job(s) concurrently.")
+        print(f"CI Scope Broker: polls managed GitHub repos, receives workflow_job webhooks, and runs up to {MAX_CONCURRENT_JOBS} JIT runner job(s) concurrently (at most {MAX_CONCURRENT_HEAVY} labelled '{HEAVY_LABEL}').")
         return 0
     os.environ["PATH"] = ":".join(
         [
@@ -152,10 +154,15 @@ def tick(state: dict, should_poll: bool) -> dict:
     active_ids = {active.get("id") for active in actives}
     queue = [job for job in queue if job.get("id") not in active_ids]
 
-    free_slots = MAX_CONCURRENT_JOBS - len(actives)
+    heavy_running = sum(1 for active in actives if job_is_heavy(active))
     dispatchable = [job for job in queue if retries.get(job["id"], 0) < MAX_RETRIES]
     dispatched = False
-    for job in dispatchable[:max(free_slots, 0)]:
+    for job in dispatchable:
+        if len(actives) >= MAX_CONCURRENT_JOBS:
+            break
+        heavy = job_is_heavy(job)
+        if heavy and heavy_running >= MAX_CONCURRENT_HEAVY:
+            continue
         try:
             process = start_runner(job)
         except Exception as exc:
@@ -171,6 +178,8 @@ def tick(state: dict, should_poll: bool) -> dict:
         actives.append(active)
         active_ids.add(job["id"])
         queue = remove_job(queue, job["id"])
+        if heavy:
+            heavy_running += 1
         dispatched = True
 
     if dispatched:
@@ -585,6 +594,10 @@ def gh_json(endpoint: str, method: str = "GET", payload: dict | None = None) -> 
     return json.loads(completed.stdout or "{}")
 
 
+def job_is_heavy(job: dict) -> bool:
+    return HEAVY_LABEL in {str(label).lower() for label in (job.get("labels") or [])}
+
+
 def job_payload(slug: str, run: dict, job: dict, labels: list[str], profile: dict) -> dict:
     job_id = job.get("id")
     run_id = run.get("id")
@@ -598,7 +611,7 @@ def job_payload(slug: str, run: dict, job: dict, labels: list[str], profile: dic
         "status": job.get("status") or run.get("status") or "queued",
         "url": job.get("html_url") or run.get("html_url") or "",
         "createdAt": job.get("created_at") or run.get("created_at") or now(),
-        "labels": labels,
+        "labels": job.get("labels") or labels,
         "runId": run_id,
         "jobId": job_id,
         "profileId": profile["id"],
@@ -635,7 +648,7 @@ def webhook_job_payload(payload: dict, registry: dict, profiles: list[dict]) -> 
         "conclusion": workflow_job.get("conclusion"),
         "url": workflow_job.get("html_url") or workflow_run.get("html_url") or "",
         "createdAt": workflow_job.get("created_at") or workflow_run.get("created_at") or now(),
-        "labels": labels,
+        "labels": job_labels or labels,
         "runId": run_id,
         "jobId": job_id,
         "profileId": profile["id"],
