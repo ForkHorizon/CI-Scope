@@ -102,11 +102,23 @@ def main() -> int:
     while True:
         try:
             with STATE_LOCK:
+                should_poll = time.monotonic() - last_poll >= poll_interval(read_state())
+            # Poll GitHub WITHOUT holding STATE_LOCK: collect_queue makes one
+            # request per managed repo (several seconds), and the webhook handler
+            # needs the lock to reply before GitHub's delivery timeout. Holding
+            # it across the poll starved webhooks (EOF) and stalled the loop.
+            polled = None
+            if should_poll:
+                try:
+                    registry = read_registry()
+                    profiles = enabled_profiles(registry)
+                    polled = collect_queue(registry, profiles)
+                except Exception:
+                    polled = None
+                last_poll = time.monotonic()
+            with STATE_LOCK:
                 state = read_state()
-                should_poll = time.monotonic() - last_poll >= poll_interval(state)
-                state = tick(state, should_poll)
-                if should_poll:
-                    last_poll = time.monotonic()
+                tick(state, polled)
         except Exception as exc:
             with STATE_LOCK:
                 state = read_state()
@@ -117,7 +129,7 @@ def main() -> int:
         time.sleep(SCHEDULER_SECONDS)
 
 
-def tick(state: dict, should_poll: bool) -> dict:
+def tick(state: dict, polled: tuple | None) -> dict:
     registry = read_registry()
     profiles = enabled_profiles(registry)
     retries = reset_stale_retries(state.get("retries") or {})
@@ -148,12 +160,13 @@ def tick(state: dict, should_poll: bool) -> dict:
             last_error = error or last_error
     actives = surviving
 
-    if should_poll:
-        polled_queue, statuses = collect_queue(registry, profiles)
+    if polled is not None:
+        # collect_queue ran outside STATE_LOCK (network I/O); apply its result.
         # The poll lists every job currently queued across all managed repos, so
         # it is authoritative: replace the queue rather than unioning it, or jobs
         # that left GitHub's queue (completed/cancelled) without the broker
         # dispatching them would linger forever and inflate the shared count.
+        polled_queue, statuses = polled
         queue = polled_queue
         retries = prune_retries(retries, queue, actives)
 
