@@ -50,8 +50,9 @@ DEFAULT_PROFILES = [
         "enabled": True,
     },
 ]
-POLL_SECONDS = 15
+POLL_SECONDS = max(1, int(os.environ.get("CI_SCOPE_POLL_SECONDS", "4")))
 WEBHOOK_RECONCILE_SECONDS = 75
+ORG_REPO_CACHE_SECONDS = int(os.environ.get("CI_SCOPE_ORG_REPO_CACHE_SECONDS", "90"))
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
 MAX_ACTIVE_SECONDS = int(os.environ.get("CI_SCOPE_MAX_ACTIVE_SECONDS", "3600"))
@@ -61,6 +62,7 @@ ROOT = Path.home() / "Library/Application Support/CI Scope/Broker"
 REGISTRY_PATH = ROOT / "managed-repos.json"
 STATE_PATH = ROOT / "broker-state.json"
 JOBS_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/jobs"
+RUNNER_TEMPLATE_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/runner-template"
 LOG_DIR = Path.home() / "Library/Logs/CI Scope/Broker"
 WEBHOOK_PORT = int(os.environ.get("CI_SCOPE_WEBHOOK_PORT", "8765"))
 WEBHOOK_PATH = os.environ.get("CI_SCOPE_WEBHOOK_PATH", "/github/workflow-job")
@@ -68,6 +70,7 @@ WEBHOOK_SECRET_PATH = Path(os.environ.get("CI_SCOPE_WEBHOOK_SECRET_PATH", ROOT /
 
 STATE_LOCK = threading.RLock()
 ACTIVE_PROCESSES: dict[int, subprocess.Popen] = {}
+ORG_REPO_CACHE: dict[str, tuple[float, list[str]]] = {}
 UNSET = object()
 
 
@@ -323,6 +326,10 @@ def repositories_for_profile(profile: dict, registry: dict) -> list[dict]:
 
 
 def organization_repositories(organization: str) -> list[str]:
+    cached = ORG_REPO_CACHE.get(organization)
+    if cached and (time.time() - cached[0]) < ORG_REPO_CACHE_SECONDS:
+        return cached[1]
+
     command = [
         "gh",
         "repo",
@@ -337,9 +344,13 @@ def organization_repositories(organization: str) -> list[str]:
     ]
     completed = subprocess.run(command, text=True, capture_output=True, timeout=60)
     if completed.returncode != 0:
+        if cached:
+            return cached[1]
         message = completed.stderr.strip() or completed.stdout.strip() or f"gh repo list failed: {organization}"
         raise RuntimeError(message)
-    return json.loads(completed.stdout or "[]")
+    repos = json.loads(completed.stdout or "[]")
+    ORG_REPO_CACHE[organization] = (time.time(), repos)
+    return repos
 
 
 def queued_jobs(slug: str, labels: list[str], profile: dict) -> list[dict]:
@@ -436,14 +447,43 @@ def cleanup_runner_by_name(repository_slug: str | None, runner_name: str | None)
             continue
 
 
-def prepare_runner_dir(job: dict) -> Path:
+def ensure_runner_template() -> Path:
     archive = find_runner_archive()
+    marker = RUNNER_TEMPLATE_DIR.parent / "runner-template.archive"
+    current = str(archive)
+    if (
+        RUNNER_TEMPLATE_DIR.exists()
+        and (RUNNER_TEMPLATE_DIR / "run.sh").exists()
+        and marker.exists()
+        and marker.read_text(encoding="utf-8").strip() == current
+    ):
+        return RUNNER_TEMPLATE_DIR
+
+    if RUNNER_TEMPLATE_DIR.exists():
+        shutil.rmtree(RUNNER_TEMPLATE_DIR)
+    RUNNER_TEMPLATE_DIR.mkdir(parents=True)
+    with tarfile.open(archive) as tar:
+        tar.extractall(RUNNER_TEMPLATE_DIR)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(current, encoding="utf-8")
+    return RUNNER_TEMPLATE_DIR
+
+
+def prepare_runner_dir(job: dict) -> Path:
+    template = ensure_runner_template()
     runner_dir = JOBS_DIR / safe_name(job["id"])
     if runner_dir.exists():
         shutil.rmtree(runner_dir)
-    runner_dir.mkdir(parents=True)
-    with tarfile.open(archive) as tar:
-        tar.extractall(runner_dir)
+
+    # Near-instant APFS copy-on-write clone of the pre-extracted template,
+    # falling back to a fresh extract if cloning is unavailable.
+    clone = subprocess.run(["cp", "-cRp", str(template), str(runner_dir)], capture_output=True, text=True)
+    if clone.returncode != 0 or not (runner_dir / "run.sh").exists():
+        if runner_dir.exists():
+            shutil.rmtree(runner_dir)
+        runner_dir.mkdir(parents=True)
+        with tarfile.open(find_runner_archive()) as tar:
+            tar.extractall(runner_dir)
     return runner_dir
 
 
