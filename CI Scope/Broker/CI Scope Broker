@@ -56,6 +56,7 @@ ORG_REPO_CACHE_SECONDS = int(os.environ.get("CI_SCOPE_ORG_REPO_CACHE_SECONDS", "
 WEBHOOK_FRESH_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_FRESH_SECONDS", "300"))
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
+RETRY_RESET_SECONDS = int(os.environ.get("CI_SCOPE_RETRY_RESET_SECONDS", "300"))
 MAX_ACTIVE_SECONDS = int(os.environ.get("CI_SCOPE_MAX_ACTIVE_SECONDS", "3600"))
 MAX_CONCURRENT_JOBS = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_JOBS", "2")))
 MAX_CONCURRENT_HEAVY = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_HEAVY", "1")))
@@ -73,6 +74,7 @@ WEBHOOK_SECRET_PATH = Path(os.environ.get("CI_SCOPE_WEBHOOK_SECRET_PATH", ROOT /
 
 STATE_LOCK = threading.RLock()
 ACTIVE_PROCESSES: dict[int, subprocess.Popen] = {}
+RETRY_RESET_AT = time.monotonic()
 ORG_REPO_CACHE: dict[str, tuple[float, list[str]]] = {}
 UNSET = object()
 
@@ -118,7 +120,7 @@ def main() -> int:
 def tick(state: dict, should_poll: bool) -> dict:
     registry = read_registry()
     profiles = enabled_profiles(registry)
-    retries = state.get("retries") or {}
+    retries = reset_stale_retries(state.get("retries") or {})
     webhook = webhook_status(state.get("webhook"))
     actives = list(state.get("actives") or [])
     queue = list(state.get("queue") or [])
@@ -888,6 +890,18 @@ def update_retry(job: dict, retries: dict) -> dict:
     result = dict(retries)
     result[job["id"]] = result.get(job["id"], 0) + 1
     return result
+
+
+def reset_stale_retries(retries: dict) -> dict:
+    # Periodically forget retry counters so a job abandoned during a transient
+    # outage (e.g. a DNS blip that broke runner startup) gets another chance
+    # once conditions recover, instead of staying wedged at MAX_RETRIES forever.
+    global RETRY_RESET_AT
+    if time.monotonic() - RETRY_RESET_AT >= RETRY_RESET_SECONDS:
+        RETRY_RESET_AT = time.monotonic()
+        if retries:
+            return {}
+    return retries
 
 
 def clear_retry(job_id: str | None, retries: dict) -> dict:
