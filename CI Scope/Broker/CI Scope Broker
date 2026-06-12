@@ -402,13 +402,15 @@ def generate_jit_config(job: dict) -> str:
 
 
 def runner_name_for(job: dict) -> str:
-    repo = safe_name(job["repositorySlug"])[:22]
-    job_id = job.get("jobId") or "run"
-    return f"ci-scope-{repo}-{job['runId']}-{job_id}-{int(time.time())}"
+    # GitHub runner names must be <= 64 chars. The job id is globally unique;
+    # a short time suffix disambiguates re-dispatches. Including the repo slug
+    # and run id overflowed the limit for longer repo names (e.g. NexusUnity).
+    job_id = job.get("jobId") or job.get("runId") or "run"
+    return f"ci-scope-{job_id}-{int(time.time()) % 100000:05d}"
 
 
 def cleanup_stale_runners(job: dict) -> None:
-    prefix = f"ci-scope-{safe_name(job['repositorySlug'])[:22]}-{job['runId']}-{job.get('jobId') or 'run'}-"
+    prefix = f"ci-scope-{job.get('jobId') or job.get('runId') or 'run'}-"
     try:
         runners = gh_json(f"repos/{job['repositorySlug']}/actions/runners?per_page=100").get("runners") or []
     except Exception:
