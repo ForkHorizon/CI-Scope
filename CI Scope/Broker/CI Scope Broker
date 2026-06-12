@@ -58,6 +58,7 @@ SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
 RETRY_RESET_SECONDS = int(os.environ.get("CI_SCOPE_RETRY_RESET_SECONDS", "300"))
 MAX_ACTIVE_SECONDS = int(os.environ.get("CI_SCOPE_MAX_ACTIVE_SECONDS", "3600"))
+IDLE_RUNNER_SECONDS = int(os.environ.get("CI_SCOPE_IDLE_RUNNER_SECONDS", "150"))
 MAX_CONCURRENT_JOBS = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_JOBS", "2")))
 MAX_CONCURRENT_HEAVY = max(1, int(os.environ.get("CI_SCOPE_MAX_CONCURRENT_HEAVY", "1")))
 HEAVY_LABEL = os.environ.get("CI_SCOPE_HEAVY_LABEL", "ci-scope-heavy").lower()
@@ -153,6 +154,14 @@ def tick(state: dict, polled: tuple | None) -> dict:
                 retries = update_retry(active, retries)
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
                 last_error = f"Stopped {active.get('id')}: runner ran past {MAX_ACTIVE_SECONDS // 60} min without completing."
+            elif polled is not None and active_idle_too_long(active) and runner_is_idle(active):
+                # The runner connected but GitHub never handed it a job (its job
+                # was already serviced by another runner). Reap it now instead of
+                # squatting a slot until the watchdog fires — no retry, since the
+                # job is done; if it weren't, the next poll re-queues it.
+                terminate_active_process(active)
+                cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+                ACTIVE_PROCESSES.pop(active.get("pid"), None)
             else:
                 surviving.append(active)
         else:
@@ -445,6 +454,24 @@ def cleanup_stale_runners(job: dict) -> None:
             continue
 
 
+def runner_is_idle(active: dict) -> bool:
+    # True only if the runner is registered on GitHub but not running a job —
+    # it connected and is "Listening for Jobs" with nothing to do. A busy runner
+    # (or one not yet registered) is left alone.
+    slug = active.get("repositorySlug")
+    name = active.get("runnerName")
+    if not slug or not name:
+        return False
+    try:
+        runners = gh_json(f"repos/{slug}/actions/runners?per_page=100").get("runners") or []
+    except Exception:
+        return False
+    for runner in runners:
+        if runner.get("name") == name:
+            return not runner.get("busy", False)
+    return False
+
+
 def cleanup_runner_by_name(repository_slug: str | None, runner_name: str | None) -> None:
     if not repository_slug or not runner_name:
         return
@@ -557,11 +584,19 @@ def job_remote_status(active: dict) -> dict:
 
 
 def active_timed_out(active: dict) -> bool:
+    return active_older_than(active, MAX_ACTIVE_SECONDS)
+
+
+def active_idle_too_long(active: dict) -> bool:
+    return active_older_than(active, IDLE_RUNNER_SECONDS)
+
+
+def active_older_than(active: dict, seconds: int) -> bool:
     dispatched = active.get("dispatchedAt")
     if not dispatched:
         return False
     try:
-        return (time.time() - float(dispatched)) > MAX_ACTIVE_SECONDS
+        return (time.time() - float(dispatched)) > seconds
     except (TypeError, ValueError):
         return False
 
