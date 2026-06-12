@@ -119,9 +119,11 @@ def main() -> int:
                 except Exception:
                     polled = None
                 last_poll = time.monotonic()
-            with STATE_LOCK:
-                state = read_state()
-                tick(state, polled)
+            # tick() does its own short-lived locking: it snapshots state under
+            # the lock, runs all gh-api work lock-free, then re-acquires only to
+            # publish. Calling it here without the lock keeps the webhook handler
+            # responsive while a runner is being dispatched.
+            tick(polled)
         except Exception as exc:
             with STATE_LOCK:
                 state = read_state()
@@ -132,18 +134,27 @@ def main() -> int:
         time.sleep(SCHEDULER_SECONDS)
 
 
-def tick(state: dict, polled: tuple | None) -> dict:
+def tick(polled: tuple | None) -> dict:
     registry = read_registry()
     profiles = enabled_profiles(registry)
-    retries = reset_stale_retries(state.get("retries") or {})
-    webhook = webhook_status(state.get("webhook"))
-    actives = list(state.get("actives") or [])
-    queue = list(state.get("queue") or [])
-    statuses = list(state.get("repos") or [])
-    last_error = None
 
+    # Snapshot the bits we need under the lock, then release it for every
+    # gh-api call below. tick used to run entirely inside STATE_LOCK, but its
+    # subprocess calls (runner-registration cleanup, JIT config generation,
+    # remote job status, runner deletion) each block up to 60s — holding the
+    # lock across them starved the webhook handler exactly like the in-loop
+    # poll once did. Mirror collect_queue: do the I/O lock-free and re-acquire
+    # the lock only to mutate in-memory state and write it.
+    with STATE_LOCK:
+        state = read_state()
+        retries = reset_stale_retries(state.get("retries") or {})
+        actives_snapshot = list(state.get("actives") or [])
+        queue_snapshot = list(state.get("queue") or [])
+
+    last_error = None
+    removed_ids: set = set()
     surviving = []
-    for active in actives:
+    for active in actives_snapshot:
         if active.get("pid") and active_is_running(active):
             # Ephemeral JIT runners pick up whichever queued job matches their
             # labels, so the process the broker started for one job may be
@@ -155,6 +166,7 @@ def tick(state: dict, polled: tuple | None) -> dict:
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
                 retries = update_retry(active, retries)
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
+                removed_ids.add(active.get("id"))
                 last_error = f"Stopped {active.get('id')}: runner ran past {MAX_ACTIVE_SECONDS // 60} min without completing."
             elif polled is not None and active_idle_too_long(active) and runner_is_idle(active):
                 # The runner connected but GitHub never handed it a job (its job
@@ -164,12 +176,13 @@ def tick(state: dict, polled: tuple | None) -> dict:
                 terminate_active_process(active)
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
+                removed_ids.add(active.get("id"))
             else:
                 surviving.append(active)
         else:
             retries, error = finish_active(active, retries)
+            removed_ids.add(active.get("id"))
             last_error = error or last_error
-    actives = surviving
 
     if polled is not None:
         # collect_queue ran outside STATE_LOCK (network I/O); apply its result.
@@ -177,19 +190,25 @@ def tick(state: dict, polled: tuple | None) -> dict:
         # it is authoritative: replace the queue rather than unioning it, or jobs
         # that left GitHub's queue (completed/cancelled) without the broker
         # dispatching them would linger forever and inflate the shared count.
-        polled_queue, statuses = polled
-        queue = polled_queue
-        retries = prune_retries(retries, queue, actives)
+        polled_queue, polled_statuses = polled
+        work_queue = polled_queue
+        retries = prune_retries(retries, work_queue, surviving)
+    else:
+        polled_queue = None
+        polled_statuses = None
+        work_queue = queue_snapshot
 
-    queue = merge_jobs(queue, [])
-    active_ids = {active.get("id") for active in actives}
-    queue = [job for job in queue if job.get("id") not in active_ids]
+    work_queue = merge_jobs(work_queue, [])
+    surviving_ids = {active.get("id") for active in surviving}
+    work_queue = [job for job in work_queue if job.get("id") not in surviving_ids]
 
-    heavy_running = sum(1 for active in actives if job_is_heavy(active))
-    dispatchable = [job for job in queue if retries.get(job["id"], 0) < MAX_RETRIES]
+    heavy_running = sum(1 for active in surviving if job_is_heavy(active))
+    dispatchable = [job for job in work_queue if retries.get(job["id"], 0) < MAX_RETRIES]
+    working_actives = list(surviving)
+    dispatched_actives = []
     dispatched = False
     for job in dispatchable:
-        if len(actives) >= MAX_CONCURRENT_JOBS:
+        if len(working_actives) >= MAX_CONCURRENT_JOBS:
             break
         heavy = job_is_heavy(job)
         if heavy and heavy_running >= MAX_CONCURRENT_HEAVY:
@@ -206,21 +225,40 @@ def tick(state: dict, polled: tuple | None) -> dict:
         active["status"] = "in_progress"
         active["dispatchedAt"] = time.time()
         ACTIVE_PROCESSES[process.pid] = process
-        actives.append(active)
-        active_ids.add(job["id"])
-        queue = remove_job(queue, job["id"])
+        working_actives.append(active)
+        dispatched_actives.append(active)
         if heavy:
             heavy_running += 1
         dispatched = True
 
     if dispatched:
         last_error = None
-    elif not last_error and not actives and queue:
-        exhausted = [job for job in queue if retries.get(job["id"], 0) >= MAX_RETRIES]
+    elif not last_error and not working_actives and work_queue:
+        exhausted = [job for job in work_queue if retries.get(job["id"], 0) >= MAX_RETRIES]
         if exhausted:
             last_error = f"Retry limit reached for {len(exhausted)} queued job(s)."
 
-    return save_state(actives, queue, statuses, last_error, retries, profiles, webhook)
+    # Re-acquire the lock only to publish. Re-read so queue/status/webhook
+    # mutations the handler made while we were doing I/O are preserved; actives
+    # membership, retries, and ACTIVE_PROCESSES are owned solely by this loop,
+    # so our computed values win there. fresh_actives minus the ids we finished
+    # or reaped equals the survivors (the handler only relabels actives, never
+    # adds or removes them), so we rebuild from fresh to keep its status labels.
+    # save_state strips any dispatched job from the queue (it is now active).
+    with STATE_LOCK:
+        fresh = read_state()
+        final_actives = [active for active in (fresh.get("actives") or []) if active.get("id") not in removed_ids]
+        final_actives.extend(dispatched_actives)
+
+        if polled is not None:
+            queue = polled_queue
+            statuses = polled_statuses
+        else:
+            queue = list(fresh.get("queue") or [])
+            statuses = list(fresh.get("repos") or [])
+
+        webhook = webhook_status(fresh.get("webhook"))
+        return save_state(final_actives, queue, statuses, last_error, retries, profiles, webhook)
 
 
 def poll_interval(state: dict) -> int:
