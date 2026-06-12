@@ -128,11 +128,12 @@ def tick(state: dict, should_poll: bool) -> dict:
     surviving = []
     for active in actives:
         if active.get("pid") and active_is_running(active):
-            if should_poll and active_completed_remotely(active):
-                terminate_active_process(active)
-                retries, error = finish_active(active, retries)
-                last_error = error or last_error
-            elif active_timed_out(active):
+            # Ephemeral JIT runners pick up whichever queued job matches their
+            # labels, so the process the broker started for one job may be
+            # running another. Never kill a live runner based on a remote job's
+            # status — only the watchdog may stop a genuinely stuck one. A slot
+            # frees when the runner process exits on its own (the else branch).
+            if active_timed_out(active):
                 terminate_active_process(active)
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
                 retries = update_retry(active, retries)
@@ -221,35 +222,6 @@ def active_is_running(active: dict) -> bool:
         return process.poll() is None
 
     return process_alive(pid)
-
-
-def active_completed_remotely(active: dict) -> bool:
-    job_id = active.get("jobId")
-    repository_slug = active.get("repositorySlug")
-    if job_id and repository_slug:
-        try:
-            job = gh_json(f"repos/{repository_slug}/actions/jobs/{job_id}")
-            status = job.get("status")
-            if status:
-                active["status"] = status
-            if status == "completed":
-                conclusion = job.get("conclusion")
-                active["conclusion"] = conclusion
-                active["exitCode"] = 0 if conclusion == "success" else 1
-                return True
-            return False
-        except Exception:
-            pass
-
-    refreshed = refresh_run(active)
-    if refreshed.get("status"):
-        active["status"] = refreshed["status"]
-    if refreshed.get("status") == "completed":
-        conclusion = refreshed.get("conclusion")
-        active["conclusion"] = conclusion
-        active["exitCode"] = 0 if conclusion == "success" else 1
-        return True
-    return False
 
 
 def terminate_active_process(active: dict) -> None:
@@ -757,16 +729,10 @@ def apply_workflow_job_event(payload: dict, delivery_id: str) -> None:
             queue = remove_job(queue, job["id"])
             actives = [{**a, "status": action} if a.get("id") == job["id"] else a for a in actives]
         elif job and action == "completed":
+            # Just drop the finished job from the queue. Do NOT kill or remove a
+            # runner by job id — ephemeral runners can be running a different
+            # (swapped) job. tick() reaps each runner when its process exits.
             queue = remove_job(queue, job["id"])
-            match = next((a for a in actives if a.get("id") == job["id"]), None)
-            if match is not None:
-                conclusion = job.get("conclusion")
-                match = {**match, "status": action, "conclusion": conclusion}
-                match["exitCode"] = 0 if conclusion == "success" else 1
-                if match.get("pid") and active_is_running(match):
-                    terminate_active_process(match)
-                retries, last_error = finish_active(match, retries)
-                actives = [a for a in actives if a.get("id") != job["id"]]
 
         if job and profile is not None:
             statuses = upsert_repo_status(statuses, queue, job["repositorySlug"], profile, labels)
