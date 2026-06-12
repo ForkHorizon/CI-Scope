@@ -39,8 +39,8 @@ private struct JobNotificationBanner: View {
                     Divider()
                     ScrollView {
                         VStack(alignment: .leading, spacing: 8) {
-                            if let runningJob = notification.runningJob {
-                                JobNotificationSection(title: "Running Now", jobs: [runningJob], tint: .green)
+                            if !notification.runningJobs.isEmpty {
+                                JobNotificationSection(title: "Running Now", jobs: notification.runningJobs, tint: .green)
                             }
 
                             if !notification.queuedJobs.isEmpty {
@@ -100,7 +100,7 @@ private struct JobNotificationBanner: View {
     }
 
     private var shouldShowWorkList: Bool {
-        notification.runningJob != nil || !notification.queuedJobs.isEmpty
+        !notification.runningJobs.isEmpty || !notification.queuedJobs.isEmpty
     }
 }
 
