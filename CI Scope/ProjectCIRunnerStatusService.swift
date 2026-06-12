@@ -156,8 +156,8 @@ extension ProjectCIService {
             )
         }
 
-        let launchState = firstMatch(in: output, pattern: #"state = ([a-zA-Z]+)"#) ?? "unknown"
-        let pid = intMatch(in: output, pattern: #"pid = ([0-9]+)"#)
+        let launchState = firstMatch(in: output, regex: Self.stateRegex) ?? "unknown"
+        let pid = intMatch(in: output, regex: Self.pidRegex)
         let uptime = await processUptime(pid: pid)
         let state: ServiceState = launchState == "running" ? .online : .offline
         let remoteRunner = await remoteRunner(matching: runner)

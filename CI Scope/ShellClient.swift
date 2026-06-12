@@ -41,19 +41,15 @@ enum ShellClient {
         }
     }
 
+    private static let ansiEscapeRegex = try! NSRegularExpression(pattern: "\u{001B}\\[[0-9;?]*[a-zA-Z]")
+    private static let oscEscapeRegex = try! NSRegularExpression(pattern: "\u{001B}\\][^\u{0007}\u{001B}]*(?:\u{0007}|\u{001B}\\\\)")
+
     private static func sanitizeOutput(_ output: String) -> String {
-        var sanitized = output.replacingOccurrences(
-            of: "\u{001B}\\[[0-9;?]*[a-zA-Z]",
-            with: "",
-            options: .regularExpression
-        )
-        sanitized = sanitized.replacingOccurrences(
-            of: "\u{001B}\\][^\u{0007}\u{001B}]*(?:\u{0007}|\u{001B}\\\\)",
-            with: "",
-            options: .regularExpression
-        )
-        sanitized = sanitized.replacingOccurrences(of: "\u{001B}", with: "")
-        return sanitized
+        let range1 = NSRange(output.startIndex..., in: output)
+        var sanitized = ansiEscapeRegex.stringByReplacingMatches(in: output, range: range1, withTemplate: "")
+        let range2 = NSRange(sanitized.startIndex..., in: sanitized)
+        sanitized = oscEscapeRegex.stringByReplacingMatches(in: sanitized, range: range2, withTemplate: "")
+        return sanitized.replacingOccurrences(of: "\u{001B}", with: "")
     }
 
     private static func configuredProcess(

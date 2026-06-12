@@ -142,8 +142,8 @@ extension LocalBrokerService {
             )
         }
 
-        let launchState = firstMatch(in: result.output, pattern: #"state = ([a-zA-Z]+)"#) ?? "running"
-        let pid = intMatch(in: result.output, pattern: #"pid = ([0-9]+)"#)
+        let launchState = firstMatch(in: result.output, regex: Self.stateRegex) ?? "running"
+        let pid = intMatch(in: result.output, regex: Self.pidRegex)
         return RunnerLaunchStatus(
             state: launchState == "running" ? .online : .warning,
             launchctlState: launchState,
@@ -225,16 +225,18 @@ extension LocalBrokerService {
         return uptime.isEmpty ? "-" : uptime
     }
 
-    private func firstMatch(in text: String, pattern: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+    private static let stateRegex = try! NSRegularExpression(pattern: #"state = ([a-zA-Z]+)"#)
+    private static let pidRegex = try! NSRegularExpression(pattern: #"pid = ([0-9]+)"#)
+
+    private func firstMatch(in text: String, regex: NSRegularExpression) -> String? {
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         guard let match = regex.firstMatch(in: text, range: range), match.numberOfRanges > 1 else { return nil }
         guard let valueRange = Range(match.range(at: 1), in: text) else { return nil }
         return String(text[valueRange])
     }
 
-    private func intMatch(in text: String, pattern: String) -> Int? {
-        firstMatch(in: text, pattern: pattern).flatMap(Int.init)
+    private func intMatch(in text: String, regex: NSRegularExpression) -> Int? {
+        firstMatch(in: text, regex: regex).flatMap(Int.init)
     }
 }
 
