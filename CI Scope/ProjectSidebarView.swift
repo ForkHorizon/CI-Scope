@@ -19,6 +19,7 @@ struct ProjectMenuPanel: View {
             HStack(spacing: 8) {
                 Label("Menu", systemImage: "sidebar.left")
                     .font(.caption.weight(.semibold))
+                    .help("Workspace Menu")
                 Spacer()
             }
             .padding(.horizontal, 12)
