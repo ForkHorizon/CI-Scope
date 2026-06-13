@@ -88,6 +88,13 @@ extension ProjectCIService {
     }
 
     func loadRuns(for project: CIProject) async -> LoadResponse<[GitHubRun]> {
+        // Prefer the broker's webhook-sourced feed: when it has fresh runs for
+        // this repo, render them with zero GitHub API calls. gh is only a
+        // cold-start / broker-down fallback.
+        let feedRuns = LocalBrokerService(config: config).workflowRuns(forRepositorySlug: project.repositorySlug)
+        if !feedRuns.isEmpty {
+            return LoadResponse(value: feedRuns)
+        }
         if let pause = await GitHubRateLimitGate.shared.activePause() {
             let when = pause.until.formatted(date: .omitted, time: .shortened)
             return LoadResponse(error: "\(pause.reason). Retrying after \(when).")
