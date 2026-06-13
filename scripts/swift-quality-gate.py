@@ -175,7 +175,7 @@ def run_dead_code(root: Path, config: dict) -> None:
 
     periphery = ensure_periphery(config)
     project = detect_project(root, config)
-    cmd = [periphery, "scan", "--format", "xcode"]
+    cmd = [periphery, "scan", "--strict", "--format", "xcode"]
     cmd.extend(str(arg) for arg in config.get("periphery_arguments", []))
 
     if project.kind == "xcode-workspace":
@@ -319,20 +319,20 @@ def collect_swift_paths(root: Path, config: dict, args: argparse.Namespace) -> l
 
 def changed_paths(root: Path, base: str, head: str) -> list[Path]:
     attempts = [
-        ["git", "diff", "--name-only", "--diff-filter=ACMRT", f"{base}...{head}"],
-        ["git", "diff", "--name-only", "--diff-filter=ACMRT", base, head],
+        ["git", "diff", "-z", "--name-only", "--diff-filter=ACMRT", f"{base}...{head}"],
+        ["git", "diff", "-z", "--name-only", "--diff-filter=ACMRT", base, head],
     ]
     for command in attempts:
         result = subprocess.run(command, cwd=root, text=True, capture_output=True, check=False)
         if result.returncode == 0:
-            return [root / line.strip() for line in result.stdout.splitlines() if line.strip()]
+            return [root / path for path in result.stdout.split('\0') if path]
     fail(trimmed_error(result.stdout + result.stderr, "Unable to collect changed files."))
 
 
 def all_repo_paths(root: Path) -> list[Path]:
-    result = subprocess.run(["git", "ls-files"], cwd=root, text=True, capture_output=True, check=False)
+    result = subprocess.run(["git", "ls-files", "-z"], cwd=root, text=True, capture_output=True, check=False)
     if result.returncode == 0:
-        return [root / line.strip() for line in result.stdout.splitlines() if line.strip()]
+        return [root / path for path in result.stdout.split('\0') if path]
 
     paths = []
     for current_root, dirnames, filenames in os.walk(root):
