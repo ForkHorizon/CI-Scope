@@ -78,8 +78,14 @@ WEBHOOK_SECRET_PATH = Path(os.environ.get("CI_SCOPE_WEBHOOK_SECRET_PATH", ROOT /
 
 STATE_LOCK = threading.RLock()
 ACTIVE_PROCESSES: dict[int, subprocess.Popen] = {}
-RETRY_RESET_AT = time.monotonic()
+# job id -> time.monotonic() when its retry counter was last bumped, so
+# reset_stale_retries can age each job out individually. Loop-owned (touched
+# only from tick), like the retries dict itself.
+RETRY_BUMPED_AT: dict[str, float] = {}
 ORG_REPO_CACHE: dict[str, tuple[float, list[str]]] = {}
+# Persistent worker pool reused across polls (collect_queue runs one repo
+# query per worker); avoids spinning up/tearing down threads every poll.
+POLL_EXECUTOR = ThreadPoolExecutor(max_workers=POLL_MAX_WORKERS, thread_name_prefix="ci-scope-poll")
 # job id -> time.monotonic() when a webhook queued it. Touched only under
 # STATE_LOCK (webhook handler + tick publish). Lets the publish keep a webhook
 # arrival that landed after the poll snapshot, until the next poll confirms it.
@@ -115,11 +121,11 @@ def main() -> int:
             # request per managed repo (several seconds), and the webhook handler
             # needs the lock to reply before GitHub's delivery timeout. Holding
             # it across the poll starved webhooks (EOF) and stalled the loop.
+            registry = read_registry()
+            profiles = enabled_profiles(registry)
             polled = None
             if should_poll:
                 try:
-                    registry = read_registry()
-                    profiles = enabled_profiles(registry)
                     polled = collect_queue(registry, profiles)
                 except Exception:
                     polled = None
@@ -128,7 +134,7 @@ def main() -> int:
             # the lock, runs all gh-api work lock-free, then re-acquires only to
             # publish. Calling it here without the lock keeps the webhook handler
             # responsive while a runner is being dispatched.
-            tick(polled)
+            tick(polled, profiles)
         except Exception as exc:
             with STATE_LOCK:
                 state = read_state()
@@ -139,10 +145,7 @@ def main() -> int:
         time.sleep(SCHEDULER_SECONDS)
 
 
-def tick(polled: tuple | None) -> dict:
-    registry = read_registry()
-    profiles = enabled_profiles(registry)
-
+def tick(polled: tuple | None, profiles: list[dict]) -> dict:
     # Snapshot the bits we need under the lock, then release it for every
     # gh-api call below. tick used to run entirely inside STATE_LOCK, but its
     # subprocess calls (runner-registration cleanup, JIT config generation,
@@ -176,10 +179,14 @@ def tick(polled: tuple | None) -> dict:
             elif polled is not None and active_idle_too_long(active) and runner_is_idle(active):
                 # The runner connected but GitHub never handed it a job (its job
                 # was already serviced by another runner). Reap it now instead of
-                # squatting a slot until the watchdog fires — no retry, since the
-                # job is done; if it weren't, the next poll re-queues it.
+                # squatting a slot until the watchdog fires. Bump the retry so a
+                # job that keeps producing idle runners (nothing ever picks it
+                # up) is eventually backed off instead of churning
+                # dispatch->idle->reap forever; for an already-done job the id
+                # never returns and prune_retries drops the counter.
                 terminate_active_process(active)
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+                retries = update_retry(active, retries)
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
                 removed_ids.add(active.get("id"))
             else:
@@ -203,7 +210,8 @@ def tick(polled: tuple | None) -> dict:
         polled_statuses = None
         work_queue = queue_snapshot
 
-    work_queue = merge_jobs(work_queue, [])
+    # work_queue is already deduped+sorted (polled comes from collect_queue's
+    # merge_jobs; queue_snapshot from a prior save_state) — no need to re-merge.
     surviving_ids = {active.get("id") for active in surviving}
     work_queue = [job for job in work_queue if job.get("id") not in surviving_ids]
 
@@ -391,15 +399,14 @@ def collect_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], lis
     # sequential so the cached org-repo list is never touched from threads.
     jobs = []
     if tasks:
-        with ThreadPoolExecutor(max_workers=min(len(tasks), POLL_MAX_WORKERS)) as pool:
-            pending = {pool.submit(queued_jobs, slug, labels, profile): (slug, labels, profile) for slug, labels, profile in tasks}
-            for future, (slug, labels, profile) in pending.items():
-                try:
-                    repo_jobs = future.result()
-                    jobs.extend(repo_jobs)
-                    statuses.append(repo_status(slug, "ok", len(repo_jobs), None, profile, labels))
-                except Exception as exc:
-                    statuses.append(repo_status(slug, "warning", 0, str(exc), profile, labels))
+        pending = {POLL_EXECUTOR.submit(queued_jobs, slug, labels, profile): (slug, labels, profile) for slug, labels, profile in tasks}
+        for future, (slug, labels, profile) in pending.items():
+            try:
+                repo_jobs = future.result()
+                jobs.extend(repo_jobs)
+                statuses.append(repo_status(slug, "ok", len(repo_jobs), None, profile, labels))
+            except Exception as exc:
+                statuses.append(repo_status(slug, "warning", 0, str(exc), profile, labels))
     return merge_jobs(jobs, []), statuses
 
 
@@ -1021,22 +1028,34 @@ def write_state(state: dict) -> None:
 def update_retry(job: dict, retries: dict) -> dict:
     result = dict(retries)
     result[job["id"]] = result.get(job["id"], 0) + 1
+    RETRY_BUMPED_AT[job["id"]] = time.monotonic()
     return result
 
 
 def reset_stale_retries(retries: dict) -> dict:
-    # Periodically forget retry counters so a job abandoned during a transient
-    # outage (e.g. a DNS blip that broke runner startup) gets another chance
-    # once conditions recover, instead of staying wedged at MAX_RETRIES forever.
-    global RETRY_RESET_AT
-    if time.monotonic() - RETRY_RESET_AT >= RETRY_RESET_SECONDS:
-        RETRY_RESET_AT = time.monotonic()
-        if retries:
-            return {}
-    return retries
+    # Forget a job's retry counter once it has gone RETRY_RESET_SECONDS without
+    # a new failure, so a job abandoned during a transient outage (e.g. a DNS
+    # blip that broke runner startup) gets another chance once conditions
+    # recover — without also resetting jobs that are still actively failing.
+    now = time.monotonic()
+    cutoff = now - RETRY_RESET_SECONDS
+    result = {}
+    for job_id, count in retries.items():
+        bumped = RETRY_BUMPED_AT.get(job_id)
+        if bumped is None:
+            # First time seen (e.g. restored from state after a restart) — start
+            # its clock now rather than dropping the count immediately.
+            RETRY_BUMPED_AT[job_id] = now
+            result[job_id] = count
+        elif bumped >= cutoff:
+            result[job_id] = count
+        else:
+            RETRY_BUMPED_AT.pop(job_id, None)
+    return result
 
 
 def clear_retry(job_id: str | None, retries: dict) -> dict:
+    RETRY_BUMPED_AT.pop(job_id, None)
     if not job_id or job_id not in retries:
         return retries
     result = dict(retries)
@@ -1049,6 +1068,8 @@ def prune_retries(retries: dict, queue: list[dict], actives: list[dict] | None =
     for active in actives or []:
         if active.get("id"):
             keep.add(active["id"])
+    for job_id in [jid for jid in RETRY_BUMPED_AT if jid not in keep]:
+        RETRY_BUMPED_AT.pop(job_id, None)
     return {job_id: count for job_id, count in retries.items() if job_id in keep}
 
 
