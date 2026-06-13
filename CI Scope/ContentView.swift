@@ -74,7 +74,12 @@ struct ContentView: View {
         }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
             guard workspaceTab != .runners else { return }
-            Task { @MainActor in refreshCurrentTab() }
+            Task { @MainActor in
+                // Fallback poll only: skip entirely while GitHub is rate-limited
+                // so we never pile requests onto an exhausted quota.
+                if await GitHubRateLimitGate.shared.isPaused() { return }
+                refreshCurrentTab()
+            }
         }
     }
 }

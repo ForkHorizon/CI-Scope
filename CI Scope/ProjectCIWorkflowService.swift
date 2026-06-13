@@ -25,10 +25,14 @@ extension ProjectCIService {
     }
 
     func loadWorkflows(for project: CIProject) async -> LoadResponse<[GitHubWorkflow]> {
+        if await GitHubRateLimitGate.shared.isPaused() {
+            return await loadWorkflowFilesViaGit(for: project, apiError: "GitHub rate limit reached.")
+        }
         let command = """
         gh workflow list --repo \(quoted(project.repositorySlug)) --all --limit 100 --json id,name,path,state
         """
         let result = await ShellClient.run(command, timeout: 15, config: config)
+        await GitHubRateLimitGate.shared.note(result: result, config: config)
         if result.exitCode != 0 || result.output.data(using: .utf8) == nil {
             return await loadWorkflowFilesViaGit(
                 for: project,
@@ -84,10 +88,15 @@ extension ProjectCIService {
     }
 
     func loadRuns(for project: CIProject) async -> LoadResponse<[GitHubRun]> {
+        if let pause = await GitHubRateLimitGate.shared.activePause() {
+            let when = pause.until.formatted(date: .omitted, time: .shortened)
+            return LoadResponse(error: "\(pause.reason). Retrying after \(when).")
+        }
         let command = """
         gh run list --repo \(quoted(project.repositorySlug)) --limit 20 --json databaseId,status,conclusion,displayTitle,workflowName,headBranch,event,createdAt,updatedAt,url
         """
         let result = await ShellClient.run(command, timeout: 15, config: config)
+        await GitHubRateLimitGate.shared.note(result: result, config: config)
         guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
             return LoadResponse(error: trimmedError(result.output, fallback: "Failed to load workflow runs."))
         }
