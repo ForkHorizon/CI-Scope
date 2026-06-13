@@ -27,3 +27,9 @@
 **Vulnerability:** ShellClient command outputs directly rendered in UI without sanitizing ANSI control sequences.
 **Learning:** Raw terminal outputs can contain malicious ANSI escape sequences that manipulate logs or inject terminal commands when rendered.
 **Prevention:** Use regex replacement to strip out CSI, OSC sequences and raw ESC characters from shell outputs.
+
+
+## 2025-02-14 - Use getuid() Instead of Shell Commands
+**Vulnerability:** Found `id -u` executed via asynchronous shell processes. While this technically works to fetch the UID, it incurs unnecessary performance overhead and opens a potential (albeit small) vector if path/environment variables are compromised.
+**Learning:** System-level information like user ID should be fetched natively rather than relying on spawned subshells or subprocesses.
+**Prevention:** Always use `getuid()` natively in Swift instead of running `id -u` through a shell process. It is faster, synchronous, and not subject to environment manipulation.

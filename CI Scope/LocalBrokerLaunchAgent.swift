@@ -16,13 +16,18 @@ extension LocalBrokerService {
         try plist.write(to: launchAgentURL, atomically: true, encoding: .utf8)
 
         if changed {
-            _ = await ShellClient.run(bootoutCommand, timeout: 8, config: config)
+            if let validUid = Optional(getuid()) {
+                _ = await ShellClient.run(bootoutCommand(uid: validUid), timeout: 8, config: config)
+            }
         }
 
         let isLoaded = await launchAgentIsLoaded()
         if changed || !isLoaded {
+            guard let validUid = Optional(getuid()) else {
+                throw LocalBrokerError.launchAgent("Could not verify current user ID.")
+            }
             let result = await ShellClient.run(
-                "launchctl bootstrap gui/$(id -u) \(quoted(launchAgentURL.path))",
+                "launchctl bootstrap gui/\(validUid) \(quoted(launchAgentURL.path))",
                 timeout: 10,
                 config: config
             )
@@ -31,17 +36,20 @@ extension LocalBrokerService {
             }
         }
 
-        _ = await ShellClient.run(kickstartCommand, timeout: 8, config: config)
+        if let validUid = Optional(getuid()) {
+            _ = await ShellClient.run(kickstartCommand(uid: validUid), timeout: 8, config: config)
+        }
         await stopStandaloneRunnerLaunchAgents()
         return executableURL.path
     }
 
     private func stopStandaloneRunnerLaunchAgents() async {
+        guard let validUid = Optional(getuid()) else { return }
         for runnerConfig in config.actionsRunners {
             guard let serviceLabel = standaloneServiceLabel(for: runnerConfig) else { continue }
             guard serviceLabel != LocalBrokerConstants.serviceLabel else { continue }
             _ = await ShellClient.run(
-                "launchctl bootout gui/$(id -u)/\(quoted(serviceLabel)) >/dev/null 2>&1 || true",
+                "launchctl bootout gui/\(validUid)/\(quoted(serviceLabel)) >/dev/null 2>&1 || true",
                 timeout: 5,
                 config: config
             )
@@ -112,21 +120,26 @@ extension LocalBrokerService {
         return "\(UUID().uuidString)-\(UUID().uuidString)"
     }
 
+    private func currentValidUid() async -> Int? {
+        return Int(getuid())
+    }
+
     private func launchAgentIsLoaded() async -> Bool {
+        guard let validUid = Optional(getuid()) else { return false }
         let result = await ShellClient.run(
-            "launchctl print gui/$(id -u)/\(LocalBrokerConstants.serviceLabel)",
+            "launchctl print gui/\(validUid)/\(LocalBrokerConstants.serviceLabel)",
             timeout: 4,
             config: config
         )
         return result.exitCode == 0
     }
 
-    private var bootoutCommand: String {
-        "launchctl bootout gui/$(id -u)/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
+    private func bootoutCommand(uid: Int) -> String {
+        "launchctl bootout gui/\(uid)/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
     }
 
-    private var kickstartCommand: String {
-        "launchctl kickstart -k gui/$(id -u)/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
+    private func kickstartCommand(uid: Int) -> String {
+        "launchctl kickstart -k gui/\(uid)/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
     }
 
     private func launchAgentPlist(executableURL: URL, secretURL: URL) -> String {

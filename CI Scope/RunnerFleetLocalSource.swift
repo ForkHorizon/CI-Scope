@@ -12,21 +12,9 @@ extension RunnerFleetService {
             )
         }
 
-        let uid = await ShellClient.run("id -u", timeout: 3, config: config)
-            .output
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let validUid = getuid()
 
-        guard let validUid = Int(uid) else {
-            return RunnerLaunchStatus(
-                state: .offline,
-                launchctlState: "unavailable",
-                pid: nil,
-                uptime: "-",
-                error: "Could not verify current user ID."
-            )
-        }
-
-        let launch = await ShellClient.run("launchctl print gui/\(validUid)/\(serviceLabel)", timeout: 5, config: config)
+        let launch = await ShellClient.run("launchctl print gui/\(validUid)/\(quoted(serviceLabel))", timeout: 5, config: config)
 
         guard launch.exitCode == 0 else {
             return RunnerLaunchStatus(
