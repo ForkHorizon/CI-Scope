@@ -7,11 +7,13 @@ extension RunnerFleetService {
     ) async -> [String] {
         switch runnerConfig.scope {
         case .organization(let organization):
+            if await GitHubRateLimitGate.shared.isPaused() { return [] }
             let command = """
             gh repo list \(quoted(organization)) --limit 200 --json nameWithOwner,isArchived \
             --jq '[.[] | select(.isArchived == false) | .nameWithOwner]'
             """
             let result = await ShellClient.run(command, timeout: 20, config: config)
+            await GitHubRateLimitGate.shared.note(result: result, config: config)
             guard
                 result.exitCode == 0,
                 let data = result.output.data(using: .utf8),
@@ -30,18 +32,22 @@ extension RunnerFleetService {
         for runnerConfig: ActionsRunnerConfig,
         localRunner: FleetLocalRunnerInfo?
     ) async -> FleetLoadResponse<FleetGitHubActionsRunner> {
+        if await GitHubRateLimitGate.shared.isPaused() {
+            return FleetLoadResponse(error: "Paused: GitHub rate limit reached.")
+        }
         let command: String
         switch runnerConfig.scope {
         case .organization(let organization):
-            command = "gh api \(quoted("orgs/\(organization)/actions/runners"))"
+            command = "gh api --cache 30s \(quoted("orgs/\(organization)/actions/runners"))"
         case .personalAccount, .repository:
             guard let repositorySlug = localRunner?.repositorySlug else {
                 return FleetLoadResponse(error: "Local runner is not registered to a GitHub repository.")
             }
-            command = "gh api \(quoted("repos/\(repositorySlug)/actions/runners"))"
+            command = "gh api --cache 30s \(quoted("repos/\(repositorySlug)/actions/runners"))"
         }
 
         let result = await ShellClient.run(command, timeout: 15, config: config)
+        await GitHubRateLimitGate.shared.note(result: result, config: config)
         guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
             return FleetLoadResponse(error: trimmedError(result.output, fallback: "Could not read GitHub runner status."))
         }
@@ -63,40 +69,34 @@ extension RunnerFleetService {
     }
 
     func workflowRuns(repositories: [String], status: String) async -> [WorkflowRunContext] {
-        await withTaskGroup(of: [WorkflowRunContext].self) { group in
-            for repository in repositories {
-                group.addTask {
-                    await workflowRuns(repository: repository, status: status)
-                }
-            }
-
-            var result: [WorkflowRunContext] = []
-            for await repositoryRuns in group {
-                result.append(contentsOf: repositoryRuns)
-            }
-            return result.sorted { $0.createdAt > $1.createdAt }
+        let runs = await mapConcurrently(repositories, maxConcurrent: 4) { repository in
+            await workflowRuns(repository: repository, status: status)
         }
+        return runs.flatMap { $0 }.sorted { $0.createdAt > $1.createdAt }
     }
 
     func jobs(for runs: [WorkflowRunContext]) async -> [JobContext] {
-        await withTaskGroup(of: [JobContext].self) { group in
-            for run in runs {
-                group.addTask {
-                    await jobs(for: run)
-                }
+        var cached: [JobContext] = []
+        var pending: [WorkflowRunContext] = []
+        for run in runs {
+            if let hit = await WorkflowJobsCache.shared.jobs(for: run) {
+                cached.append(contentsOf: hit)
+            } else {
+                pending.append(run)
             }
-
-            var result: [JobContext] = []
-            for await runJobs in group {
-                result.append(contentsOf: runJobs)
-            }
-            return result
         }
+
+        let fetched = await mapConcurrently(pending, maxConcurrent: 4) { run in
+            await jobs(for: run)
+        }
+        return cached + fetched.flatMap { $0 }
     }
 
     private func workflowRuns(repository: String, status: String) async -> [WorkflowRunContext] {
-        let command = "gh api \(quoted("repos/\(repository)/actions/runs?status=\(status)&per_page=20"))"
+        if await GitHubRateLimitGate.shared.isPaused() { return [] }
+        let command = "gh api --cache 30s \(quoted("repos/\(repository)/actions/runs?status=\(status)&per_page=20"))"
         let result = await ShellClient.run(command, timeout: 15, config: config)
+        await GitHubRateLimitGate.shared.note(result: result, config: config)
         guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
             return []
         }
@@ -121,8 +121,12 @@ extension RunnerFleetService {
     }
 
     private func jobs(for run: WorkflowRunContext) async -> [JobContext] {
-        let command = "gh api \(quoted("repos/\(run.repositorySlug)/actions/runs/\(run.id)/jobs?per_page=100"))"
+        if await GitHubRateLimitGate.shared.isPaused() {
+            return await WorkflowJobsCache.shared.jobs(for: run) ?? []
+        }
+        let command = "gh api --cache 30s \(quoted("repos/\(run.repositorySlug)/actions/runs/\(run.id)/jobs?per_page=100"))"
         let result = await ShellClient.run(command, timeout: 15, config: config)
+        await GitHubRateLimitGate.shared.note(result: result, config: config)
         guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
             return []
         }
@@ -131,7 +135,9 @@ extension RunnerFleetService {
             return []
         }
 
-        return decoded.jobs.map { JobContext(run: run, job: $0) }
+        let jobs = decoded.jobs.map { JobContext(run: run, job: $0) }
+        await WorkflowJobsCache.shared.store(jobs, for: run)
+        return jobs
     }
 }
 
