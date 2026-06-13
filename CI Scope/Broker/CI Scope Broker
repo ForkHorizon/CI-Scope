@@ -69,6 +69,7 @@ MAX_WEBHOOK_BODY_BYTES = 2_000_000
 ROOT = Path.home() / "Library/Application Support/CI Scope/Broker"
 REGISTRY_PATH = ROOT / "managed-repos.json"
 STATE_PATH = ROOT / "broker-state.json"
+RUNS_PATH = ROOT / "workflow-runs.json"
 JOBS_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/jobs"
 RUNNER_TEMPLATE_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/runner-template"
 LOG_DIR = Path.home() / "Library/Logs/CI Scope/Broker"
@@ -77,6 +78,10 @@ WEBHOOK_PATH = os.environ.get("CI_SCOPE_WEBHOOK_PATH", "/github/workflow-job")
 WEBHOOK_SECRET_PATH = Path(os.environ.get("CI_SCOPE_WEBHOOK_SECRET_PATH", ROOT / "webhook-secret"))
 
 STATE_LOCK = threading.RLock()
+# Guards workflow-runs.json (the dashboard snapshot), kept separate from
+# STATE_LOCK so dashboard recording can never block job dispatch.
+RUNS_LOCK = threading.Lock()
+MAX_DASHBOARD_RUNS = int(os.environ.get("CI_SCOPE_MAX_DASHBOARD_RUNS", "80"))
 ACTIVE_PROCESSES: dict[int, subprocess.Popen] = {}
 # job id -> time.monotonic() when its retry counter was last bumped, so
 # reset_stale_retries can age each job out individually. Loop-owned (touched
@@ -794,7 +799,7 @@ class GitHubWebhookHandler(BaseHTTPRequestHandler):
 
         body = self.rfile.read(length)
         event = self.headers.get("X-GitHub-Event") or ""
-        if event != "workflow_job":
+        if event not in ("workflow_job", "workflow_run"):
             self.respond(202, "ignored")
             return
         if not verify_signature(body, self.headers.get("X-Hub-Signature-256") or "", self.server.secret):
@@ -809,7 +814,14 @@ class GitHubWebhookHandler(BaseHTTPRequestHandler):
             return
 
         delivery_id = self.headers.get("X-GitHub-Delivery") or ""
-        apply_workflow_job_event(payload, delivery_id)
+        if event == "workflow_job":
+            apply_workflow_job_event(payload, delivery_id)
+        # Dashboard recording is best-effort: it must never affect job dispatch,
+        # so a failure here is swallowed rather than rejecting the delivery.
+        try:
+            record_dashboard_event(event, payload)
+        except Exception:
+            pass
         self.respond(202, "accepted")
 
     def respond(self, status: int, text: str) -> None:
@@ -1023,6 +1035,104 @@ def write_state(state: dict) -> None:
     tmp = STATE_PATH.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
     tmp.replace(STATE_PATH)
+
+
+def record_dashboard_event(event: str, payload: dict) -> None:
+    """Update workflow-runs.json from a webhook delivery so the app can render
+    recent runs/jobs without polling the GitHub API. Best-effort and isolated
+    from the dispatch state machine via its own file and lock."""
+    repository = payload.get("repository") or {}
+    slug = repository.get("full_name") or ""
+    if not slug:
+        return
+    with RUNS_LOCK:
+        index = {run["id"]: run for run in read_runs() if run.get("id") is not None}
+        if event == "workflow_run":
+            apply_dashboard_run(index, slug, payload)
+        elif event == "workflow_job":
+            apply_dashboard_job(index, slug, payload)
+        write_runs(prune_runs(list(index.values())))
+
+
+def apply_dashboard_run(index: dict, slug: str, payload: dict) -> None:
+    run = payload.get("workflow_run") or {}
+    run_id = run.get("id")
+    if run_id is None:
+        return
+    entry = index.get(run_id) or {"id": run_id, "jobs": []}
+    entry.update({
+        "repositorySlug": slug,
+        "workflowName": run.get("name") or entry.get("workflowName") or "Workflow",
+        "displayTitle": run.get("display_title") or run.get("name") or entry.get("displayTitle") or "Workflow run",
+        "headBranch": run.get("head_branch") or entry.get("headBranch") or "-",
+        "status": run.get("status") or entry.get("status") or "queued",
+        "conclusion": run.get("conclusion"),
+        "url": run.get("html_url") or entry.get("url") or "",
+        "event": run.get("event") or entry.get("event") or "",
+        "createdAt": run.get("created_at") or entry.get("createdAt") or now(),
+        "updatedAt": now(),
+    })
+    index[run_id] = entry
+
+
+def apply_dashboard_job(index: dict, slug: str, payload: dict) -> None:
+    job = payload.get("workflow_job") or {}
+    run = payload.get("workflow_run") or {}
+    run_id = job.get("run_id") or run.get("id")
+    job_id = job.get("id")
+    if run_id is None or job_id is None:
+        return
+    entry = index.get(run_id) or {
+        "id": run_id,
+        "repositorySlug": slug,
+        "workflowName": job.get("workflow_name") or "Workflow",
+        "displayTitle": run.get("display_title") or job.get("name") or "Workflow run",
+        "headBranch": job.get("head_branch") or "-",
+        "status": "in_progress",
+        "conclusion": None,
+        "url": run.get("html_url") or job.get("run_url") or "",
+        "event": "",
+        "createdAt": job.get("created_at") or now(),
+        "jobs": [],
+    }
+    entry["updatedAt"] = now()
+    jobs = [item for item in entry.get("jobs", []) if item.get("id") != job_id]
+    jobs.append({
+        "id": job_id,
+        "name": job.get("name") or "Workflow job",
+        "status": job.get("status") or "queued",
+        "conclusion": job.get("conclusion"),
+        "runnerName": job.get("runner_name"),
+        "htmlURL": job.get("html_url"),
+        "startedAt": job.get("started_at"),
+        "completedAt": job.get("completed_at"),
+        "labels": job.get("labels") or [],
+    })
+    entry["jobs"] = sorted(jobs, key=lambda item: item.get("id") or 0)
+    index[run_id] = entry
+
+
+def prune_runs(runs: list[dict]) -> list[dict]:
+    ordered = sorted(runs, key=lambda item: item.get("createdAt") or "", reverse=True)
+    return ordered[:MAX_DASHBOARD_RUNS]
+
+
+def read_runs() -> list[dict]:
+    if not RUNS_PATH.exists():
+        return []
+    try:
+        data = json.loads(RUNS_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    runs = data.get("runs") if isinstance(data, dict) else data
+    return runs if isinstance(runs, list) else []
+
+
+def write_runs(runs: list[dict]) -> None:
+    payload = {"version": 1, "updatedAt": now(), "runs": runs}
+    tmp = RUNS_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(RUNS_PATH)
 
 
 def update_retry(job: dict, retries: dict) -> dict:
