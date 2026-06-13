@@ -1,0 +1,34 @@
+# Concurrency Correctness Audit
+
+## 1. @MainActor Violations / Unstructured Task Capturing Mutable State
+**File:** `CI Scope/NotificationManager.swift`
+**Line:** 20
+**Concurrent Sequence:**
+`NotificationManager` is a `@MainActor` isolated class. Its synchronous `init()` spawns an unstructured `Task { await requestAuthorization() }`. Because it is spawned from a synchronous context, this unstructured task runs on the global concurrent executor rather than inheriting the main actor's isolation. It then executes `requestAuthorization()`, which mutates the `@MainActor`-isolated `hasRequestedPermission` property from a background thread. This causes a data race with any concurrent main thread accesses.
+
+## 2. Snapshot Caches Mutated Off the Main Actor
+**File:** `CI Scope/AutomationScriptInstallViewModel.swift`
+**Lines:** 50, 53, 74, 77
+**Concurrent Sequence:**
+The `AutomationScriptInstallViewModel` is `@MainActor` isolated, and uses a dictionary `snapshots` to cache the state of script installations. In the synchronous `install` and `remove` methods, it spawns an unstructured `Task { ... }`. Because the `Task` does not explicitly specify `@MainActor`, it may execute on a background thread. Inside this background task, it updates the `snapshots[snapshotKey]` cache directly (e.g., `snapshots[snapshotKey] = .succeeded(result)`). This mutates the view model's published state off the main actor, leading to UI update glitches or crashes.
+
+## 3. Stale-Write Bugs (Async results applied after state changed)
+
+### Bug A: ProjectCIViewModel
+**File:** `CI Scope/ProjectCIViewModel.swift`
+**Line:** 25
+**Concurrent Sequence:**
+1. A user triggers `load(project)` for Project A, which suspends on `await service.loadSnapshot(for: project)`.
+2. Concurrently, a local broker live update triggers `refreshLocalRunnerFromBroker(project)` for Project A, suspending on `await service.loadLocalRunner(...)`.
+3. The broker update finishes first, resuming on the main actor to update `snapshots[project.id]` with a fresh local runner state.
+4. The long-running `loadSnapshot` network request finishes later. It resumes on the main actor and unconditionally overwrites `snapshots[project.id] = snapshot` at line 25. Because `loadSnapshot` fetched its `localRunner` state at the beginning, its result contains a stale local runner state, entirely overwriting and reverting the recent live broker update.
+(This also occurs if the user selects Project A, switches to Project B, and switches back to Project A quickly: the first `load` finishes last and overwrites the second `load`'s data with older data).
+
+### Bug B: RunnerFleetViewModel
+**File:** `CI Scope/RunnerFleetViewModel.swift`
+**Line:** 22
+**Concurrent Sequence:**
+1. The user navigates to the Runners tab. `load()` is called, suspending on `await service.loadSnapshot()` to fetch runner data from GitHub.
+2. Concurrently, a file system event triggers the broker monitor to call `applyLiveUpdate`, which enters its update loop and suspends on `await service.loadSnapshot(prepareBroker: false)`.
+3. The live update finishes first, resuming on the main actor and setting `snapshot = nextSnapshot` with fresh, up-to-date broker data.
+4. The original `load()` finishes later. It resumes on the main actor and unconditionally overwrites `snapshot = await service.loadSnapshot()` at line 22 with older, stale data captured before the live update, temporarily hiding the live update from the UI.
