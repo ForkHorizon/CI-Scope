@@ -377,6 +377,7 @@ def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
 
     refreshed = job_remote_status(active)
     cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+    remove_runner_dir(active.get("id"))
     if refreshed.get("status") == "queued":
         retries = update_retry(active, retries)
     else:
@@ -609,6 +610,17 @@ def prepare_runner_dir(job: dict) -> Path:
         with tarfile.open(find_runner_archive()) as tar:
             tar.extractall(runner_dir)
     return runner_dir
+
+
+def remove_runner_dir(job_id: str | None) -> None:
+    """Delete a finished job's runner working directory. Each job clones a
+    ~430MB runner template into JOBS_DIR; without this cleanup those dirs
+    accumulate (273 dirs = 118GB observed) and eventually fill the disk."""
+    if not job_id:
+        return
+    runner_dir = JOBS_DIR / safe_name(job_id)
+    if runner_dir.exists():
+        shutil.rmtree(runner_dir, ignore_errors=True)
 
 
 def find_runner_archive() -> Path:
