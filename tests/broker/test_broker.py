@@ -8,7 +8,7 @@ import hmac
 import hashlib
 
 # Need to import CI Scope Broker but it has spaces and no .py extension.
-broker_dir = Path(__file__).parent.parent
+broker_dir = Path(__file__).parent.parent.parent / "CI Scope" / "Broker"
 sys.path.insert(0, str(broker_dir))
 
 loader = importlib.machinery.SourceFileLoader(
