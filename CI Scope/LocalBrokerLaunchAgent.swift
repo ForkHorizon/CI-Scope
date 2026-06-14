@@ -22,7 +22,7 @@ extension LocalBrokerService {
         let isLoaded = await launchAgentIsLoaded()
         if changed || !isLoaded {
             let result = await ShellClient.run(
-                "launchctl bootstrap gui/$(id -u) \(quoted(launchAgentURL.path))",
+                "launchctl bootstrap gui/\(geteuid()) \(quoted(launchAgentURL.path))",
                 timeout: 10,
                 config: config
             )
@@ -37,11 +37,12 @@ extension LocalBrokerService {
     }
 
     private func stopStandaloneRunnerLaunchAgents() async {
+        let uid = geteuid()
         for runnerConfig in config.actionsRunners {
             guard let serviceLabel = standaloneServiceLabel(for: runnerConfig) else { continue }
             guard serviceLabel != LocalBrokerConstants.serviceLabel else { continue }
             _ = await ShellClient.run(
-                "launchctl bootout gui/$(id -u)/\(quoted(serviceLabel)) >/dev/null 2>&1 || true",
+                "launchctl bootout gui/\(uid)/\(quoted(serviceLabel)) >/dev/null 2>&1 || true",
                 timeout: 5,
                 config: config
             )
@@ -114,7 +115,7 @@ extension LocalBrokerService {
 
     private func launchAgentIsLoaded() async -> Bool {
         let result = await ShellClient.run(
-            "launchctl print gui/$(id -u)/\(LocalBrokerConstants.serviceLabel)",
+            "launchctl print gui/\(geteuid())/\(LocalBrokerConstants.serviceLabel)",
             timeout: 4,
             config: config
         )
@@ -122,11 +123,11 @@ extension LocalBrokerService {
     }
 
     private var bootoutCommand: String {
-        "launchctl bootout gui/$(id -u)/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
+        "launchctl bootout gui/\(geteuid())/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
     }
 
     private var kickstartCommand: String {
-        "launchctl kickstart -k gui/$(id -u)/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
+        "launchctl kickstart -k gui/\(geteuid())/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
     }
 
     private func launchAgentPlist(executableURL: URL, secretURL: URL) -> String {
