@@ -13,6 +13,7 @@ final class RunnerFleetViewModel: ObservableObject {
     private var isApplyingLiveUpdate = false
     private var lastAppliedBrokerSignature: String?
     private var pendingBrokerSignature: String?
+    private var loadGeneration = 0
 
     init() {
         let config = DashboardConfig()
@@ -22,10 +23,21 @@ final class RunnerFleetViewModel: ObservableObject {
 
     func load() async {
         isLoading = true
-        snapshot = await service.loadSnapshot()
+        let generation = loadGeneration + 1
+        loadGeneration = generation
+        let brokerSignatureAtStart = lastAppliedBrokerSignature
 
-        NotificationManager.shared.checkWorkUpdates(snapshot: snapshot)
-        NotificationManager.shared.checkRunnerUpdates(runners: snapshot.runners)
+        let nextSnapshot = await service.loadSnapshot()
+        guard loadGeneration == generation else { return }
+
+        // A live broker update applied fresher data while we were loading; don't
+        // clobber it with the snapshot captured before that update (it already
+        // fired its own notifications).
+        if lastAppliedBrokerSignature == brokerSignatureAtStart {
+            snapshot = nextSnapshot
+            NotificationManager.shared.checkWorkUpdates(snapshot: nextSnapshot)
+            NotificationManager.shared.checkRunnerUpdates(runners: nextSnapshot.runners)
+        }
 
         isLoading = false
     }
