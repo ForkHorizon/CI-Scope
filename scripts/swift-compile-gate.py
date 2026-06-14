@@ -321,7 +321,7 @@ def parse_warning_line(line: str) -> WarningRecord | None:
         r"^(?P<path>.*?):(?P<line>\d+):(?P<column>\d+):\s*warning:\s*(?P<message>.*)$",
         r"^(?P<path>.*?):(?P<line>\d+):\s*warning:\s*(?P<message>.*)$",
     ):
-        match = re.match(pattern, text)
+        match = re.match(pattern, text, flags=re.IGNORECASE)
         if match:
             return WarningRecord(
                 raw_line=text,

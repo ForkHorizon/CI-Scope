@@ -41,6 +41,7 @@
     "target",
     "vendor",
     "linter-checker-300-lines.py",
+    "swift-compile-gate.py",
     "swift-quality-gate.py",
     "*.designer.cs",
     "*.generated.*",
