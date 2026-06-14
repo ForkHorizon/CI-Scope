@@ -69,12 +69,14 @@ extension ProjectCIService {
     }
 
     func repositoryRunners(for project: CIProject) async -> LoadResponse<[GitHubActionsRunner]> {
-        let command = "gh api \(quoted("repos/\(project.repositorySlug)/actions/runners"))"
+        if let pause = await GitHubRateLimitGate.shared.activePause() {
+            return LoadResponse(error: pause.reason)
+        }
+        let command = "gh api --cache 30s \(quoted("repos/\(project.repositorySlug)/actions/runners"))"
         let result = await ShellClient.run(command, timeout: 15, config: config)
+        await GitHubRateLimitGate.shared.note(result: result, config: config)
         guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
-            return LoadResponse(
-                error: trimmedError(result.output, fallback: "Could not read repo runners.")
-            )
+            return LoadResponse(error: trimmedError(result.output, fallback: "Could not read repo runners."))
         }
 
         guard let runnerList = try? JSONDecoder().decode(GitHubRunnerList.self, from: data) else {
@@ -266,24 +268,22 @@ extension ProjectCIService {
     }
 
     func remoteRunner(matching runner: LocalRunnerInfo) async -> GitHubActionsRunner? {
+        if await GitHubRateLimitGate.shared.isPaused() { return nil }
         let command: String?
         switch runner.config.scope {
         case .organization(let organization):
-            command = "gh api \(quoted("orgs/\(organization)/actions/runners"))"
+            command = "gh api --cache 30s \(quoted("orgs/\(organization)/actions/runners"))"
         case .personalAccount, .repository:
             guard let repositorySlug = runner.repositorySlug else { return nil }
-            command = "gh api \(quoted("repos/\(repositorySlug)/actions/runners"))"
+            command = "gh api --cache 30s \(quoted("repos/\(repositorySlug)/actions/runners"))"
         }
-
         guard let command else { return nil }
         let result = await ShellClient.run(command, timeout: 15, config: config)
-        guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
-            return nil
-        }
-
-        guard let runnerList = try? JSONDecoder().decode(GitHubRunnerList.self, from: data) else {
-            return nil
-        }
+        await GitHubRateLimitGate.shared.note(result: result, config: config)
+        guard result.exitCode == 0,
+              let data = result.output.data(using: .utf8),
+              let runnerList = try? JSONDecoder().decode(GitHubRunnerList.self, from: data)
+        else { return nil }
 
         return runnerList.runners.first {
             $0.name.caseInsensitiveCompare(runner.runner.agentName ?? "") == .orderedSame

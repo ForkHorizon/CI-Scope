@@ -102,6 +102,10 @@ struct LocalBrokerService {
         try! brokerDirectory.safelyAppendingPathComponent("broker-state.json")
     }
 
+    var workflowRunsURL: URL {
+        try! brokerDirectory.safelyAppendingPathComponent("workflow-runs.json")
+    }
+
     var logsDirectory: URL {
         try! fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
             .safelyAppendingPathComponent("Logs/CI Scope/Broker", isDirectory: true)
