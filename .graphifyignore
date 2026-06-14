@@ -1,0 +1,2 @@
+# graphify's own output — don't index the graph into itself
+graphify-out/
