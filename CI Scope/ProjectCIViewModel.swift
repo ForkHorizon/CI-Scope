@@ -31,12 +31,14 @@ final class ProjectCIViewModel: ObservableObject {
 
         var snapshot = await service.loadSnapshot(for: project)
         guard !invalidatedProjectIDs.contains(project.id),
-              loadGeneration[project.id] == generation else { return }
+            loadGeneration[project.id] == generation
+        else { return }
 
         // A broker refresh landed a fresher local-runner state while we were loading;
         // keep it instead of reverting to the copy loadSnapshot fetched earlier.
         if brokerWriteSeq[project.id] != brokerSeqAtStart,
-           let liveRunner = snapshots[project.id]?.localRunner {
+            let liveRunner = snapshots[project.id]?.localRunner
+        {
             snapshot.localRunner = liveRunner
         }
         snapshots[project.id] = snapshot
