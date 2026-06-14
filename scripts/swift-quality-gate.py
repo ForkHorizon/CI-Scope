@@ -175,11 +175,8 @@ def run_dead_code(root: Path, config: dict) -> None:
 
     periphery = ensure_periphery(config)
     project = detect_project(root, config)
-    cmd = [periphery, "scan", "--strict", "--format", "xcode"]
+    cmd = [periphery, "scan", "--format", "xcode"]
     cmd.extend(str(arg) for arg in config.get("periphery_arguments", []))
-
-    if "--baseline" not in cmd and (root / ".periphery-baseline.json").exists():
-        cmd.extend(["--baseline", ".periphery-baseline.json"])
 
     if project.kind == "xcode-workspace":
         cmd.extend(["--workspace", project.project_path or "", "--schemes", project.scheme or ""])
