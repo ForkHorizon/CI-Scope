@@ -182,7 +182,7 @@ extension ProjectCIService {
     func launchctlPrint(serviceLabel: String) async -> ShellResult? {
         let validUid = getuid()
 
-        return await ShellClient.run("launchctl print gui/\(validUid)/\(quoted(serviceLabel))", timeout: 5, config: config)
+        return await ShellClient.run("launchctl print gui/\(Int(validUid))/\(quoted(serviceLabel))", timeout: 5, config: config)
     }
 
     func readLocalRunner(_ runnerConfig: ActionsRunnerConfig) -> LocalRunnerInfo? {

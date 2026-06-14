@@ -17,7 +17,7 @@ extension LocalBrokerService {
 
         if changed {
             if let validUid = Optional(getuid()) {
-                _ = await ShellClient.run(bootoutCommand(uid: validUid), timeout: 8, config: config)
+                _ = await ShellClient.run(bootoutCommand(uid: Int(validUid)), timeout: 8, config: config)
             }
         }
 
@@ -27,7 +27,7 @@ extension LocalBrokerService {
                 throw LocalBrokerError.launchAgent("Could not verify current user ID.")
             }
             let result = await ShellClient.run(
-                "launchctl bootstrap gui/\(validUid) \(quoted(launchAgentURL.path))",
+                "launchctl bootstrap gui/\(Int(validUid)) \(quoted(launchAgentURL.path))",
                 timeout: 10,
                 config: config
             )
@@ -37,7 +37,7 @@ extension LocalBrokerService {
         }
 
         if let validUid = Optional(getuid()) {
-            _ = await ShellClient.run(kickstartCommand(uid: validUid), timeout: 8, config: config)
+            _ = await ShellClient.run(kickstartCommand(uid: Int(validUid)), timeout: 8, config: config)
         }
         await stopStandaloneRunnerLaunchAgents()
         return executableURL.path
@@ -49,7 +49,7 @@ extension LocalBrokerService {
             guard let serviceLabel = standaloneServiceLabel(for: runnerConfig) else { continue }
             guard serviceLabel != LocalBrokerConstants.serviceLabel else { continue }
             _ = await ShellClient.run(
-                "launchctl bootout gui/\(validUid)/\(quoted(serviceLabel)) >/dev/null 2>&1 || true",
+                "launchctl bootout gui/\(Int(validUid))/\(quoted(serviceLabel)) >/dev/null 2>&1 || true",
                 timeout: 5,
                 config: config
             )
@@ -127,7 +127,7 @@ extension LocalBrokerService {
     private func launchAgentIsLoaded() async -> Bool {
         guard let validUid = Optional(getuid()) else { return false }
         let result = await ShellClient.run(
-            "launchctl print gui/\(validUid)/\(LocalBrokerConstants.serviceLabel)",
+            "launchctl print gui/\(Int(validUid))/\(LocalBrokerConstants.serviceLabel)",
             timeout: 4,
             config: config
         )

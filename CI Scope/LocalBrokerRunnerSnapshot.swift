@@ -129,7 +129,7 @@ extension LocalBrokerService {
     private func launchStatus() async -> RunnerLaunchStatus {
         let validUid = getuid()
         let result = await ShellClient.run(
-            "launchctl print gui/\(validUid)/\(LocalBrokerConstants.serviceLabel)",
+            "launchctl print gui/\(Int(validUid))/\(LocalBrokerConstants.serviceLabel)",
             timeout: 5,
             config: config
         )

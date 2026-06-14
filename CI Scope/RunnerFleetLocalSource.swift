@@ -14,7 +14,7 @@ extension RunnerFleetService {
 
         let validUid = getuid()
 
-        let launch = await ShellClient.run("launchctl print gui/\(validUid)/\(quoted(serviceLabel))", timeout: 5, config: config)
+        let launch = await ShellClient.run("launchctl print gui/\(Int(validUid))/\(quoted(serviceLabel))", timeout: 5, config: config)
 
         guard launch.exitCode == 0 else {
             return RunnerLaunchStatus(
