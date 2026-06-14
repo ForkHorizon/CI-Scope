@@ -1,0 +1,507 @@
+{
+  ".ci-scope-swift-format.json": {
+    "mtime": 1780569968.2856522,
+    "ast_hash": "b411fb46d9bb75f4e53e9b71defdc52f",
+    "semantic_hash": "b411fb46d9bb75f4e53e9b71defdc52f"
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1781207244.9255233,
+    "ast_hash": "568c28e14dc5728b525db1801ad5feb1",
+    "semantic_hash": "568c28e14dc5728b525db1801ad5feb1"
+  },
+  ".linter-checker-300-lines.json": {
+    "mtime": 1780569968.2869306,
+    "ast_hash": "b38f9649bd835275246d23400d45a65c",
+    "semantic_hash": "b38f9649bd835275246d23400d45a65c"
+  },
+  ".periphery-baseline.json": {
+    "mtime": 1780569968.287196,
+    "ast_hash": "4696877f2a630594fff387b03e799eed",
+    "semantic_hash": "4696877f2a630594fff387b03e799eed"
+  },
+  ".swift-compile-gate.json": {
+    "mtime": 1780569968.2873073,
+    "ast_hash": "f99d7a9c24f6a0f2b0e66cf5223c370d",
+    "semantic_hash": "f99d7a9c24f6a0f2b0e66cf5223c370d"
+  },
+  ".swift-quality-gate.json": {
+    "mtime": 1780569968.2875032,
+    "ast_hash": "bb09c1fd205c816fe15cf691d890e3f7",
+    "semantic_hash": "bb09c1fd205c816fe15cf691d890e3f7"
+  },
+  "CI Scope/Assets.xcassets/AccentColor.colorset/Contents.json": {
+    "mtime": 1779881475.5125947,
+    "ast_hash": "55019f7265dde0a78318b0807f98e847",
+    "semantic_hash": "55019f7265dde0a78318b0807f98e847"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/Contents.json": {
+    "mtime": 1781258289.1314445,
+    "ast_hash": "9c01a570bd74d51ebd6b098d78512768",
+    "semantic_hash": "9c01a570bd74d51ebd6b098d78512768"
+  },
+  "CI Scope/Assets.xcassets/Contents.json": {
+    "mtime": 1779881475.5133998,
+    "ast_hash": "9deb2ada1cc834bbebf8bbad9c8978a1",
+    "semantic_hash": "9deb2ada1cc834bbebf8bbad9c8978a1"
+  },
+  "CI Scope/AutomationScriptErrors.swift": {
+    "mtime": 1780569968.2962947,
+    "ast_hash": "7a5522ad15005214205812d6e378ff69",
+    "semantic_hash": "7a5522ad15005214205812d6e378ff69"
+  },
+  "CI Scope/AutomationScriptInstallMode.swift": {
+    "mtime": 1781183711.0678167,
+    "ast_hash": "94626bc3d41cc711ea765f1bda1c6442",
+    "semantic_hash": "94626bc3d41cc711ea765f1bda1c6442"
+  },
+  "CI Scope/AutomationScriptInstallViewModel.swift": {
+    "mtime": 1780569968.2968917,
+    "ast_hash": "69a0040d50a1cfefb89af9ccc566001a",
+    "semantic_hash": "69a0040d50a1cfefb89af9ccc566001a"
+  },
+  "CI Scope/AutomationScriptInstaller+Broker.swift": {
+    "mtime": 1781183711.0679677,
+    "ast_hash": "c68fb7310c5f0772ee3b1be6df6ecdef",
+    "semantic_hash": "c68fb7310c5f0772ee3b1be6df6ecdef"
+  },
+  "CI Scope/AutomationScriptInstaller+PullRequest.swift": {
+    "mtime": 1780642295.2703562,
+    "ast_hash": "2bfe37924cc91baca3393222e366b3bb",
+    "semantic_hash": "2bfe37924cc91baca3393222e366b3bb"
+  },
+  "CI Scope/AutomationScriptInstaller+Shell.swift": {
+    "mtime": 1780642295.2707415,
+    "ast_hash": "ca73e1930d45f286d8123b9d9957ab32",
+    "semantic_hash": "ca73e1930d45f286d8123b9d9957ab32"
+  },
+  "CI Scope/AutomationScriptInstaller.swift": {
+    "mtime": 1781183711.068257,
+    "ast_hash": "1dad670b85b82adc7947536b5a0fb2c5",
+    "semantic_hash": "1dad670b85b82adc7947536b5a0fb2c5"
+  },
+  "CI Scope/AutomationScriptModels.swift": {
+    "mtime": 1780569968.2987294,
+    "ast_hash": "e9418c803a45023c854e18149439c150",
+    "semantic_hash": "e9418c803a45023c854e18149439c150"
+  },
+  "CI Scope/AutomationScriptNaming.swift": {
+    "mtime": 1780569968.2989628,
+    "ast_hash": "d4b853492fbeb5c2f5b647f9fe24f5fc",
+    "semantic_hash": "d4b853492fbeb5c2f5b647f9fe24f5fc"
+  },
+  "CI Scope/AutomationScriptProjectDetection.swift": {
+    "mtime": 1780569968.299323,
+    "ast_hash": "992a1cc3f00655af25c34b3c71c80cdf",
+    "semantic_hash": "992a1cc3f00655af25c34b3c71c80cdf"
+  },
+  "CI Scope/AutomationScriptRenderer.swift": {
+    "mtime": 1780569968.2995155,
+    "ast_hash": "1b59957e994d15b062a55298419cef4c",
+    "semantic_hash": "1b59957e994d15b062a55298419cef4c"
+  },
+  "CI Scope/AutomationScriptSeedProvider.swift": {
+    "mtime": 1780569968.2999341,
+    "ast_hash": "bb01edc97e8b8f504a5d0c758d5268a4",
+    "semantic_hash": "bb01edc97e8b8f504a5d0c758d5268a4"
+  },
+  "CI Scope/AutomationScriptSeeds/ai-readability.json": {
+    "mtime": 1780569968.3003602,
+    "ast_hash": "2e8dbf4a89405efe0b3dbcb8358747b5",
+    "semantic_hash": "2e8dbf4a89405efe0b3dbcb8358747b5"
+  },
+  "CI Scope/AutomationScriptSeeds/swift-compile-gate.json": {
+    "mtime": 1780569968.3007474,
+    "ast_hash": "85955146cff0e0f2cb66f095eadfcbf5",
+    "semantic_hash": "85955146cff0e0f2cb66f095eadfcbf5"
+  },
+  "CI Scope/AutomationScriptSeeds/swift-quality-gate.json": {
+    "mtime": 1780569968.3010352,
+    "ast_hash": "0d79ce16cf0cb07ac4ec200c10fdebd7",
+    "semantic_hash": "0d79ce16cf0cb07ac4ec200c10fdebd7"
+  },
+  "CI Scope/AutomationScriptStore+Migration.swift": {
+    "mtime": 1780569968.3013198,
+    "ast_hash": "1c02109ce8c14f7baf7a91ff47bef9df",
+    "semantic_hash": "1c02109ce8c14f7baf7a91ff47bef9df"
+  },
+  "CI Scope/AutomationScriptStore.swift": {
+    "mtime": 1780642295.2712586,
+    "ast_hash": "691852acf728a52567de480a986dfec6",
+    "semantic_hash": "691852acf728a52567de480a986dfec6"
+  },
+  "CI Scope/AutomationScriptValidation.swift": {
+    "mtime": 1780569968.301861,
+    "ast_hash": "897f4c66860e125d849b4315b252e041",
+    "semantic_hash": "897f4c66860e125d849b4315b252e041"
+  },
+  "CI Scope/Broker/CI Scope Broker": {
+    "mtime": 1781364085.0763905,
+    "ast_hash": "8328c15542e497103228a31cc6a9c959",
+    "semantic_hash": ""
+  },
+  "CI Scope/CI_ScopeApp.swift": {
+    "mtime": 1779881475.5047214,
+    "ast_hash": "f0f77dee956355e169485b1189aa8ce5",
+    "semantic_hash": "f0f77dee956355e169485b1189aa8ce5"
+  },
+  "CI Scope/CompactPanels.swift": {
+    "mtime": 1781183711.0686107,
+    "ast_hash": "13feba6016c1c8939e07d4d76ed9ed99",
+    "semantic_hash": "13feba6016c1c8939e07d4d76ed9ed99"
+  },
+  "CI Scope/ContentView+Layout.swift": {
+    "mtime": 1781183711.0688915,
+    "ast_hash": "6fc3270db2ec951ae3a01e6273152408",
+    "semantic_hash": "6fc3270db2ec951ae3a01e6273152408"
+  },
+  "CI Scope/ContentView+State.swift": {
+    "mtime": 1781183711.0691311,
+    "ast_hash": "d4cbba4f7e5407864d2b0044c727f839",
+    "semantic_hash": "d4cbba4f7e5407864d2b0044c727f839"
+  },
+  "CI Scope/ContentView.swift": {
+    "mtime": 1781363705.151052,
+    "ast_hash": "67ab6fe0fd35f37a5034c7ce516a6652",
+    "semantic_hash": ""
+  },
+  "CI Scope/DashboardConfig.swift": {
+    "mtime": 1781183711.0695717,
+    "ast_hash": "da3be770e72b1a469b46f035c92ab703",
+    "semantic_hash": "da3be770e72b1a469b46f035c92ab703"
+  },
+  "CI Scope/DashboardSections.swift": {
+    "mtime": 1781183711.0697193,
+    "ast_hash": "fa3a7430cea33c8667ecc117367a8c6a",
+    "semantic_hash": "fa3a7430cea33c8667ecc117367a8c6a"
+  },
+  "CI Scope/JobNotificationBanner.swift": {
+    "mtime": 1781306332.5376558,
+    "ast_hash": "67532fa53cc8d4fcc155b796ca4e0d7b",
+    "semantic_hash": "67532fa53cc8d4fcc155b796ca4e0d7b"
+  },
+  "CI Scope/LocalBrokerLaunchAgent.swift": {
+    "mtime": 1781183725.9456391,
+    "ast_hash": "b18acd793e9065528f1ad6a6dc9604db",
+    "semantic_hash": "b18acd793e9065528f1ad6a6dc9604db"
+  },
+  "CI Scope/LocalBrokerModels.swift": {
+    "mtime": 1781210686.2651186,
+    "ast_hash": "defd631e96d6f91efa5f5e74dfacaf3d",
+    "semantic_hash": "defd631e96d6f91efa5f5e74dfacaf3d"
+  },
+  "CI Scope/LocalBrokerRunnerSnapshot.swift": {
+    "mtime": 1781210686.2656076,
+    "ast_hash": "728fcc864b4ba96e7a8efb11fc558698",
+    "semantic_hash": "728fcc864b4ba96e7a8efb11fc558698"
+  },
+  "CI Scope/LocalBrokerService.swift": {
+    "mtime": 1781364153.3800058,
+    "ast_hash": "e9f6a65c39ec9b3a2cf530fc2a7c751a",
+    "semantic_hash": ""
+  },
+  "CI Scope/Models.swift": {
+    "mtime": 1781183711.0706155,
+    "ast_hash": "269b8191ae0f45e9c25e129fdf86590d",
+    "semantic_hash": "269b8191ae0f45e9c25e129fdf86590d"
+  },
+  "CI Scope/NotificationManager.swift": {
+    "mtime": 1781306332.5379026,
+    "ast_hash": "ca30dd7f2b184a0231d957b1232d4736",
+    "semantic_hash": "ca30dd7f2b184a0231d957b1232d4736"
+  },
+  "CI Scope/ProjectCIHelpers.swift": {
+    "mtime": 1780569968.3070626,
+    "ast_hash": "b97d28998f871a984c587fb7684521a1",
+    "semantic_hash": "b97d28998f871a984c587fb7684521a1"
+  },
+  "CI Scope/ProjectCIModels.swift": {
+    "mtime": 1780569968.307248,
+    "ast_hash": "e8191a32b6388ba536a59f807af9f996",
+    "semantic_hash": "e8191a32b6388ba536a59f807af9f996"
+  },
+  "CI Scope/ProjectCIPanel.swift": {
+    "mtime": 1781183711.0708942,
+    "ast_hash": "7d6bc0b76dabab91e78faa1a8d63a28c",
+    "semantic_hash": "7d6bc0b76dabab91e78faa1a8d63a28c"
+  },
+  "CI Scope/ProjectCIRunnerStatusService.swift": {
+    "mtime": 1781364373.7906961,
+    "ast_hash": "be63037f6bb07b224e93b47c8e727be9",
+    "semantic_hash": ""
+  },
+  "CI Scope/ProjectCIService.swift": {
+    "mtime": 1780569968.30849,
+    "ast_hash": "1a87c0bc46a636d8f821f9a63ff427a4",
+    "semantic_hash": "1a87c0bc46a636d8f821f9a63ff427a4"
+  },
+  "CI Scope/ProjectCIViewModel.swift": {
+    "mtime": 1781183711.0713513,
+    "ast_hash": "aa1c224170ae377d3f4e55687f7482e3",
+    "semantic_hash": "aa1c224170ae377d3f4e55687f7482e3"
+  },
+  "CI Scope/ProjectCIWorkflowService.swift": {
+    "mtime": 1781364214.092787,
+    "ast_hash": "a9b3256f1cd3051adaa02969cd974e77",
+    "semantic_hash": ""
+  },
+  "CI Scope/ProjectListsAndForms.swift": {
+    "mtime": 1780569968.3090286,
+    "ast_hash": "8907ec7724ea2aa050314581a792f163",
+    "semantic_hash": "8907ec7724ea2aa050314581a792f163"
+  },
+  "CI Scope/ProjectMenuRow.swift": {
+    "mtime": 1780569968.3093863,
+    "ast_hash": "77304f59c11fcae661254789f88fe784",
+    "semantic_hash": "77304f59c11fcae661254789f88fe784"
+  },
+  "CI Scope/ProjectScriptRemovalList.swift": {
+    "mtime": 1780569968.3096502,
+    "ast_hash": "6c6a9eb69ba6639f7112645dba9d32fc",
+    "semantic_hash": "6c6a9eb69ba6639f7112645dba9d32fc"
+  },
+  "CI Scope/ProjectSidebarView.swift": {
+    "mtime": 1781183711.0715005,
+    "ast_hash": "bc22a8da18e117ff333f2b6bca2732f2",
+    "semantic_hash": "bc22a8da18e117ff333f2b6bca2732f2"
+  },
+  "CI Scope/ProjectStore.swift": {
+    "mtime": 1780602257.1989417,
+    "ast_hash": "42e81e332f94fcec55e64185ccb6a67d",
+    "semantic_hash": "42e81e332f94fcec55e64185ccb6a67d"
+  },
+  "CI Scope/RunnerFleetGitHubSource.swift": {
+    "mtime": 1781363583.9156373,
+    "ast_hash": "1095d7023796e6e22596984636d03216",
+    "semantic_hash": ""
+  },
+  "CI Scope/RunnerFleetLocalSource.swift": {
+    "mtime": 1780602257.1992145,
+    "ast_hash": "a95fd3a9f4199c5b3698fb240b961774",
+    "semantic_hash": "a95fd3a9f4199c5b3698fb240b961774"
+  },
+  "CI Scope/RunnerFleetModels.swift": {
+    "mtime": 1781306332.5381818,
+    "ast_hash": "1955451e5cbf8168f3beadc4ae38065a",
+    "semantic_hash": "1955451e5cbf8168f3beadc4ae38065a"
+  },
+  "CI Scope/RunnerFleetService.swift": {
+    "mtime": 1781183711.0717895,
+    "ast_hash": "442ae540236f991afc2169fcd918a984",
+    "semantic_hash": "442ae540236f991afc2169fcd918a984"
+  },
+  "CI Scope/RunnerFleetViewModel.swift": {
+    "mtime": 1781210686.2659674,
+    "ast_hash": "7821fd8defc671e42bf504e7037332f6",
+    "semantic_hash": "7821fd8defc671e42bf504e7037332f6"
+  },
+  "CI Scope/RunnerSubRunnerViews.swift": {
+    "mtime": 1781183711.0720408,
+    "ast_hash": "b09eb505ee542147528d0a2f3e98840b",
+    "semantic_hash": "b09eb505ee542147528d0a2f3e98840b"
+  },
+  "CI Scope/RunnerWorkStrips.swift": {
+    "mtime": 1781270828.3554955,
+    "ast_hash": "e138e1dbf431158e449d6c204c1d4d46",
+    "semantic_hash": "e138e1dbf431158e449d6c204c1d4d46"
+  },
+  "CI Scope/RunnerWorkViews.swift": {
+    "mtime": 1781270828.355736,
+    "ast_hash": "836ce36d68c5321bb6b40d9bc8eee210",
+    "semantic_hash": "836ce36d68c5321bb6b40d9bc8eee210"
+  },
+  "CI Scope/RunnersView.swift": {
+    "mtime": 1781183725.9468594,
+    "ast_hash": "622d88c6844f504038a97206c8354f61",
+    "semantic_hash": "622d88c6844f504038a97206c8354f61"
+  },
+  "CI Scope/ScriptEditorPanel.swift": {
+    "mtime": 1780569968.3118227,
+    "ast_hash": "c8c400acdf6a7ae36ca7a5bb894a45ef",
+    "semantic_hash": "c8c400acdf6a7ae36ca7a5bb894a45ef"
+  },
+  "CI Scope/ScriptFilesEditor.swift": {
+    "mtime": 1780569968.3120294,
+    "ast_hash": "1b76404f26fa43eb611f56a0dd303511",
+    "semantic_hash": "1b76404f26fa43eb611f56a0dd303511"
+  },
+  "CI Scope/ScriptInstallPanel.swift": {
+    "mtime": 1780569968.3123736,
+    "ast_hash": "53ed2cd070cac0f61059c3c65a5c5464",
+    "semantic_hash": "53ed2cd070cac0f61059c3c65a5c5464"
+  },
+  "CI Scope/ScriptInstallSubmenu.swift": {
+    "mtime": 1781183711.0725183,
+    "ast_hash": "a9b02ed39d7472480f8fa40ef261898f",
+    "semantic_hash": "a9b02ed39d7472480f8fa40ef261898f"
+  },
+  "CI Scope/ScriptLibraryList.swift": {
+    "mtime": 1780569968.3125744,
+    "ast_hash": "4437c59f2fc4b13aa3b03c671de8115c",
+    "semantic_hash": "4437c59f2fc4b13aa3b03c671de8115c"
+  },
+  "CI Scope/ScriptListRow.swift": {
+    "mtime": 1781183711.0726216,
+    "ast_hash": "fa242e7bcda19eb660d8fdf7bd5db73e",
+    "semantic_hash": "fa242e7bcda19eb660d8fdf7bd5db73e"
+  },
+  "CI Scope/ScriptVariablesEditor.swift": {
+    "mtime": 1780569968.3128455,
+    "ast_hash": "c83ef73721ed2e91f8036b219a037b63",
+    "semantic_hash": "c83ef73721ed2e91f8036b219a037b63"
+  },
+  "CI Scope/ScriptsView.swift": {
+    "mtime": 1781183711.0727804,
+    "ast_hash": "8b78f315b265210217d8b17eb5c737f9",
+    "semantic_hash": "8b78f315b265210217d8b17eb5c737f9"
+  },
+  "CI Scope/SharedUIViews.swift": {
+    "mtime": 1780569968.3132946,
+    "ast_hash": "1b307e82eba8850c2127004d9b4924b1",
+    "semantic_hash": "1b307e82eba8850c2127004d9b4924b1"
+  },
+  "CI Scope/ShellClient.swift": {
+    "mtime": 1780602257.1995592,
+    "ast_hash": "f51b892df529ea59b06b11bb59305173",
+    "semantic_hash": "f51b892df529ea59b06b11bb59305173"
+  },
+  "CI Scope/ShellQuoting.swift": {
+    "mtime": 1780569968.3139083,
+    "ast_hash": "ebd8a4caae86203d40da65e47e4f37f6",
+    "semantic_hash": "ebd8a4caae86203d40da65e47e4f37f6"
+  },
+  "CI Scope/URL+SafeAppend.swift": {
+    "mtime": 1780642295.2716703,
+    "ast_hash": "d6f070d826334b96b897a655764f712b",
+    "semantic_hash": "d6f070d826334b96b897a655764f712b"
+  },
+  "scripts/linter-checker-300-lines.py": {
+    "mtime": 1780569968.3152134,
+    "ast_hash": "994ab51a4638b7e4fa12afb12e0b8226",
+    "semantic_hash": "994ab51a4638b7e4fa12afb12e0b8226"
+  },
+  "scripts/setup-ci-scope-runners.sh": {
+    "mtime": 1780569968.315531,
+    "ast_hash": "a567bea089de1de895bf8d083c19e735",
+    "semantic_hash": "a567bea089de1de895bf8d083c19e735"
+  },
+  "scripts/swift-compile-gate.py": {
+    "mtime": 1780569968.315986,
+    "ast_hash": "2704a6a7798955e6f285b2f0570e3c4c",
+    "semantic_hash": "2704a6a7798955e6f285b2f0570e3c4c"
+  },
+  "scripts/swift-quality-gate.py": {
+    "mtime": 1780569968.316203,
+    "ast_hash": "e05a4c1c5d72ea49efd3b4dcfabff84f",
+    "semantic_hash": "e05a4c1c5d72ea49efd3b4dcfabff84f"
+  },
+  ".github/workflows/linter-checker-300-lines.yml": {
+    "mtime": 1780569968.2859411,
+    "ast_hash": "e7957b82c7e125e30a735613d99d6965",
+    "semantic_hash": "e7957b82c7e125e30a735613d99d6965"
+  },
+  ".github/workflows/swift-compile-gate.yml": {
+    "mtime": 1780569968.2860696,
+    "ast_hash": "c587db85ea4316ec120bed3f581781a9",
+    "semantic_hash": "c587db85ea4316ec120bed3f581781a9"
+  },
+  ".github/workflows/swift-quality-gate.yml": {
+    "mtime": 1780569968.2862432,
+    "ast_hash": "d9157d782b3fe8628b71e516b14adade",
+    "semantic_hash": "d9157d782b3fe8628b71e516b14adade"
+  },
+  ".jules/sentinel.md": {
+    "mtime": 1780642295.270042,
+    "ast_hash": "39ea78d4c43813d0471cf8520145d774",
+    "semantic_hash": "39ea78d4c43813d0471cf8520145d774"
+  },
+  "README.md": {
+    "mtime": 1781183725.9471002,
+    "ast_hash": "df650d805918aaa63ad02934d2c5d104",
+    "semantic_hash": "df650d805918aaa63ad02934d2c5d104"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/512Icon.png": {
+    "mtime": 1781260408.9877906,
+    "ast_hash": "2da3102599a31f0bc3561b435b0b2d5f",
+    "semantic_hash": "2da3102599a31f0bc3561b435b0b2d5f"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/AppIcon-128.png": {
+    "mtime": 1781260442.2800014,
+    "ast_hash": "6903ad89ab20cc2914bd99a3c6943881",
+    "semantic_hash": "6903ad89ab20cc2914bd99a3c6943881"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/AppIcon-128@2x.png": {
+    "mtime": 1781260442.2980433,
+    "ast_hash": "de9327344c398241afea9f3735ee780d",
+    "semantic_hash": "de9327344c398241afea9f3735ee780d"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/AppIcon-16.png": {
+    "mtime": 1781260442.202815,
+    "ast_hash": "de2769a58167a2f6814208cf4c48b222",
+    "semantic_hash": "de2769a58167a2f6814208cf4c48b222"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/AppIcon-16@2x.png": {
+    "mtime": 1781260442.2250142,
+    "ast_hash": "e6433edb9cce323fef00c08b79836337",
+    "semantic_hash": "e6433edb9cce323fef00c08b79836337"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/AppIcon-256.png": {
+    "mtime": 1781260442.3178174,
+    "ast_hash": "de9327344c398241afea9f3735ee780d",
+    "semantic_hash": "de9327344c398241afea9f3735ee780d"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/AppIcon-256@2x.png": {
+    "mtime": 1781260442.3306046,
+    "ast_hash": "2da3102599a31f0bc3561b435b0b2d5f",
+    "semantic_hash": "2da3102599a31f0bc3561b435b0b2d5f"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/AppIcon-32.png": {
+    "mtime": 1781260442.2424855,
+    "ast_hash": "e6433edb9cce323fef00c08b79836337",
+    "semantic_hash": "e6433edb9cce323fef00c08b79836337"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/AppIcon-32@2x.png": {
+    "mtime": 1781260442.2585585,
+    "ast_hash": "085082e2da837c409618f6d8e924dbf9",
+    "semantic_hash": "085082e2da837c409618f6d8e924dbf9"
+  },
+  "CI Scope/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png": {
+    "mtime": 1781260442.3736198,
+    "ast_hash": "4439c026b94ab8a19f17b65943a56794",
+    "semantic_hash": "4439c026b94ab8a19f17b65943a56794"
+  },
+  "status-bar-app-icon.png": {
+    "mtime": 1780569968.316453,
+    "ast_hash": "0f507467eab5d5c279c913074d5c40a7",
+    "semantic_hash": "0f507467eab5d5c279c913074d5c40a7"
+  },
+  ".claude/settings.json": {
+    "mtime": 1781335136.1993856,
+    "ast_hash": "bfee062c3962c14264fd704e975a6b38",
+    "semantic_hash": "bfee062c3962c14264fd704e975a6b38"
+  },
+  "CLAUDE.md": {
+    "mtime": 1781335136.1992018,
+    "ast_hash": "82efb97a359f5c7290bf2513d14686be",
+    "semantic_hash": "82efb97a359f5c7290bf2513d14686be"
+  },
+  "CI Scope/BoundedConcurrency.swift": {
+    "mtime": 1781363483.741664,
+    "ast_hash": "d10673545a1136b83c9b62d547adf583",
+    "semantic_hash": ""
+  },
+  "CI Scope/GitHubRateLimitGate.swift": {
+    "mtime": 1781363380.856371,
+    "ast_hash": "eeb3d3dcb88cc59a2acf31617ac09864",
+    "semantic_hash": ""
+  },
+  "CI Scope/WorkflowJobsCache.swift": {
+    "mtime": 1781363499.58178,
+    "ast_hash": "cbb079d6c6e22d43ab7c7b81e8308b9e",
+    "semantic_hash": ""
+  },
+  "CI Scope/WorkflowRunsFeed.swift": {
+    "mtime": 1781364202.1215978,
+    "ast_hash": "29f1f76239d890d11cfd77b91d50fca7",
+    "semantic_hash": ""
+  }
+}
