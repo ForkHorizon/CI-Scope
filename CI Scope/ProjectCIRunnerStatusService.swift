@@ -182,15 +182,7 @@ extension ProjectCIService {
     }
 
     func launchctlPrint(serviceLabel: String) async -> ShellResult? {
-        let uid = await ShellClient.run("id -u", timeout: 3, config: config)
-            .output
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard let validUid = Int(uid) else {
-            return nil
-        }
-
-        return await ShellClient.run("launchctl print gui/\(validUid)/\(serviceLabel)", timeout: 5, config: config)
+        return await ShellClient.run("launchctl print gui/\(geteuid())/\(quoted(serviceLabel))", timeout: 5, config: config)
     }
 
     func readLocalRunner(_ runnerConfig: ActionsRunnerConfig) -> LocalRunnerInfo? {
@@ -281,8 +273,8 @@ extension ProjectCIService {
         let result = await ShellClient.run(command, timeout: 15, config: config)
         await GitHubRateLimitGate.shared.note(result: result, config: config)
         guard result.exitCode == 0,
-              let data = result.output.data(using: .utf8),
-              let runnerList = try? JSONDecoder().decode(GitHubRunnerList.self, from: data)
+            let data = result.output.data(using: .utf8),
+            let runnerList = try? JSONDecoder().decode(GitHubRunnerList.self, from: data)
         else { return nil }
 
         return runnerList.runners.first {
