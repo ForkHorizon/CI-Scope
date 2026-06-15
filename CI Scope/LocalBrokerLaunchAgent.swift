@@ -179,9 +179,9 @@ extension LocalBrokerService {
         return keys.compactMap { key in
             guard let value = environment[key], !value.isEmpty else { return nil }
             return """
-            <key>\(key)</key>
-            <string>\(xmlEscaped(value))</string>
-            """
+                <key>\(key)</key>
+                <string>\(xmlEscaped(value))</string>
+                """
         }.joined(separator: "\n")
     }
 

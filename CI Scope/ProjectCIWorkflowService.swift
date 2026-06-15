@@ -24,7 +24,7 @@ private final class ProjectCIResponseCache {
     func cachedWorkflows(slug: String, maxAge: TimeInterval) -> LoadResponse<[GitHubWorkflow]>? {
         locked {
             guard let cached = workflows[slug.lowercased()],
-                  Date().timeIntervalSince(cached.storedAt) <= maxAge
+                Date().timeIntervalSince(cached.storedAt) <= maxAge
             else { return nil }
             return cached.value
         }
@@ -39,7 +39,7 @@ private final class ProjectCIResponseCache {
     func cachedRuns(slug: String, maxAge: TimeInterval) -> LoadResponse<[GitHubRun]>? {
         locked {
             guard let cached = runs[slug.lowercased()],
-                  Date().timeIntervalSince(cached.storedAt) <= maxAge
+                Date().timeIntervalSince(cached.storedAt) <= maxAge
             else { return nil }
             return cached.value
         }
@@ -99,8 +99,8 @@ extension ProjectCIService {
             return response
         }
         let command = """
-        gh workflow list --repo \(quoted(project.repositorySlug)) --all --limit 100 --json id,name,path,state
-        """
+            gh workflow list --repo \(quoted(project.repositorySlug)) --all --limit 100 --json id,name,path,state
+            """
         let result = await ShellClient.run(command, timeout: 15, config: config)
         await GitHubRateLimitGate.shared.note(result: result, config: config)
         if result.exitCode != 0 || result.output.data(using: .utf8) == nil {
@@ -137,15 +137,15 @@ extension ProjectCIService {
 
     func loadWorkflowFilesViaGit(for project: CIProject, apiError: String) async -> LoadResponse<[GitHubWorkflow]> {
         let command = """
-        tmp=$(mktemp -d)
-        cleanup() { rm -rf "$tmp"; }
-        trap cleanup EXIT
-        if git clone --depth 1 --filter=blob:none --sparse \(quoted(cloneURL(for: project))) "$tmp/repo" >/dev/null 2>&1; then
-          cd "$tmp/repo" || exit 1
-          git sparse-checkout set .github/workflows >/dev/null 2>&1 || true
-          find .github/workflows -maxdepth 1 -type f \\( -name '*.yml' -o -name '*.yaml' \\) -print 2>/dev/null | sort
-        fi
-        """
+            tmp=$(mktemp -d)
+            cleanup() { rm -rf "$tmp"; }
+            trap cleanup EXIT
+            if git clone --depth 1 --filter=blob:none --sparse \(quoted(cloneURL(for: project))) "$tmp/repo" >/dev/null 2>&1; then
+              cd "$tmp/repo" || exit 1
+              git sparse-checkout set .github/workflows >/dev/null 2>&1 || true
+              find .github/workflows -maxdepth 1 -type f \\( -name '*.yml' -o -name '*.yaml' \\) -print 2>/dev/null | sort
+            fi
+            """
         let result = await ShellClient.run(command, timeout: 30, config: config)
         let paths = result.output
             .components(separatedBy: .newlines)
@@ -186,8 +186,8 @@ extension ProjectCIService {
             return LoadResponse(error: "\(pause.reason). Retrying after \(when).")
         }
         let command = """
-        gh run list --repo \(quoted(project.repositorySlug)) --limit 20 --json databaseId,status,conclusion,displayTitle,workflowName,headBranch,event,createdAt,updatedAt,url
-        """
+            gh run list --repo \(quoted(project.repositorySlug)) --limit 20 --json databaseId,status,conclusion,displayTitle,workflowName,headBranch,event,createdAt,updatedAt,url
+            """
         let result = await ShellClient.run(command, timeout: 15, config: config)
         await GitHubRateLimitGate.shared.note(result: result, config: config)
         guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
