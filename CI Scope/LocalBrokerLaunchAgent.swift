@@ -156,6 +156,7 @@ extension LocalBrokerService {
             <string>\(secretURL.path)</string>
             <key>CI_SCOPE_WEBHOOK_PATH</key>
             <string>\(LocalBrokerConstants.webhookPath)</string>
+            \(backendEnvironmentPlistEntries())
           </dict>
           <key>StandardOutPath</key>
           <string>\(try! logsDirectory.safelyAppendingPathComponent("broker.out.log").path)</string>
@@ -164,6 +165,33 @@ extension LocalBrokerService {
         </dict>
         </plist>
         """
+    }
+
+    private func backendEnvironmentPlistEntries() -> String {
+        let keys = [
+            "CI_SCOPE_BACKEND_URL",
+            "CI_SCOPE_BACKEND_TOKEN",
+            "CI_SCOPE_BACKEND_SNAPSHOT_SECONDS",
+            "CI_SCOPE_BACKEND_FALLBACK_SECONDS",
+            "CI_SCOPE_BACKEND_FALLBACK_MAX_SECONDS",
+        ]
+        let environment = ProcessInfo.processInfo.environment
+        return keys.compactMap { key in
+            guard let value = environment[key], !value.isEmpty else { return nil }
+            return """
+            <key>\(key)</key>
+            <string>\(xmlEscaped(value))</string>
+            """
+        }.joined(separator: "\n")
+    }
+
+    private func xmlEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 }
 

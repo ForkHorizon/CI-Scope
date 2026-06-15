@@ -158,15 +158,41 @@ Repository -> Settings -> Actions -> Runners
 
 CI Scope shows job arrivals through an in-app Liquid Glass notification banner and also sends a native macOS notification when notification permission is available. The banner self-dismisses after five seconds and can be dismissed manually.
 
-The broker also supports **Server mode**: point it at a backend implementing
-its `/api/ci/local/*` protocol (heartbeat, queue/run snapshot sync) and it
-reads state from the backend instead of polling GitHub directly, using SSE
-only as a wakeup signal. In production that backend is
-`https://ci.forkhorizon.com`, served by the separate `ForkHorizon/WebSite`
-repo — not part of this repository. See `develop`'s README for the current
-Server mode setup details; that work hasn't been backported to `main` yet.
+The MacBook Runner broker is designed to avoid GitHub polling in normal use.
+The preferred production path is a GitHub App backend:
 
-Without Server mode configured, the MacBook Runner broker supports a free webhook-first path for faster queue updates:
+```text
+GitHub App webhook -> CI Scope backend -> outbound SSE -> local broker -> Swift UI
+```
+
+The backend lives in `backend/` and stores normalized GitHub webhook state in
+SQLite. Configure the GitHub App webhook URL to:
+
+```text
+https://ci.forkhorizon.com/github/webhook
+```
+
+Subscribe the GitHub App to:
+
+- `workflow_job`
+- `workflow_run`
+- `push`
+- `repository`
+- `installation_repositories`
+
+Start the local broker with:
+
+```text
+CI_SCOPE_BACKEND_URL=https://ci.forkhorizon.com
+CI_SCOPE_BACKEND_TOKEN=<shared client token>
+```
+
+When the backend is healthy, CI Scope reads queue/run state from the backend and
+does not call GitHub just to prove that no jobs are queued. If the backend is
+down, the broker falls back to slow GitHub reconciliation polling instead of the
+old tight loop.
+
+Without Server mode configured, the broker also supports a direct local webhook path for ad-hoc setups:
 
 ```text
 POST http://127.0.0.1:8765/github/workflow-job
@@ -178,7 +204,7 @@ GitHub cannot call a private localhost URL directly, so expose that local endpoi
 - Content type: `application/json`
 - Secret: the contents of `~/Library/Application Support/CI Scope/Broker/webhook-secret`
 
-The webhook secret is generated automatically when CI Scope installs or updates the broker launch agent. If no webhook deliveries arrive, the broker keeps using its existing GitHub CLI polling fallback; once webhooks are active, polling slows down and acts as reconciliation for missed deliveries.
+The webhook secret is generated automatically when CI Scope installs or updates the broker launch agent. If no webhook deliveries arrive, the broker uses a slow GitHub CLI reconciliation fallback; once webhooks are active, that fallback remains slow and only repairs missed deliveries.
 
 ## Build
 
