@@ -36,6 +36,16 @@ struct WorkflowRunsFeed: Decodable {
     }
 }
 
+extension WorkflowRunsFeed {
+    func githubRuns(forRepositorySlug slug: String, limit: Int = 20) -> [GitHubRun] {
+        runs
+            .filter { $0.repositorySlug.caseInsensitiveCompare(slug) == .orderedSame }
+            .sorted { $0.createdAt > $1.createdAt }
+            .prefix(limit)
+            .map { $0.asGitHubRun() }
+    }
+}
+
 extension WorkflowRunsFeed.Run {
     /// Maps a feed run onto the dashboard's GitHubRun model.
     func asGitHubRun() -> GitHubRun {
@@ -55,20 +65,19 @@ extension WorkflowRunsFeed.Run {
 }
 
 extension LocalBrokerService {
+    func workflowRunsFeed(maxAge: TimeInterval = 900) -> WorkflowRunsFeed? {
+        guard isWorkflowRunsFeedFresh(maxAge: maxAge),
+              let data = try? Data(contentsOf: workflowRunsURL),
+              let feed = try? JSONDecoder().decode(WorkflowRunsFeed.self, from: data)
+        else { return nil }
+        return feed
+    }
+
     /// Recent runs for one repository, newest first, mapped to GitHubRun. Empty
     /// when the feed is missing, unreadable, or stale (older than `maxAge`), so
     /// callers fall back to a direct gh query.
     func workflowRuns(forRepositorySlug slug: String, limit: Int = 20, maxAge: TimeInterval = 900) -> [GitHubRun] {
-        guard isWorkflowRunsFeedFresh(maxAge: maxAge),
-              let data = try? Data(contentsOf: workflowRunsURL),
-              let feed = try? JSONDecoder().decode(WorkflowRunsFeed.self, from: data)
-        else { return [] }
-
-        return feed.runs
-            .filter { $0.repositorySlug.caseInsensitiveCompare(slug) == .orderedSame }
-            .sorted { $0.createdAt > $1.createdAt }
-            .prefix(limit)
-            .map { $0.asGitHubRun() }
+        workflowRunsFeed(maxAge: maxAge)?.githubRuns(forRepositorySlug: slug, limit: limit) ?? []
     }
 
     private func isWorkflowRunsFeedFresh(maxAge: TimeInterval) -> Bool {
