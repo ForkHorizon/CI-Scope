@@ -67,8 +67,8 @@ extension WorkflowRunsFeed.Run {
 extension LocalBrokerService {
     func workflowRunsFeed(maxAge: TimeInterval = 900) -> WorkflowRunsFeed? {
         guard isWorkflowRunsFeedFresh(maxAge: maxAge),
-              let data = try? Data(contentsOf: workflowRunsURL),
-              let feed = try? JSONDecoder().decode(WorkflowRunsFeed.self, from: data)
+            let data = try? Data(contentsOf: workflowRunsURL),
+            let feed = try? JSONDecoder().decode(WorkflowRunsFeed.self, from: data)
         else { return nil }
         return feed
     }
@@ -82,7 +82,7 @@ extension LocalBrokerService {
 
     private func isWorkflowRunsFeedFresh(maxAge: TimeInterval) -> Bool {
         guard let attributes = try? fileManager.attributesOfItem(atPath: workflowRunsURL.path),
-              let modified = attributes[.modificationDate] as? Date
+            let modified = attributes[.modificationDate] as? Date
         else { return false }
         return Date().timeIntervalSince(modified) <= maxAge
     }

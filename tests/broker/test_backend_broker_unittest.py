@@ -6,6 +6,24 @@ from pathlib import Path
 
 
 BROKER_PATH = Path(__file__).resolve().parents[2] / "CI Scope" / "Broker" / "CI Scope Broker"
+BACKEND_QUEUE_JOB = {
+    "id": "ForkHorizon/Widget:1001:2002",
+    "repositorySlug": "ForkHorizon/Widget",
+    "workflowName": "CI",
+    "title": "Run tests",
+    "jobName": "quality",
+    "headBranch": "feature/events",
+    "status": "queued",
+    "url": "https://github.com/ForkHorizon/Widget/actions/runs/1001/job/2002",
+    "createdAt": "2026-06-15T10:00:01Z",
+    "labels": ["self-hosted", "macOS", "ARM64", "ci-scope-broker"],
+    "runId": 1001,
+    "jobId": 2002,
+}
+
+
+class MockProcess:
+    pid = 9999
 
 
 def load_broker():
@@ -56,26 +74,8 @@ class BrokerBackendTests(unittest.TestCase):
         )
 
     def test_tick_dispatches_backend_fed_queue_without_polling_github(self):
-        queue = [
-            {
-                "id": "ForkHorizon/Widget:1001:2002",
-                "repositorySlug": "ForkHorizon/Widget",
-                "workflowName": "CI",
-                "title": "Run tests",
-                "jobName": "quality",
-                "headBranch": "feature/events",
-                "status": "queued",
-                "url": "https://github.com/ForkHorizon/Widget/actions/runs/1001/job/2002",
-                "createdAt": "2026-06-15T10:00:01Z",
-                "labels": ["self-hosted", "macOS", "ARM64", "ci-scope-broker"],
-                "runId": 1001,
-                "jobId": 2002,
-            }
-        ]
+        queue = [dict(BACKEND_QUEUE_JOB)]
         calls = []
-
-        class MockProcess:
-            pid = 9999
 
         def mock_read_state():
             return {
@@ -112,4 +112,3 @@ class BrokerBackendTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
