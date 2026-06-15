@@ -28,7 +28,12 @@
   "xcode_destination": "generic/platform=macOS",
   "xcode_configuration": "Debug",
   "xcode_code_signing_allowed": false,
-  "xcodebuild_arguments": [],
+  "xcodebuild_arguments": [
+    "-jobs",
+    "1",
+    "-derivedDataPath",
+    ".build/swift-compile-gate-derived-data"
+  ],
   "swift_build_arguments": [],
   "fail_on_any_warning": false,
   "critical_warning_patterns": [
