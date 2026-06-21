@@ -159,14 +159,15 @@ Repository -> Settings -> Actions -> Runners
 CI Scope shows job arrivals through an in-app Liquid Glass notification banner and also sends a native macOS notification when notification permission is available. The banner self-dismisses after five seconds and can be dismissed manually.
 
 The MacBook Runner broker is designed to avoid GitHub polling in normal use.
-The preferred production path is a GitHub App backend:
+The production path is a GitHub App backend:
 
 ```text
 GitHub App webhook -> CI Scope backend -> outbound SSE -> local broker -> Swift UI
 ```
 
 The backend lives in `backend/` and stores normalized GitHub webhook state in
-SQLite. Configure the GitHub App webhook URL to:
+SQLite. GitHub should call this backend directly; do not add per-workflow
+`curl` steps for CI Scope events. Configure the GitHub App webhook URL to:
 
 ```text
 https://ci.forkhorizon.com/github/webhook
@@ -187,12 +188,13 @@ CI_SCOPE_BACKEND_URL=https://ci.forkhorizon.com
 CI_SCOPE_BACKEND_TOKEN=<shared client token>
 ```
 
-When the backend is healthy, CI Scope reads queue/run state from the backend and
-does not call GitHub just to prove that no jobs are queued. If the backend is
-down, the broker falls back to slow GitHub reconciliation polling instead of the
-old tight loop.
+When the backend is healthy, CI Scope reads queue/run state from the backend on
+startup, then uses SSE only as a wakeup signal to sync a fresh snapshot. If the
+backend is down, the broker falls back to slow GitHub reconciliation polling
+instead of the old tight loop.
 
-Without Server mode configured, the broker also supports a direct local webhook path for ad-hoc setups:
+Without `CI_SCOPE_BACKEND_URL`, the broker still supports a localhost-only
+webhook path for ad-hoc setups:
 
 ```text
 POST http://127.0.0.1:8765/github/workflow-job

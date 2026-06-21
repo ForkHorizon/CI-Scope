@@ -144,3 +144,43 @@ where id > ?
 order by id asc
 limit ?
 """
+
+ADMIN_LATEST_EVENT_SQL = """
+select id, delivery_id as deliveryId, event, action, repository_slug as repositorySlug, created_at as createdAt
+from events
+order by id desc
+limit 1
+"""
+
+ADMIN_RECENT_EVENTS_SQL = """
+select id, delivery_id as deliveryId, event, action, repository_slug as repositorySlug, created_at as createdAt
+from events
+order by id desc
+limit 20
+"""
+
+ADMIN_RECENT_RUNS_SQL = """
+select * from workflow_runs
+order by coalesce(updated_at, created_at) desc
+limit 20
+"""
+
+ADMIN_RECENT_JOBS_SQL = """
+select * from workflow_jobs
+order by coalesce(updated_at, created_at) desc
+limit 20
+"""
+
+ADMIN_QUEUED_JOBS_SQL = """
+select * from workflow_jobs
+where status = 'queued'
+order by coalesce(started_at, created_at) asc
+limit 100
+"""
+
+ADMIN_IN_PROGRESS_JOBS_SQL = """
+select * from workflow_jobs
+where status = 'in_progress'
+order by coalesce(started_at, created_at) asc
+limit 100
+"""

@@ -7,6 +7,12 @@ from typing import Any
 
 from .core import normalize_webhook, now_iso
 from .store_sql import (
+    ADMIN_IN_PROGRESS_JOBS_SQL,
+    ADMIN_LATEST_EVENT_SQL,
+    ADMIN_QUEUED_JOBS_SQL,
+    ADMIN_RECENT_EVENTS_SQL,
+    ADMIN_RECENT_JOBS_SQL,
+    ADMIN_RECENT_RUNS_SQL,
     EVENTS_AFTER_SQL,
     INSERT_EVENT_SQL,
     SCHEMA_SQL,
@@ -176,6 +182,35 @@ class SQLiteStore:
             for row in rows
         ]
 
+    def admin_status(self, active_sse_clients: int = 0) -> dict[str, Any]:
+        with self.connect() as db:
+            latest_event = db.execute(ADMIN_LATEST_EVENT_SQL).fetchone()
+            return {
+                "version": 1,
+                "generatedAt": now_iso(),
+                "sse": {"activeClients": active_sse_clients},
+                "events": {
+                    "total": self.count_rows(db, "events"),
+                    "latest": dict(latest_event) if latest_event else None,
+                    "recent": [dict(row) for row in db.execute(ADMIN_RECENT_EVENTS_SQL)],
+                },
+                "repositories": {
+                    "total": self.count_rows(db, "repositories", "deleted = 0"),
+                },
+                "runs": {
+                    "total": self.count_rows(db, "workflow_runs"),
+                    "byStatus": self.count_by(db, "workflow_runs", "status"),
+                    "recent": [self.run_from_row(row) for row in db.execute(ADMIN_RECENT_RUNS_SQL)],
+                },
+                "jobs": {
+                    "total": self.count_rows(db, "workflow_jobs"),
+                    "byStatus": self.count_by(db, "workflow_jobs", "status"),
+                    "queued": [self.job_from_row(row) for row in db.execute(ADMIN_QUEUED_JOBS_SQL)],
+                    "inProgress": [self.job_from_row(row) for row in db.execute(ADMIN_IN_PROGRESS_JOBS_SQL)],
+                    "recent": [self.job_from_row(row) for row in db.execute(ADMIN_RECENT_JOBS_SQL)],
+                },
+            }
+
     def latest_event_id(self, db: sqlite3.Connection | None = None) -> int:
         owns_connection = db is None
         if db is None:
@@ -186,6 +221,20 @@ class SQLiteStore:
         finally:
             if owns_connection:
                 db.close()
+
+    @staticmethod
+    def count_rows(db: sqlite3.Connection, table: str, where: str | None = None) -> int:
+        query = f"select count(*) from {table}"
+        if where:
+            query += f" where {where}"
+        return int(db.execute(query).fetchone()[0] or 0)
+
+    @staticmethod
+    def count_by(db: sqlite3.Connection, table: str, column: str) -> dict[str, int]:
+        rows = db.execute(
+            f"select coalesce({column}, 'unknown') as value, count(*) as count from {table} group by value"
+        )
+        return {str(row["value"]): int(row["count"]) for row in rows}
 
     @staticmethod
     def run_from_row(row: sqlite3.Row) -> dict[str, Any]:
