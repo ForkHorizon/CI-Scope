@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -18,11 +19,12 @@ def create_app() -> FastAPI:
     webhook_secret = os.environ.get("CI_SCOPE_WEBHOOK_SECRET", "")
     client_token = os.environ.get("CI_SCOPE_CLIENT_TOKEN", "")
     store = SQLiteStore(Path(db_path))
-    register_routes(app, store, webhook_secret, client_token)
+    active_sse_clients = {"count": 0}
+    register_routes(app, store, webhook_secret, client_token, active_sse_clients)
     return app
 
 
-def require_client(authorization: str | None, client_token: str) -> None:
+def require_client(authorization: Optional[str], client_token: str) -> None:
     if not client_token:
         return
     expected = f"Bearer {client_token}"
@@ -35,11 +37,13 @@ def register_routes(
     store: SQLiteStore,
     webhook_secret: str,
     client_token: str,
+    active_sse_clients: dict[str, int],
 ) -> None:
     register_health_route(app)
     register_webhook_route(app, store, webhook_secret)
     register_snapshot_route(app, store, client_token)
-    register_stream_route(app, store, client_token)
+    register_admin_route(app, store, client_token, active_sse_clients)
+    register_stream_route(app, store, client_token, active_sse_clients)
 
 
 def register_health_route(app: FastAPI) -> None:
@@ -71,45 +75,69 @@ def register_webhook_route(app: FastAPI, store: SQLiteStore, webhook_secret: str
 
 def register_snapshot_route(app: FastAPI, store: SQLiteStore, client_token: str) -> None:
     @app.get("/v1/snapshot")
-    def snapshot(authorization: str | None = Header(default=None)) -> dict[str, object]:
+    def snapshot(authorization: Optional[str] = Header(default=None)) -> dict[str, object]:
         require_client(authorization, client_token)
         return store.snapshot()
 
 
-def register_stream_route(app: FastAPI, store: SQLiteStore, client_token: str) -> None:
+def register_admin_route(
+    app: FastAPI,
+    store: SQLiteStore,
+    client_token: str,
+    active_sse_clients: dict[str, int],
+) -> None:
+    @app.get("/v1/admin/status")
+    def admin_status(authorization: Optional[str] = Header(default=None)) -> dict[str, object]:
+        require_client(authorization, client_token)
+        return store.admin_status(active_sse_clients["count"])
+
+
+def register_stream_route(
+    app: FastAPI,
+    store: SQLiteStore,
+    client_token: str,
+    active_sse_clients: dict[str, int],
+) -> None:
     @app.get("/v1/events/stream")
     async def events_stream(
         last_event_id: int = 0,
-        authorization: str | None = Header(default=None),
-        last_event_id_header: str | None = Header(default=None, alias="Last-Event-ID"),
+        authorization: Optional[str] = Header(default=None),
+        last_event_id_header: Optional[str] = Header(default=None, alias="Last-Event-ID"),
     ) -> StreamingResponse:
         require_client(authorization, client_token)
         cursor = event_cursor(last_event_id, last_event_id_header)
-        return StreamingResponse(stream_events(store, cursor), media_type="text/event-stream")
+        return StreamingResponse(
+            stream_events(store, cursor, active_sse_clients),
+            media_type="text/event-stream",
+        )
 
 
-def event_cursor(last_event_id: int, last_event_id_header: str | None) -> int:
+def event_cursor(last_event_id: int, last_event_id_header: Optional[str]) -> int:
     try:
         return int(last_event_id_header or last_event_id or 0)
     except ValueError:
         return 0
 
 
-async def stream_events(store: SQLiteStore, cursor: int):
+async def stream_events(store: SQLiteStore, cursor: int, active_sse_clients: dict[str, int]):
+    active_sse_clients["count"] += 1
     heartbeat = 0
-    while True:
-        events = store.events_after(cursor, limit=100)
-        if events:
-            for item in events:
-                cursor = item["id"]
-                yield sse(item["id"], item["event"], item["payload"])
-            heartbeat = 0
-        else:
-            heartbeat += 1
-            if heartbeat >= 15:
-                yield ": heartbeat\n\n"
+    try:
+        while True:
+            events = store.events_after(cursor, limit=100)
+            if events:
+                for item in events:
+                    cursor = item["id"]
+                    yield sse(item["id"], item["event"], item["payload"])
                 heartbeat = 0
-            await asyncio.sleep(1)
+            else:
+                heartbeat += 1
+                if heartbeat >= 15:
+                    yield ": heartbeat\n\n"
+                    heartbeat = 0
+                await asyncio.sleep(1)
+    finally:
+        active_sse_clients["count"] = max(0, active_sse_clients["count"] - 1)
 
 
 def sse(event_id: int, event: str, payload: dict[str, object]) -> str:

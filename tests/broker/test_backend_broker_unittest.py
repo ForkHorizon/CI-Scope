@@ -26,6 +26,26 @@ class MockProcess:
     pid = 9999
 
 
+class StopLoop(Exception):
+    pass
+
+
+class FakeSSEResponse:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def __iter__(self):
+        return iter([
+            b"id: 12\n",
+            b"event: workflow_job\n",
+            b"data: {}\n",
+            b"\n",
+        ])
+
+
 def load_broker():
     loader = importlib.machinery.SourceFileLoader("broker_unittest", str(BROKER_PATH))
     spec = importlib.util.spec_from_loader("broker_unittest", loader)
@@ -108,6 +128,42 @@ class BrokerBackendTests(unittest.TestCase):
 
         self.assertEqual(calls[-1]["queue"], [])
         self.assertEqual(calls[-1]["actives"][0]["id"], "ForkHorizon/Widget:1001:2002")
+
+    def test_backend_sse_event_wakes_snapshot_sync(self):
+        syncs = []
+        opened = []
+
+        def fake_urlopen(_request, timeout):
+            if not opened:
+                opened.append(timeout)
+                return FakeSSEResponse()
+            raise RuntimeError("stop")
+
+        original_urlopen = self.broker.urllib.request.urlopen
+        original_sleep = self.broker.time.sleep
+        original_backend_url = self.broker.BACKEND_URL
+        original_last_event_id = self.broker.BACKEND_LAST_EVENT_ID
+        original_record_status = self.broker.record_backend_status
+        original_sync = self.broker.sync_backend_snapshot
+        try:
+            self.broker.BACKEND_URL = "https://backend.example.com"
+            self.broker.BACKEND_LAST_EVENT_ID = 0
+            self.broker.urllib.request.urlopen = fake_urlopen
+            self.broker.record_backend_status = lambda **_kwargs: None
+            self.broker.sync_backend_snapshot = lambda reason: syncs.append((reason, self.broker.BACKEND_LAST_EVENT_ID)) or True
+            self.broker.time.sleep = lambda _seconds: (_ for _ in ()).throw(StopLoop())
+
+            with self.assertRaises(StopLoop):
+                self.broker.backend_stream_loop()
+        finally:
+            self.broker.urllib.request.urlopen = original_urlopen
+            self.broker.time.sleep = original_sleep
+            self.broker.BACKEND_URL = original_backend_url
+            self.broker.BACKEND_LAST_EVENT_ID = original_last_event_id
+            self.broker.record_backend_status = original_record_status
+            self.broker.sync_backend_snapshot = original_sync
+
+        self.assertEqual(syncs, [("sse", 12)])
 
 
 if __name__ == "__main__":
