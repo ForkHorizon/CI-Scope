@@ -62,6 +62,11 @@ WEBHOOK_FRESH_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_FRESH_SECONDS", "30
 WEBHOOK_QUEUE_GRACE_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_QUEUE_GRACE", "120"))
 BACKEND_URL = os.environ.get("CI_SCOPE_BACKEND_URL", "").rstrip("/")
 BACKEND_TOKEN = os.environ.get("CI_SCOPE_BACKEND_TOKEN", "")
+# Cloudflare's Browser Integrity Check 403s the default Python-urllib/x.y UA
+# (error 1010) before the request reaches the Worker, so every backend call
+# advertises a product UA instead. Overridable in case the edge ever needs a
+# different allow-listed value.
+BACKEND_USER_AGENT = os.environ.get("CI_SCOPE_USER_AGENT", "") or "CI-Scope-Broker/1.0"
 SERVER_MODE = os.environ.get("CI_SCOPE_SERVER_MODE", "") == "1"
 MACHINE_ID = os.environ.get("CI_SCOPE_MACHINE_ID", "") or os.uname().nodename
 MACHINE_NAME = os.environ.get("CI_SCOPE_MACHINE_NAME", "") or os.uname().nodename
@@ -280,7 +285,7 @@ def backend_get_json(path: str) -> dict:
 
 def backend_request(path: str, last_event_id: int | None = None) -> urllib.request.Request:
     url = f"{BACKEND_URL}{path}"
-    headers = {"Accept": "application/json"}
+    headers = {"Accept": "application/json", "User-Agent": BACKEND_USER_AGENT}
     if path.endswith("/stream"):
         headers["Accept"] = "text/event-stream"
     if BACKEND_TOKEN:
