@@ -14,6 +14,7 @@ import tarfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -61,6 +62,15 @@ WEBHOOK_FRESH_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_FRESH_SECONDS", "30
 WEBHOOK_QUEUE_GRACE_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_QUEUE_GRACE", "120"))
 BACKEND_URL = os.environ.get("CI_SCOPE_BACKEND_URL", "").rstrip("/")
 BACKEND_TOKEN = os.environ.get("CI_SCOPE_BACKEND_TOKEN", "")
+SERVER_MODE = os.environ.get("CI_SCOPE_SERVER_MODE", "") == "1"
+MACHINE_ID = os.environ.get("CI_SCOPE_MACHINE_ID", "") or os.uname().nodename
+MACHINE_NAME = os.environ.get("CI_SCOPE_MACHINE_NAME", "") or os.uname().nodename
+MACHINE_LABELS = [
+    label.strip()
+    for label in os.environ.get("CI_SCOPE_MACHINE_LABELS", ",".join(PRIVATE_LABELS)).split(",")
+    if label.strip()
+]
+MACHINE_CAPACITY = max(1, int(os.environ.get("CI_SCOPE_MACHINE_CAPACITY", "1")))
 BACKEND_SNAPSHOT_SECONDS = max(30, int(os.environ.get("CI_SCOPE_BACKEND_SNAPSHOT_SECONDS", "900")))
 BACKEND_FALLBACK_SECONDS = max(60, int(os.environ.get("CI_SCOPE_BACKEND_FALLBACK_SECONDS", "900")))
 BACKEND_FALLBACK_MAX_SECONDS = max(
@@ -130,12 +140,15 @@ def main() -> int:
         ]
     )
     ensure_dirs()
-    if not backend_enabled():
+    if not backend_enabled() or not SERVER_MODE:
         start_webhook_server()
-    start_backend_stream_thread()
+    if backend_enabled() and not SERVER_MODE:
+        start_backend_stream_thread()
 
     last_poll = 0.0
     last_backend_snapshot = -BACKEND_SNAPSHOT_SECONDS
+    last_server_claim = -5
+    last_server_heartbeat = -30
     backend_failures = 0
     while True:
         try:
@@ -143,7 +156,14 @@ def main() -> int:
             profiles = enabled_profiles(registry)
             polled = None
             monotonic_now = time.monotonic()
-            if backend_enabled():
+            if SERVER_MODE and backend_enabled():
+                if monotonic_now - last_server_heartbeat >= 30:
+                    server_heartbeat()
+                    last_server_heartbeat = monotonic_now
+                if server_has_capacity() and monotonic_now - last_server_claim >= 5:
+                    polled = server_claim_queue(registry, profiles)
+                    last_server_claim = monotonic_now
+            elif backend_enabled():
                 if monotonic_now - last_backend_snapshot >= BACKEND_SNAPSHOT_SECONDS:
                     if sync_backend_snapshot("scheduled"):
                         backend_failures = 0
@@ -268,6 +288,119 @@ def backend_request(path: str, last_event_id: int | None = None) -> urllib.reque
     if last_event_id:
         headers["Last-Event-ID"] = str(last_event_id)
     return urllib.request.Request(url, headers=headers)
+
+
+def server_has_capacity() -> bool:
+    with STATE_LOCK:
+        active_count = len(read_state().get("actives") or [])
+    return active_count < min(MACHINE_CAPACITY, MAX_CONCURRENT_JOBS)
+
+
+def server_heartbeat() -> None:
+    with STATE_LOCK:
+        state = read_state()
+        active = state.get("actives") or []
+    active_ids = [item.get("id") for item in active if item.get("id")]
+    payload = {
+        "machineId": MACHINE_ID,
+        "name": MACHINE_NAME,
+        "status": "busy" if len(active) >= min(MACHINE_CAPACITY, MAX_CONCURRENT_JOBS) else "online",
+        "labels": MACHINE_LABELS,
+        "capacity": min(MACHINE_CAPACITY, MAX_CONCURRENT_JOBS),
+        "activeJobId": active_ids[0] if active_ids else None,
+        "activeJobIds": active_ids,
+    }
+    try:
+        server_post_json("/api/ci/local/heartbeat", payload)
+        record_backend_status(connected=True, last_error=None)
+    except Exception as exc:
+        record_backend_status(connected=False, last_error=str(exc))
+
+
+def server_claim_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
+    payload = {
+        "machineId": MACHINE_ID,
+        "name": MACHINE_NAME,
+        "labels": MACHINE_LABELS,
+        "capacity": min(MACHINE_CAPACITY, MAX_CONCURRENT_JOBS),
+    }
+    try:
+        response = server_post_json("/api/ci/local/claim", payload)
+        record_backend_status(connected=True, last_sync_at=now(), last_error=None)
+    except Exception as exc:
+        record_backend_status(connected=False, last_error=str(exc))
+        return [], []
+
+    action = response.get("action")
+    if not isinstance(action, dict):
+        return [], []
+
+    job = server_job_payload(action, registry, profiles)
+    if not job:
+        server_post_status(
+            action,
+            "released",
+            f"Claimed server action did not match enabled local profiles: {action.get('repositorySlug') or 'unknown'}",
+        )
+        return [], []
+
+    statuses = backend_repo_statuses(
+        {"repositories": [{"slug": job["repositorySlug"]}]},
+        registry,
+        profiles,
+        [job],
+    )
+    return [job], statuses
+
+
+def server_job_payload(action: dict, registry: dict, profiles: list[dict]) -> dict | None:
+    slug = action.get("repositorySlug") or ""
+    labels = action.get("labels") or MACHINE_LABELS
+    match = matching_profile(slug, labels, registry, profiles)
+    if match is None:
+        return None
+    profile, required_labels = match
+    return {
+        "id": action.get("id") or f"{slug}:{action.get('runId')}:{action.get('jobId')}",
+        "repositorySlug": slug,
+        "workflowName": action.get("workflowName") or "Workflow",
+        "title": action.get("title") or action.get("workflowName") or "Workflow run",
+        "jobName": action.get("jobName") or "Queued job",
+        "headBranch": action.get("headBranch") or "-",
+        "status": "queued",
+        "url": action.get("url") or "",
+        "createdAt": action.get("queuedAt") or action.get("createdAt") or now(),
+        "labels": labels or required_labels,
+        "runId": action.get("runId"),
+        "jobId": action.get("jobId"),
+        "profileId": profile["id"],
+        "profileTitle": profile["title"],
+        "profileScope": profile["scope"],
+    }
+
+
+def server_post_status(job: dict, status: str, error: str | None = None) -> None:
+    if not SERVER_MODE or not backend_enabled() or not job.get("id"):
+        return
+    payload = {
+        "machineId": MACHINE_ID,
+        "status": status,
+        "error": error,
+    }
+    try:
+        server_post_json(f"/api/ci/local/actions/{urllib.parse.quote(str(job['id']), safe='')}/status", payload)
+    except Exception:
+        pass
+
+
+def server_post_json(path: str, payload: dict) -> dict:
+    data = json.dumps(payload).encode("utf-8")
+    request = backend_request(path)
+    request.add_header("Content-Type", "application/json")
+    request.data = data
+    request.method = "POST"
+    with urllib.request.urlopen(request, timeout=BACKEND_CONNECT_TIMEOUT) as response:
+        return json.loads(response.read().decode("utf-8") or "{}")
 
 
 def backend_snapshot_to_polled(payload: dict, registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -445,6 +578,7 @@ def tick(polled: tuple | None, profiles: list[dict]) -> dict:
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
                 removed_ids.add(active.get("id"))
                 last_error = f"Stopped {active.get('id')}: runner ran past {MAX_ACTIVE_SECONDS // 60} min without completing."
+                server_post_status(active, "failed", last_error)
             elif polled is not None and active_idle_too_long(active) and runner_is_idle(active):
                 # The runner connected but GitHub never handed it a job (its job
                 # was already serviced by another runner). Reap it now instead of
@@ -458,6 +592,7 @@ def tick(polled: tuple | None, profiles: list[dict]) -> dict:
                 retries = update_retry(active, retries)
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
                 removed_ids.add(active.get("id"))
+                server_post_status(active, "released", f"Runner stayed idle for {IDLE_RUNNER_SECONDS}s.")
             else:
                 surviving.append(active)
         else:
@@ -500,12 +635,14 @@ def tick(polled: tuple | None, profiles: list[dict]) -> dict:
         except Exception as exc:
             retries = update_retry(job, retries)
             last_error = f"Could not start {job.get('id', 'queued job')}: {exc}"
+            server_post_status(job, "released", last_error)
             continue
 
         active = dict(job)
         active["pid"] = process.pid
         active["status"] = "in_progress"
         active["dispatchedAt"] = time.time()
+        server_post_status(active, "in_progress")
         ACTIVE_PROCESSES[process.pid] = process
         working_actives.append(active)
         dispatched_actives.append(active)
@@ -519,6 +656,9 @@ def tick(polled: tuple | None, profiles: list[dict]) -> dict:
         exhausted = [job for job in work_queue if retries.get(job["id"], 0) >= MAX_RETRIES]
         if exhausted:
             last_error = f"Retry limit reached for {len(exhausted)} queued job(s)."
+            if SERVER_MODE and polled is not None:
+                for job in exhausted:
+                    server_post_status(job, "released", last_error)
 
     # Re-acquire the lock only to publish. Re-read so queue/status/webhook
     # mutations the handler made while we were doing I/O are preserved; actives
@@ -640,7 +780,8 @@ def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
         active["exitCode"] = exit_code
     active["status"] = "completed" if exit_code in (0, None) else "failed"
 
-    refreshed = job_remote_status(active)
+    refreshed = {"status": active["status"], "lastError": None} if SERVER_MODE else job_remote_status(active)
+    server_post_status(active, active["status"], None if active["status"] == "completed" else refreshed.get("lastError"))
     cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
     remove_runner_dir(active.get("id"))
     if refreshed.get("status") == "queued":

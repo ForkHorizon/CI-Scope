@@ -9,6 +9,7 @@ struct ContentView: View {
     @StateObject var scriptStore = AutomationScriptStore()
     @StateObject var scriptInstallViewModel = AutomationScriptInstallViewModel()
     @StateObject var runnerFleetViewModel = RunnerFleetViewModel()
+    @StateObject var settingsStore = CIQueueSettingsStore()
     @StateObject var notificationManager = NotificationManager.shared
     @State var workspaceTab: WorkspaceTab = .projects
     @State var isProjectMenuOpen = true
