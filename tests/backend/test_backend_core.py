@@ -13,6 +13,13 @@ sys.path.insert(0, str(ROOT / "backend"))
 from ci_scope_backend.core import normalize_webhook, verify_signature
 from ci_scope_backend.store import SQLiteStore
 
+try:
+    from ci_scope_backend.app import require_client
+    from fastapi import HTTPException
+except ModuleNotFoundError:
+    require_client = None
+    HTTPException = None
+
 
 def workflow_job_payload(action="queued", status="queued"):
     return {
@@ -55,6 +62,14 @@ def workflow_job_payload(action="queued", status="queued"):
     }
 
 
+def workflow_job_payload_for(job_id, run_id, action="queued", status="queued"):
+    payload = workflow_job_payload(action=action, status=status)
+    payload["workflow_run"]["id"] = run_id
+    payload["workflow_job"]["run_id"] = run_id
+    payload["workflow_job"]["id"] = job_id
+    return payload
+
+
 class BackendCoreTests(unittest.TestCase):
     def test_verify_signature(self):
         secret = "top-secret"
@@ -94,13 +109,55 @@ class BackendCoreTests(unittest.TestCase):
             self.assertEqual(snapshot["runs"][0]["status"], "completed")
             self.assertEqual(snapshot["runs"][0]["conclusion"], "success")
 
+    def test_snapshot_keeps_queued_jobs_while_broker_is_offline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SQLiteStore(Path(directory) / "state.sqlite3")
+            store.record_webhook("workflow_job", "delivery-1", workflow_job_payload())
+
+            first_snapshot = store.snapshot()
+            later_snapshot = store.snapshot()
+
+            self.assertEqual(first_snapshot["eventId"], later_snapshot["eventId"])
+            self.assertEqual(len(later_snapshot["jobs"]), 1)
+            self.assertEqual(later_snapshot["jobs"][0]["status"], "queued")
+
     def test_snapshot_is_json_serializable(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SQLiteStore(Path(directory) / "state.sqlite3")
             store.record_webhook("workflow_job", "delivery-1", workflow_job_payload())
             json.dumps(store.snapshot())
 
+    def test_admin_status_counts_events_runs_jobs_and_sse_clients(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SQLiteStore(Path(directory) / "state.sqlite3")
+            store.record_webhook("workflow_job", "delivery-1", workflow_job_payload_for(2002, 1001))
+            store.record_webhook(
+                "workflow_job",
+                "delivery-2",
+                workflow_job_payload_for(2003, 1002, action="in_progress", status="in_progress"),
+            )
+            store.record_webhook(
+                "workflow_job",
+                "delivery-3",
+                workflow_job_payload_for(2004, 1003, action="completed", status="completed"),
+            )
+
+            status = store.admin_status(active_sse_clients=2)
+
+            self.assertEqual(status["sse"]["activeClients"], 2)
+            self.assertEqual(status["events"]["total"], 3)
+            self.assertEqual(status["events"]["latest"]["deliveryId"], "delivery-3")
+            self.assertEqual(status["repositories"]["total"], 1)
+            self.assertEqual(status["jobs"]["byStatus"], {"completed": 1, "in_progress": 1, "queued": 1})
+            self.assertEqual(len(status["jobs"]["queued"]), 1)
+            self.assertEqual(len(status["jobs"]["inProgress"]), 1)
+
+    @unittest.skipIf(require_client is None or HTTPException is None, "FastAPI is not installed")
+    def test_admin_status_auth_guard_uses_bearer_token(self):
+        require_client("Bearer secret", "secret")
+        with self.assertRaises(HTTPException):
+            require_client("Bearer wrong", "secret")
+
 
 if __name__ == "__main__":
     unittest.main()
-

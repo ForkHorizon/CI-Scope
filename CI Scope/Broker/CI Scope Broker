@@ -130,7 +130,8 @@ def main() -> int:
         ]
     )
     ensure_dirs()
-    start_webhook_server()
+    if not backend_enabled():
+        start_webhook_server()
     start_backend_stream_thread()
 
     last_poll = 0.0
