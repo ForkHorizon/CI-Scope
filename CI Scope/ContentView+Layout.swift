@@ -31,6 +31,8 @@ extension ContentView {
                     }
                 }
             )
+        case .settings:
+            SettingsView(store: settingsStore)
         }
     }
 

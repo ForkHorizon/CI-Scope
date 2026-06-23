@@ -168,16 +168,20 @@ extension LocalBrokerService {
     }
 
     private func backendEnvironmentPlistEntries() -> String {
-        let keys = [
-            "CI_SCOPE_BACKEND_URL",
-            "CI_SCOPE_BACKEND_TOKEN",
-            "CI_SCOPE_BACKEND_SNAPSHOT_SECONDS",
-            "CI_SCOPE_BACKEND_FALLBACK_SECONDS",
-            "CI_SCOPE_BACKEND_FALLBACK_MAX_SECONDS",
-        ]
-        let environment = ProcessInfo.processInfo.environment
-        return keys.compactMap { key in
-            guard let value = environment[key], !value.isEmpty else { return nil }
+        let settings = CIQueueSettingsStore.snapshot()
+        var values: [String: String] = [:]
+        if settings.serverModeEnabled, !settings.normalizedServerURL.isEmpty, !settings.localToken.isEmpty {
+            values["CI_SCOPE_SERVER_MODE"] = "1"
+            values["CI_SCOPE_BACKEND_URL"] = settings.normalizedServerURL
+            values["CI_SCOPE_BACKEND_TOKEN"] = settings.localToken
+            values["CI_SCOPE_MACHINE_ID"] = settings.machineID
+            values["CI_SCOPE_MACHINE_NAME"] = settings.machineName
+            values["CI_SCOPE_MACHINE_LABELS"] = settings.labels.joined(separator: ",")
+            values["CI_SCOPE_MACHINE_CAPACITY"] = String(settings.capacity)
+        }
+
+        return values.keys.sorted().compactMap { key in
+            guard let value = values[key], !value.isEmpty else { return nil }
             return """
                 <key>\(key)</key>
                 <string>\(xmlEscaped(value))</string>
