@@ -35,7 +35,12 @@ final class CIQueueSettingsStore: ObservableObject {
     @Published var machineID = "" { didSet { persist() } }
     @Published var machineName = "" { didSet { persist() } }
     @Published var labelsText = "self-hosted, macOS, ARM64, ci-scope-broker" { didSet { persist() } }
-    @Published var capacity = 1 { didSet { capacity = max(1, capacity); persist() } }
+    @Published var capacity = 1 {
+        didSet {
+            capacity = max(1, capacity)
+            persist()
+        }
+    }
 
     private let defaults: UserDefaults
 
@@ -132,8 +137,9 @@ enum CIQueueKeychain {
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
         var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data
+        guard
+            SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+            let data = item as? Data
         else { return nil }
         return String(data: data, encoding: .utf8)
     }
