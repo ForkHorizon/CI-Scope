@@ -3,6 +3,7 @@ import importlib.util
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 BROKER_PATH = Path(__file__).resolve().parents[2] / "CI Scope" / "Broker" / "CI Scope Broker"
@@ -164,6 +165,97 @@ class BrokerBackendTests(unittest.TestCase):
             self.broker.sync_backend_snapshot = original_sync
 
         self.assertEqual(syncs, [("sse", 12)])
+
+    def test_server_claim_converts_worker_action_without_polling_github(self):
+        calls = []
+
+        def fake_post(path, payload):
+            calls.append((path, payload))
+            return {"action": dict(BACKEND_QUEUE_JOB)}
+
+        with patch.object(self.broker, "BACKEND_URL", "https://ci.example.com"), \
+             patch.object(self.broker, "server_post_json", fake_post), \
+             patch.object(self.broker, "record_backend_status", lambda **_kwargs: None):
+            queue, statuses = self.broker.server_claim_queue(
+                {"repos": [], "profiles": self.broker.DEFAULT_PROFILES},
+                self.broker.DEFAULT_PROFILES,
+            )
+
+        self.assertEqual(calls[0][0], "/api/ci/local/claim")
+        self.assertEqual(queue[0]["id"], "ForkHorizon/Widget:1001:2002")
+        self.assertTrue(any(status["queuedCount"] == 1 for status in statuses))
+
+    def test_server_claim_releases_unmatched_action(self):
+        calls = []
+        action = dict(BACKEND_QUEUE_JOB, id="Other/Repo:1001:2002", repositorySlug="Other/Repo")
+
+        def fake_post(path, payload):
+            calls.append((path, payload))
+            return {"action": action}
+
+        with patch.object(self.broker, "BACKEND_URL", "https://ci.example.com"), \
+             patch.object(self.broker, "SERVER_MODE", True), \
+             patch.object(self.broker, "server_post_json", fake_post), \
+             patch.object(self.broker, "record_backend_status", lambda **_kwargs: None):
+            queue, statuses = self.broker.server_claim_queue(
+                {"repos": [], "profiles": self.broker.DEFAULT_PROFILES},
+                self.broker.DEFAULT_PROFILES,
+            )
+
+        self.assertEqual(queue, [])
+        self.assertEqual(statuses, [])
+        self.assertEqual(calls[1][0], "/api/ci/local/actions/Other%2FRepo%3A1001%3A2002/status")
+        self.assertEqual(calls[1][1]["status"], "released")
+
+    def test_server_heartbeat_reports_all_active_jobs(self):
+        calls = []
+
+        with patch.object(self.broker, "read_state", lambda: {"actives": [{"id": "a"}, {"id": "b"}]}), \
+             patch.object(self.broker, "server_post_json", lambda path, payload: calls.append((path, payload)) or {"ok": True}), \
+             patch.object(self.broker, "record_backend_status", lambda **_kwargs: None):
+            self.broker.server_heartbeat()
+
+        self.assertEqual(calls[0][0], "/api/ci/local/heartbeat")
+        self.assertEqual(calls[0][1]["activeJobIds"], ["a", "b"])
+
+    def test_tick_releases_server_claim_when_runner_start_fails(self):
+        queue = [dict(BACKEND_QUEUE_JOB)]
+        status_calls = []
+
+        def mock_read_state():
+            return {
+                "version": 1,
+                "actives": [],
+                "queue": [],
+                "repos": [],
+                "retries": {},
+                "webhook": {},
+            }
+
+        with patch.object(self.broker, "SERVER_MODE", True), \
+             patch.object(self.broker, "read_state", mock_read_state), \
+             patch.object(self.broker, "write_state", lambda _state: None), \
+             patch.object(self.broker, "start_runner", lambda _job: (_ for _ in ()).throw(RuntimeError("boom"))), \
+             patch.object(self.broker, "server_post_status", lambda job, status, error=None: status_calls.append((job, status, error))):
+            self.broker.tick((queue, []), self.broker.DEFAULT_PROFILES)
+
+        self.assertEqual(status_calls[0][1], "released")
+        self.assertIn("boom", status_calls[0][2])
+
+    def test_server_status_posts_to_worker_action_endpoint(self):
+        calls = []
+
+        with patch.object(self.broker, "BACKEND_URL", "https://ci.example.com"), \
+             patch.object(self.broker, "SERVER_MODE", True), \
+             patch.object(
+                 self.broker,
+                 "server_post_json",
+                 lambda path, payload: calls.append((path, payload)) or {"ok": True},
+             ):
+            self.broker.server_post_status({"id": "ForkHorizon/Widget:1001:2002"}, "in_progress")
+
+        self.assertEqual(calls[0][0], "/api/ci/local/actions/ForkHorizon%2FWidget%3A1001%3A2002/status")
+        self.assertEqual(calls[0][1]["status"], "in_progress")
 
 
 if __name__ == "__main__":

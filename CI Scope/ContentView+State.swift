@@ -16,6 +16,8 @@ extension ContentView {
             return runnerFleetViewModel.isLoading
         case .scripts:
             return false
+        case .settings:
+            return false
         }
     }
 
@@ -28,6 +30,8 @@ extension ContentView {
             return runnerFleetViewModel.snapshot.refreshedAt
         case .scripts:
             return nil
+        case .settings:
+            return nil
         }
     }
 
@@ -38,6 +42,8 @@ extension ContentView {
         case .runners:
             true
         case .scripts:
+            false
+        case .settings:
             false
         }
     }
@@ -50,6 +56,8 @@ extension ContentView {
             "Runner · MacBook"
         case .scripts:
             "\(scriptStore.scripts.count) installable scripts"
+        case .settings:
+            settingsStore.serverModeEnabled ? "Server queue enabled" : "Server queue off"
         }
     }
 
@@ -61,6 +69,8 @@ extension ContentView {
             "Runners"
         case .scripts:
             "Scripts"
+        case .settings:
+            "Settings"
         }
     }
 
@@ -72,6 +82,8 @@ extension ContentView {
             "server.rack"
         case .scripts:
             "curlybraces.square"
+        case .settings:
+            "gearshape"
         }
     }
 
@@ -84,6 +96,8 @@ extension ContentView {
             return runnerFleetViewModel.snapshot.state
         case .scripts:
             return scriptStore.scripts.isEmpty ? .unknown : .online
+        case .settings:
+            return settingsStore.serverModeEnabled ? .online : .unknown
         }
     }
 
@@ -140,6 +154,8 @@ extension ContentView {
                 await runnerFleetViewModel.load()
             }
         case .scripts:
+            break
+        case .settings:
             break
         }
     }
