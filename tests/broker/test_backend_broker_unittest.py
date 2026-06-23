@@ -242,6 +242,17 @@ class BrokerBackendTests(unittest.TestCase):
         self.assertEqual(status_calls[0][1], "released")
         self.assertIn("boom", status_calls[0][2])
 
+    def test_backend_request_sends_non_bot_user_agent(self):
+        # Cloudflare BIC 403s the default Python-urllib UA before it reaches the
+        # Worker, so every backend call must carry an overridable product UA.
+        with patch.object(self.broker, "BACKEND_URL", "https://ci.example.com"), \
+             patch.object(self.broker, "BACKEND_USER_AGENT", "CI-Scope-Broker/9.9"):
+            request = self.broker.backend_request("/api/ci/local/heartbeat")
+
+        ua = request.get_header("User-agent")
+        self.assertEqual(ua, "CI-Scope-Broker/9.9")
+        self.assertNotIn("urllib", (ua or "").lower())
+
     def test_server_status_posts_to_worker_action_endpoint(self):
         calls = []
 
