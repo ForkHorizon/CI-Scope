@@ -37,7 +37,6 @@ final class CIQueueSettingsStore: ObservableObject {
     @Published var labelsText = "self-hosted, macOS, ARM64, ci-scope-broker" { didSet { persist() } }
     @Published var capacity = 1 {
         didSet {
-            capacity = max(1, capacity)
             persist()
         }
     }
