@@ -361,7 +361,17 @@ def server_claim_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict]
 def server_job_payload(action: dict, registry: dict, profiles: list[dict]) -> dict | None:
     slug = action.get("repositorySlug") or ""
     labels = action.get("labels") or MACHINE_LABELS
-    match = matching_profile(slug, labels, registry, profiles)
+    # The backend only leases a machine jobs whose labels it satisfies, so trust
+    # that and accept any leased job for a repo this broker manages — the JIT
+    # runner is built from the job's own labels (generate_jit_config), not the
+    # repo's configured labels. Requiring the job to match a hand-maintained
+    # per-repo/org label list is redundant here and silently strands jobs whose
+    # runs-on differs from that config (e.g. moodling build-and-test vs
+    # local-smoke, or any org-owned repo). Keep a cheap capability guard in case
+    # the backend ever hands over something this machine can't run.
+    if not has_labels(MACHINE_LABELS, labels):
+        return None
+    match = matching_profile(slug, labels, registry, profiles, require_label_match=False)
     if match is None:
         return None
     profile, required_labels = match
@@ -1376,12 +1386,23 @@ def upsert_repo_status(statuses: list[dict], queue: list[dict], slug: str, profi
     return result
 
 
-def matching_profile(slug: str, job_labels: list[str], registry: dict, profiles: list[dict]) -> tuple[dict, list[str]] | None:
+def matching_profile(
+    slug: str,
+    job_labels: list[str],
+    registry: dict,
+    profiles: list[dict],
+    require_label_match: bool = True,
+) -> tuple[dict, list[str]] | None:
     for profile in profiles:
         labels = labels_for_repository(slug, profile, registry)
         if labels is None:
             continue
-        if has_labels(job_labels, labels):
+        # require_label_match=False (server mode): the backend already leased this
+        # machine the job, so a repo being managed by an enabled profile is enough;
+        # don't also require the job to carry the profile's configured labels. That
+        # configured-label subset check is the right filter only in poll mode, where
+        # the broker itself decides what to run. See server_job_payload.
+        if not require_label_match or has_labels(job_labels, labels):
             return profile, labels
     return None
 

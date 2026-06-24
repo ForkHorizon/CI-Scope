@@ -253,6 +253,57 @@ class BrokerBackendTests(unittest.TestCase):
         self.assertEqual(ua, "CI-Scope-Broker/9.9")
         self.assertNotIn("urllib", (ua or "").lower())
 
+    def test_server_job_payload_accepts_managed_job_with_nonmatching_labels(self):
+        # Server mode: a job whose runs-on labels differ from the org/per-repo
+        # configured labels must still be accepted — the backend already leased it
+        # to this machine and the JIT runner is built from the job's own labels.
+        # (moodling's build-and-test = [...,moodling] vs an org profile configured
+        # for ci-scope-broker would otherwise strand forever.)
+        action = dict(
+            BACKEND_QUEUE_JOB,
+            id="ForkHorizon/moodling:1:2",
+            repositorySlug="ForkHorizon/moodling",
+            labels=["self-hosted", "macOS", "ARM64", "moodling"],
+        )
+        with patch.object(
+            self.broker,
+            "MACHINE_LABELS",
+            ["self-hosted", "macOS", "ARM64", "ci-scope-broker", "moodling", "ollama"],
+        ):
+            job = self.broker.server_job_payload(
+                action,
+                {"repos": [], "profiles": self.broker.DEFAULT_PROFILES},
+                self.broker.DEFAULT_PROFILES,
+            )
+
+        self.assertIsNotNone(job)
+        self.assertEqual(job["repositorySlug"], "ForkHorizon/moodling")
+        self.assertEqual(job["labels"], ["self-hosted", "macOS", "ARM64", "moodling"])
+
+    def test_server_job_payload_rejects_unmanaged_repo(self):
+        action = dict(BACKEND_QUEUE_JOB, id="Stranger/repo:1:2", repositorySlug="Stranger/repo")
+        with patch.object(self.broker, "MACHINE_LABELS", ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]):
+            job = self.broker.server_job_payload(
+                action,
+                {"repos": [], "profiles": self.broker.DEFAULT_PROFILES},
+                self.broker.DEFAULT_PROFILES,
+            )
+        self.assertIsNone(job)
+
+    def test_server_job_payload_rejects_job_machine_cannot_satisfy(self):
+        action = dict(
+            BACKEND_QUEUE_JOB,
+            repositorySlug="ForkHorizon/moodling",
+            labels=["self-hosted", "macOS", "ARM64", "gpu"],
+        )
+        with patch.object(self.broker, "MACHINE_LABELS", ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]):
+            job = self.broker.server_job_payload(
+                action,
+                {"repos": [], "profiles": self.broker.DEFAULT_PROFILES},
+                self.broker.DEFAULT_PROFILES,
+            )
+        self.assertIsNone(job)
+
     def test_server_status_posts_to_worker_action_endpoint(self):
         calls = []
 
