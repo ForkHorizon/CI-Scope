@@ -253,6 +253,31 @@ class BrokerBackendTests(unittest.TestCase):
         self.assertEqual(ua, "CI-Scope-Broker/9.9")
         self.assertNotIn("urllib", (ua or "").lower())
 
+    def _server_job(self, action, machine_labels):
+        with patch.object(self.broker, "MACHINE_LABELS", machine_labels):
+            return self.broker.server_job_payload(
+                action, {"repos": [], "profiles": self.broker.DEFAULT_PROFILES}, self.broker.DEFAULT_PROFILES
+            )
+
+    def test_server_job_payload_accepts_managed_job_with_nonmatching_labels(self):
+        # Server mode trusts the backend lease: a managed job whose runs-on differs
+        # from the org/per-repo config is still accepted (runner uses the job's own
+        # labels). moodling build-and-test would otherwise strand forever.
+        job = self._server_job(
+            dict(BACKEND_QUEUE_JOB, repositorySlug="ForkHorizon/moodling", labels=["self-hosted", "macOS", "ARM64", "moodling"]),
+            ["self-hosted", "macOS", "ARM64", "ci-scope-broker", "moodling", "ollama"],
+        )
+        self.assertEqual(job["labels"], ["self-hosted", "macOS", "ARM64", "moodling"])
+
+    def test_server_job_payload_rejects_unmanaged_repo(self):
+        self.assertIsNone(self._server_job(
+            dict(BACKEND_QUEUE_JOB, repositorySlug="Stranger/repo"), ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]))
+
+    def test_server_job_payload_rejects_job_machine_cannot_satisfy(self):
+        self.assertIsNone(self._server_job(
+            dict(BACKEND_QUEUE_JOB, repositorySlug="ForkHorizon/moodling", labels=["self-hosted", "macOS", "ARM64", "gpu"]),
+            ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]))
+
     def test_server_status_posts_to_worker_action_endpoint(self):
         calls = []
 
