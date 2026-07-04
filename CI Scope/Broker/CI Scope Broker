@@ -593,7 +593,12 @@ def tick(polled: tuple | None, profiles: list[dict]) -> dict:
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
                 removed_ids.add(active.get("id"))
                 last_error = f"Stopped {active.get('id')}: runner ran past {MAX_ACTIVE_SECONDS // 60} min without completing."
-                server_post_status(active, "failed", last_error)
+                # "released", not "failed": the backend no longer accepts a
+                # broker-reported terminal status (see finish_active) — GitHub's
+                # own workflow_job webhook is the sole source of truth for a job
+                # actually finishing. Releasing lets it be retried through the
+                # normal retry-limited claim flow.
+                server_post_status(active, "released", last_error)
             elif polled is not None and active_idle_too_long(active) and runner_is_idle(active):
                 # The runner connected but GitHub never handed it a job (its job
                 # was already serviced by another runner). Reap it now instead of
@@ -795,14 +800,25 @@ def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
         active["exitCode"] = exit_code
     active["status"] = "completed" if exit_code in (0, None) else "failed"
 
-    refreshed = {"status": active["status"], "lastError": None} if SERVER_MODE else job_remote_status(active)
-    server_post_status(active, active["status"], None if active["status"] == "completed" else refreshed.get("lastError"))
-    cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
-    remove_runner_dir(active.get("id"))
+    # A clean runner exit does NOT mean the job we leased is the one that ran:
+    # GitHub hands a connecting runner ANY queued job whose labels match, so
+    # two same-run jobs sharing runs-on labels can swap which one actually
+    # executes (NexusUnity PR #145, 2026-07-04). Always check GitHub's own
+    # record for the leased job rather than trusting the local exit code — if
+    # it's still "queued" there, our runner ran a different job, so release
+    # the lease immediately instead of falsely reporting it done. Whichever
+    # job DID run closes out on its own via GitHub's workflow_job webhook,
+    # which is now the only accepted source of a terminal status.
+    refreshed = job_remote_status(active)
     if refreshed.get("status") == "queued":
+        server_post_status(
+            active, "released", "Runner exited without running this job (GitHub assigned it a different queued job)."
+        )
         retries = update_retry(active, retries)
     else:
         retries = clear_retry(active.get("id"), retries)
+    cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+    remove_runner_dir(active.get("id"))
     return retries, refreshed.get("lastError")
 
 

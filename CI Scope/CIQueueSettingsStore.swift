@@ -6,6 +6,7 @@ struct CIQueueSettingsSnapshot {
     var serverModeEnabled: Bool
     var serverURL: String
     var localToken: String
+    var webhookSecret: String
     var machineID: String
     var machineName: String
     var labelsText: String
@@ -31,7 +32,8 @@ struct CIQueueSettingsSnapshot {
 final class CIQueueSettingsStore: ObservableObject {
     @Published var serverModeEnabled = false { didSet { persist() } }
     @Published var serverURL = "" { didSet { persist() } }
-    @Published var localToken = "" { didSet { persistSecret() } }
+    @Published var localToken = "" { didSet { persistSecrets() } }
+    @Published var webhookSecret = "" { didSet { persistSecrets() } }
     @Published var machineID = "" { didSet { persist() } }
     @Published var machineName = "" { didSet { persist() } }
     @Published var labelsText = "self-hosted, macOS, ARM64, ci-scope-broker" { didSet { persist() } }
@@ -49,6 +51,7 @@ final class CIQueueSettingsStore: ObservableObject {
         serverModeEnabled = snapshot.serverModeEnabled
         serverURL = snapshot.serverURL
         localToken = snapshot.localToken
+        webhookSecret = snapshot.webhookSecret
         machineID = snapshot.machineID
         machineName = snapshot.machineName
         labelsText = snapshot.labelsText
@@ -67,6 +70,7 @@ final class CIQueueSettingsStore: ObservableObject {
             serverModeEnabled: defaults.bool(forKey: "ciScope.queue.serverModeEnabled"),
             serverURL: defaults.string(forKey: "ciScope.queue.serverURL") ?? "",
             localToken: CIQueueKeychain.read(account: "localToken") ?? "",
+            webhookSecret: CIQueueKeychain.read(account: "webhookSecret") ?? "",
             machineID: machineID,
             machineName: defaults.string(forKey: "ciScope.queue.machineName") ?? fallbackName,
             labelsText: defaults.string(forKey: "ciScope.queue.labelsText") ?? "self-hosted, macOS, ARM64, ci-scope-broker",
@@ -79,6 +83,7 @@ final class CIQueueSettingsStore: ObservableObject {
             serverModeEnabled: serverModeEnabled,
             serverURL: serverURL,
             localToken: localToken,
+            webhookSecret: webhookSecret,
             machineID: machineID,
             machineName: machineName,
             labelsText: labelsText,
@@ -119,8 +124,9 @@ final class CIQueueSettingsStore: ObservableObject {
         defaults.set(capacity, forKey: "ciScope.queue.capacity")
     }
 
-    private func persistSecret() {
+    private func persistSecrets() {
         CIQueueKeychain.write(localToken, account: "localToken")
+        CIQueueKeychain.write(webhookSecret, account: "webhookSecret")
     }
 }
 
