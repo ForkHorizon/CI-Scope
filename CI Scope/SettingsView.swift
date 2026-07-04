@@ -81,7 +81,16 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Text("Webhook secret is configured on the website Worker.")
+            HStack(spacing: 8) {
+                Text("Webhook secret")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 92, alignment: .leading)
+                SecureField("Must match CI_SCOPE_GITHUB_WEBHOOK_SECRET on the Worker", text: $store.webhookSecret)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            Text("Attaching a project auto-creates its repo webhook (if missing) using this secret.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
