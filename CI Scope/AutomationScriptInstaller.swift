@@ -14,8 +14,7 @@ struct AutomationScriptInstaller {
         variableValues: [String: String],
         mode: AutomationScriptInstallMode
     ) async throws -> AutomationScriptInstallResult {
-        _ = try await run("NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
-        try await validateBrokerAccessIfNeeded(mode: mode, project: project)
+        try await prepareBrokerForInstall(script: script, project: project, mode: mode)
         let defaultBranch = try await defaultBranch(for: project)
         let renderer = AutomationScriptRenderer(
             script: script,
@@ -43,7 +42,6 @@ struct AutomationScriptInstaller {
             try await commitAndPush(renderer: renderer, cwd: repoURL)
         }
         guard try await branchDiffersFromDefault(defaultBranch: defaultBranch, cwd: repoURL) else {
-            try await attachBrokerIfNeeded(mode: mode, project: project)
             return alreadyInstalledResult(script, defaultBranch: defaultBranch)
         }
         let pullRequestURL = try await pullRequestURL(
@@ -51,8 +49,22 @@ struct AutomationScriptInstaller {
             renderer: renderer,
             tempRoot: tempRoot
         )
-        try await attachBrokerIfNeeded(mode: mode, project: project)
         return readyResult(script, pullRequestURL: pullRequestURL)
+    }
+
+    /// Attach (and create the repo's webhook) before any push or PR: a
+    /// brand-new project's very first PR fires workflow_job:queued the moment
+    /// it opens, and if the webhook doesn't exist yet that event has nowhere
+    /// to go — permanently stuck, unrecoverable (see NexusUnity, 2026-07-04).
+    private func prepareBrokerForInstall(
+        script: AutomationScript,
+        project: CIProject,
+        mode: AutomationScriptInstallMode
+    ) async throws {
+        _ = try await run("NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
+        try await validateBrokerAccessIfNeeded(mode: mode, project: project)
+        try validateRunnerLabelsSatisfiable(mode: mode, script: script, project: project)
+        try await attachBrokerIfNeeded(mode: mode, project: project)
     }
 
     private func renderAndStageInstall(
