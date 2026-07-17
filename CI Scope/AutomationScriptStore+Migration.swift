@@ -95,6 +95,20 @@ extension AutomationScriptStore {
         return seed
     }
 
+    func migratedCallerBasedScript(_ script: AutomationScript) -> AutomationScript {
+        let seedID = script.defaultSeedID ?? script.id
+        guard AutomationScriptSeedProvider.defaultSeedIDs.contains(seedID) else { return script }
+
+        let stillInstallsChecker = script.files.contains { file in
+            file.destinationPath.normalizedScriptStorePath == "scripts/{{script_slug}}.py"
+        }
+        guard stillInstallsChecker else { return script }
+
+        guard var seed = try? AutomationScriptSeedProvider.loadSeed(seedID) else { return script }
+        seed.id = script.id
+        return seed
+    }
+
     private func migratedDestinationPath(for path: String) -> String {
         switch path.normalizedScriptStorePath {
         case ".ai-readability.json":
