@@ -1,7 +1,10 @@
 import Foundation
 
 enum AutomationScriptSeedProvider {
-    static let defaultSeedIDs = ["ai-readability", "swift-quality-gate", "swift-compile-gate"]
+    static let defaultSeedIDs = [
+        "ai-readability", "swift-quality-gate", "swift-compile-gate",
+        "web-quality-gate", "python-quality-gate",
+    ]
 
     static func loadDefaultScripts() throws -> [AutomationScript] {
         try defaultSeedIDs.map { try loadSeed($0) }
@@ -18,6 +21,10 @@ enum AutomationScriptSeedProvider {
             return fallbackSwiftQualityGateSeed()
         case "swift-compile-gate":
             return fallbackSwiftCompileGateSeed()
+        case "web-quality-gate":
+            return fallbackWebQualityGateSeed()
+        case "python-quality-gate":
+            return fallbackPythonQualityGateSeed()
         default:
             throw AutomationScriptError.missingSeed(id)
         }
@@ -183,7 +190,7 @@ enum AutomationScriptSeedProvider {
         fallbackCallerWorkflow(jobID: "readability", gate: "readability.yml")
     }
 
-    private static func fallbackCallerWorkflow(jobID: String, gate: String) -> String {
+    private static func fallbackCallerWorkflow(jobID: String, gate: String, withConfig: Bool = true) -> String {
         """
         name: {{script_title}}
 
@@ -198,10 +205,58 @@ enum AutomationScriptSeedProvider {
           \(jobID):
             uses: ForkHorizon/ci-gates/.github/workflows/\(gate)@main
             with:
-              config: .{{script_slug}}.json
-              runs-on: '{{runner_labels_json}}'
+        \(withConfig ? "      config: .{{script_slug}}.json\n" : "")      runs-on: '{{runner_labels_json}}'
 
         """
+    }
+
+    private static func fallbackWebQualityGateSeed() -> AutomationScript {
+        AutomationScript(
+            id: "web-quality-gate",
+            title: "Web Quality Gate",
+            summary: "Typechecks TS/JS and blocks dead code, unused dependencies, and copy-paste.",
+            detail: "Installs a workflow calling the shared ci-gates web gate: tsc, ESLint, knip, jscpd.",
+            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
+            branchName: "ci-scope/install-{{script_id}}",
+            commitMessage: "Add {{script_title}}",
+            pullRequestTitle: "Add {{script_title}}",
+            pullRequestBody: fallbackPullRequestBody,
+            variables: [],
+            files: [
+                AutomationScriptFile(
+                    id: "workflow",
+                    destinationPath: ".github/workflows/{{script_slug}}.yml",
+                    isExecutable: false,
+                    contents: fallbackCallerWorkflow(jobID: "web-quality-gate", gate: "web-quality.yml", withConfig: false)
+                )
+            ],
+            defaultSeedID: "web-quality-gate"
+        )
+    }
+
+    private static func fallbackPythonQualityGateSeed() -> AutomationScript {
+        AutomationScript(
+            id: "python-quality-gate",
+            title: "Python Quality Gate",
+            summary: "Runs ruff lint and format checks with a strict anti-slop fallback config.",
+            detail: "Installs a workflow calling the shared ci-gates Python gate: ruff check and format.",
+            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
+            branchName: "ci-scope/install-{{script_id}}",
+            commitMessage: "Add {{script_title}}",
+            pullRequestTitle: "Add {{script_title}}",
+            pullRequestBody: fallbackPullRequestBody,
+            variables: [],
+            files: [
+                AutomationScriptFile(
+                    id: "workflow",
+                    destinationPath: ".github/workflows/{{script_slug}}.yml",
+                    isExecutable: false,
+                    contents: fallbackCallerWorkflow(
+                        jobID: "python-quality-gate", gate: "python-quality.yml", withConfig: false)
+                )
+            ],
+            defaultSeedID: "python-quality-gate"
+        )
     }
 
     private static var fallbackPullRequestBody: String {
