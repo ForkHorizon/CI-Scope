@@ -46,10 +46,6 @@ extension AutomationScript {
         return paths
     }
 
-    func isDetected(in snapshot: ProjectCISnapshot?) -> Bool {
-        matchingWorkflow(in: snapshot) != nil
-    }
-
     func matchingWorkflow(in snapshot: ProjectCISnapshot?) -> GitHubWorkflow? {
         guard let snapshot else { return nil }
         let scriptWorkflowPaths = workflowDestinationPaths

@@ -73,13 +73,6 @@ extension LocalBrokerService {
         return feed
     }
 
-    /// Recent runs for one repository, newest first, mapped to GitHubRun. Empty
-    /// when the feed is missing, unreadable, or stale (older than `maxAge`), so
-    /// callers fall back to a direct gh query.
-    func workflowRuns(forRepositorySlug slug: String, limit: Int = 20, maxAge: TimeInterval = 900) -> [GitHubRun] {
-        workflowRunsFeed(maxAge: maxAge)?.githubRuns(forRepositorySlug: slug, limit: limit) ?? []
-    }
-
     private func isWorkflowRunsFeedFresh(maxAge: TimeInterval) -> Bool {
         guard let attributes = try? fileManager.attributesOfItem(atPath: workflowRunsURL.path),
             let modified = attributes[.modificationDate] as? Date

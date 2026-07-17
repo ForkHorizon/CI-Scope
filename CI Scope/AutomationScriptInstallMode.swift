@@ -15,10 +15,6 @@ enum AutomationScriptInstallMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var detail: String {
-        detail(for: nil)
-    }
-
     func detail(for script: AutomationScript?) -> String {
         switch self {
         case .localBroker: "Runs jobs on this Mac through the serial broker."
@@ -29,10 +25,6 @@ enum AutomationScriptInstallMode: String, CaseIterable, Identifiable {
                 "Uses GitHub-hosted runners for portable scripts."
             }
         }
-    }
-
-    var runnerLabels: [String] {
-        runnerLabels(for: nil)
     }
 
     func runnerLabels(for script: AutomationScript?) -> [String] {

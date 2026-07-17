@@ -35,7 +35,7 @@
     ".build/swift-compile-gate-derived-data"
   ],
   "swift_build_arguments": [],
-  "fail_on_any_warning": false,
+  "fail_on_any_warning": true,
   "critical_warning_patterns": [
     "will be an error in Swift 6",
     "\\bSendable\\b",
@@ -45,5 +45,7 @@
     "\\bdata race\\b",
     "\\bconcurrently[- ]executing\\b"
   ],
-  "critical_warning_exclude_patterns": []
+  "critical_warning_exclude_patterns": [
+    "Metadata extraction skipped"
+  ]
 }

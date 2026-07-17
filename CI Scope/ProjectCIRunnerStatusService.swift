@@ -8,7 +8,7 @@ extension ProjectCIService {
 
         let localRunners = config.actionsRunners.compactMap(readLocalRunner)
         if let runner = localRunners.first(where: { localRunner($0, appliesTo: project) }) {
-            return await localRunnerStatus(runner, for: project)
+            return await localRunnerStatus(runner)
         }
 
         return await repositoryRunnerStatus(
@@ -34,10 +34,7 @@ extension ProjectCIService {
         return ProjectLocalRunnerStatus(
             state: broker.state,
             summary: summary,
-            detail: detail,
-            repositorySlug: project.repositorySlug,
-            pid: broker.pid,
-            filePath: LocalBrokerService(config: config).registryURL.path
+            detail: detail
         )
     }
 
@@ -47,10 +44,7 @@ extension ProjectCIService {
     ) async -> ProjectLocalRunnerStatus {
         let response = await repositoryRunners(for: project)
         guard let runners = response.value else {
-            return unknownRepositoryRunnerStatus(
-                detail: response.error ?? "Could not read repo runners.",
-                localRunners: localRunners
-            )
+            return unknownRepositoryRunnerStatus(detail: response.error ?? "Could not read repo runners.")
         }
 
         let macRunners = runners.filter { $0.hasLabels(config.actionsRunnerRequiredLabels) }
@@ -58,14 +52,11 @@ extension ProjectCIService {
             return ProjectLocalRunnerStatus(
                 state: .offline,
                 summary: "No CI runner",
-                detail: missingRunnerDetail(for: project, localRunners: localRunners),
-                repositorySlug: localRunners.first?.repositorySlug,
-                pid: nil,
-                filePath: nil
+                detail: missingRunnerDetail(for: project, localRunners: localRunners)
             )
         }
 
-        return macRunnerStatus(macRunners, for: project)
+        return macRunnerStatus(macRunners)
     }
 
     func repositoryRunners(for project: CIProject) async -> LoadResponse<[GitHubActionsRunner]> {
@@ -86,21 +77,15 @@ extension ProjectCIService {
         return LoadResponse(value: runnerList.runners)
     }
 
-    func unknownRepositoryRunnerStatus(
-        detail: String,
-        localRunners: [LocalRunnerInfo]
-    ) -> ProjectLocalRunnerStatus {
+    func unknownRepositoryRunnerStatus(detail: String) -> ProjectLocalRunnerStatus {
         ProjectLocalRunnerStatus(
             state: .warning,
             summary: "Runner status unknown",
-            detail: detail,
-            repositorySlug: localRunners.first?.repositorySlug,
-            pid: nil,
-            filePath: nil
+            detail: detail
         )
     }
 
-    func macRunnerStatus(_ macRunners: [GitHubActionsRunner], for project: CIProject) -> ProjectLocalRunnerStatus {
+    func macRunnerStatus(_ macRunners: [GitHubActionsRunner]) -> ProjectLocalRunnerStatus {
         let onlineRunner = macRunners.first { $0.status.lowercased() == "online" && !$0.busy }
         let busyRunner = macRunners.first { $0.status.lowercased() == "online" && $0.busy }
         let selectedRunner = onlineRunner ?? busyRunner ?? macRunners[0]
@@ -124,22 +109,16 @@ extension ProjectCIService {
         return ProjectLocalRunnerStatus(
             state: state,
             summary: summary,
-            detail: selectedRunner.name,
-            repositorySlug: project.repositorySlug,
-            pid: nil,
-            filePath: nil
+            detail: selectedRunner.name
         )
     }
 
-    func localRunnerStatus(_ runner: LocalRunnerInfo, for project: CIProject) async -> ProjectLocalRunnerStatus {
+    func localRunnerStatus(_ runner: LocalRunnerInfo) async -> ProjectLocalRunnerStatus {
         guard let serviceLabel = serviceLabel(for: runner.config) else {
             return ProjectLocalRunnerStatus(
                 state: .warning,
                 summary: "Runner configured",
-                detail: "Service not installed for \(runner.config.title).",
-                repositorySlug: runner.repositorySlug ?? project.repositorySlug,
-                pid: nil,
-                filePath: runner.config.runnerConfigurationPath
+                detail: "Service not installed for \(runner.config.title)."
             )
         }
 
@@ -151,10 +130,7 @@ extension ProjectCIService {
             return ProjectLocalRunnerStatus(
                 state: .offline,
                 summary: "Service unavailable",
-                detail: trimmedError(errorOutput, fallback: fallbackError),
-                repositorySlug: runner.repositorySlug ?? project.repositorySlug,
-                pid: nil,
-                filePath: runner.config.runnerConfigurationPath
+                detail: trimmedError(errorOutput, fallback: fallbackError)
             )
         }
 
@@ -174,10 +150,7 @@ extension ProjectCIService {
         return ProjectLocalRunnerStatus(
             state: hasRequiredLabels ? state : .warning,
             summary: labelSummary,
-            detail: detail,
-            repositorySlug: runner.repositorySlug ?? project.repositorySlug,
-            pid: pid,
-            filePath: runner.config.runnerConfigurationPath
+            detail: detail
         )
     }
 
