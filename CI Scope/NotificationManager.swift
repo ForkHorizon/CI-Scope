@@ -92,7 +92,7 @@ final class NotificationManager: ObservableObject {
 
             if fetchedRunnerSnapshots {
                 if previousState == .online && runner.state == .offline {
-                    sendRunnerNotification(runnerName: runner.title, state: runner.state)
+                    sendRunnerNotification(runnerName: runner.title)
                 }
             }
 
@@ -149,7 +149,7 @@ final class NotificationManager: ObservableObject {
         UNUserNotificationCenter.current().add(request)
     }
 
-    private func sendRunnerNotification(runnerName: String, state: ServiceState) {
+    private func sendRunnerNotification(runnerName: String) {
         let content = UNMutableNotificationContent()
 
         content.title = "⚠️ Runner Offline"

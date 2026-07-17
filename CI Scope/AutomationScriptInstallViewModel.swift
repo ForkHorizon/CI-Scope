@@ -11,10 +11,6 @@ final class AutomationScriptInstallViewModel: ObservableObject {
         self.installer = AutomationScriptInstaller(config: DashboardConfig())
     }
 
-    init(config: DashboardConfig) {
-        self.installer = AutomationScriptInstaller(config: config)
-    }
-
     func snapshot(for script: AutomationScript?) -> AutomationScriptInstallSnapshot {
         guard let script else { return .idle }
         return snapshots[installKey(script)] ?? .idle

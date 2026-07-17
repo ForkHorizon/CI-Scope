@@ -72,7 +72,7 @@ struct ErrorBox: View {
                 RoundedRectangle(cornerRadius: 7)
                     .stroke(Color.red.opacity(0.18))
             )
-        }
+    }
 }
 
 struct LimitedStatusRow: View {

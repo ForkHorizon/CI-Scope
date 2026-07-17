@@ -21,10 +21,6 @@ struct RunnerFleetSnapshot {
         runners.reduce(0) { $0 + $1.queuedJobs.count }
     }
 
-    var visibleRepositoryCount: Int {
-        runners.reduce(0) { $0 + $1.visibleRepositoryCount }
-    }
-
     var subRunnerCount: Int {
         runners.reduce(0) { $0 + $1.subRunners.count }
     }
@@ -58,11 +54,9 @@ struct RunnerMonitorSnapshot: Identifiable {
     let id: String
     let title: String
     let scope: String
-    let root: String
     var state: ServiceState = .unknown
     var localState: ServiceState = .unknown
     var githubState: ServiceState = .unknown
-    var serviceLabel: String?
     var launchctlState = "unknown"
     var pid: Int?
     var uptime = "-"
@@ -74,7 +68,6 @@ struct RunnerMonitorSnapshot: Identifiable {
     var missingLabels: [String] = []
     var activeJobs: [RunnerWorkItem] = []
     var queuedJobs: [RunnerWorkItem] = []
-    var visibleRepositoryCount = 0
     var subRunners: [RunnerSubRunnerSnapshot] = []
     var webhook: BrokerWebhookStatus?
     var error: String?
@@ -101,9 +94,6 @@ struct RunnerWorkItem: Identifiable {
     let headBranch: String
     let status: String
     let url: String
-    let createdAt: String
-    let labels: [String]
-    let assemblerID: String?
     let assemblerTitle: String?
     let assemblerScope: String?
 
@@ -116,9 +106,6 @@ struct RunnerWorkItem: Identifiable {
         headBranch: String,
         status: String,
         url: String,
-        createdAt: String,
-        labels: [String],
-        assemblerID: String? = nil,
         assemblerTitle: String? = nil,
         assemblerScope: String? = nil
     ) {
@@ -130,9 +117,6 @@ struct RunnerWorkItem: Identifiable {
         self.headBranch = headBranch
         self.status = status
         self.url = url
-        self.createdAt = createdAt
-        self.labels = labels
-        self.assemblerID = assemblerID
         self.assemblerTitle = assemblerTitle
         self.assemblerScope = assemblerScope
     }
@@ -167,87 +151,4 @@ struct RunnerLaunchStatus {
     let launchctlState: String
     let pid: Int?
     let uptime: String
-    let error: String?
-}
-
-struct FleetRunnerConfiguration: Decodable {
-    let agentName: String?
-    let gitHubUrl: String?
-}
-
-struct FleetLocalRunnerInfo {
-    let config: ActionsRunnerConfig
-    let runner: FleetRunnerConfiguration
-    let repositorySlug: String?
-    let owner: String?
-
-    var registrationLabel: String {
-        repositorySlug ?? owner ?? config.scope.description
-    }
-}
-
-struct FleetGitHubRunnerList: Decodable {
-    let runners: [FleetGitHubActionsRunner]
-}
-
-struct FleetGitHubActionsRunner: Decodable {
-    let name: String
-    let status: String
-    let busy: Bool
-    let labels: [FleetGitHubRunnerLabel]
-
-    func hasLabels(_ requiredLabels: [String]) -> Bool {
-        let availableLabels = Set(labels.map { $0.name.lowercased() })
-        return requiredLabels.allSatisfy { availableLabels.contains($0.lowercased()) }
-    }
-}
-
-struct FleetGitHubRunnerLabel: Decodable {
-    let name: String
-}
-
-struct WorkflowRunContext {
-    let id: Int64
-    let repositorySlug: String
-    let workflowName: String
-    let displayTitle: String
-    let headBranch: String
-    let status: String
-    let conclusion: String?
-    let url: String
-    let createdAt: String
-}
-
-struct WorkflowJob: Decodable {
-    let id: Int64
-    let name: String
-    let status: String
-    let runnerName: String?
-    let htmlURL: String?
-    let labels: [String]
-    let workflowName: String?
-    let createdAt: String?
-    let startedAt: String?
-
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case name
-        case status
-        case runnerName = "runner_name"
-        case htmlURL = "html_url"
-        case labels
-        case workflowName = "workflow_name"
-        case createdAt = "created_at"
-        case startedAt = "started_at"
-    }
-}
-
-struct JobContext {
-    let run: WorkflowRunContext
-    let job: WorkflowJob
-}
-
-struct FleetLoadResponse<Value> {
-    var value: Value?
-    var error: String?
 }

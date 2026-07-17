@@ -14,7 +14,7 @@ struct ProjectCIService {
         let runResponse = await runsResult
         let localRunnerResponse = await localRunnerResult
 
-        var snapshot = ProjectCISnapshot(projectID: project.id)
+        var snapshot = ProjectCISnapshot()
         snapshot.localRunner = localRunnerResponse
         snapshot.workflows = workflowResponse.value ?? []
         snapshot.runs = runResponse.value ?? []

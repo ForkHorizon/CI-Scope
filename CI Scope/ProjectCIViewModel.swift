@@ -55,7 +55,7 @@ final class ProjectCIViewModel: ObservableObject {
         guard !invalidatedProjectIDs.contains(project.id) else { return }
 
         let localRunner = await service.loadLocalRunner(for: project, prepareBroker: false)
-        var snapshot = snapshots[project.id] ?? ProjectCISnapshot(projectID: project.id)
+        var snapshot = snapshots[project.id] ?? ProjectCISnapshot()
         snapshot.localRunner = localRunner
         snapshot.refreshedAt = Date()
         if snapshot.workflows.isEmpty && snapshot.runs.isEmpty && snapshot.error == nil {

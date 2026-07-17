@@ -60,7 +60,6 @@ struct GitHubWorkflow: Identifiable, Decodable {
 }
 
 struct ProjectCISnapshot {
-    let projectID: CIProject.ID
     var state: ServiceState = .unknown
     var localRunner = ProjectLocalRunnerStatus()
     var workflows: [GitHubWorkflow] = []
@@ -73,7 +72,4 @@ struct ProjectLocalRunnerStatus {
     var state: ServiceState = .unknown
     var summary = "Checking"
     var detail = "-"
-    var repositorySlug: String?
-    var pid: Int?
-    var filePath: String?
 }

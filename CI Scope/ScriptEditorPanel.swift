@@ -57,7 +57,6 @@ struct ScriptEditorPanel: View {
 
 struct ScriptDetailsEditor: View {
     @Binding var script: AutomationScript
-    @State private var runnerLabelsText = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
