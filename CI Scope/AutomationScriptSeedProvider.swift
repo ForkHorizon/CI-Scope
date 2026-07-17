@@ -42,7 +42,7 @@ enum AutomationScriptSeedProvider {
             id: "ai-readability",
             title: "Linter Checker 300 Lines",
             summary: "Checks max source file length and function length.",
-            detail: "Installs a GitHub workflow, JSON config, and Python checker.",
+            detail: "Installs a GitHub workflow that calls the shared readability gate in ForkHorizon/ci-gates.",
             runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
@@ -59,7 +59,7 @@ enum AutomationScriptSeedProvider {
             id: "swift-quality-gate",
             title: "Swift Quality Gate",
             summary: "Builds Swift projects and blocks formatting and dead-code regressions.",
-            detail: "Installs a Swift CI workflow, JSON config, swift-format config, and Python driver.",
+            detail: "Installs a Swift workflow calling the shared ci-gates quality gate, plus JSON and swift-format configs.",
             runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
@@ -76,7 +76,7 @@ enum AutomationScriptSeedProvider {
             id: "swift-compile-gate",
             title: "Swift Compile Gate",
             summary: "Compiles Swift projects and blocks configured critical warnings.",
-            detail: "Installs a Swift compile workflow, JSON config, and Python checker.",
+            detail: "Installs a Swift workflow that calls the shared compile gate in ForkHorizon/ci-gates.",
             runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
@@ -163,35 +163,7 @@ enum AutomationScriptSeedProvider {
                 id: "workflow",
                 destinationPath: ".github/workflows/{{script_slug}}.yml",
                 isExecutable: false,
-                contents: """
-                    name: {{script_title}}
-
-                    on:
-                      pull_request:
-                      workflow_dispatch:
-
-                    jobs:
-                      swift-quality-gate:
-                        name: {{script_title}}
-                        runs-on: [{{runner_labels}}]
-                        steps:
-                          - uses: actions/checkout@v6
-                          - run: python3 scripts/{{script_slug}}.py --config .{{script_slug}}.json --stage all --mode all
-
-                    """
-            ),
-            AutomationScriptFile(
-                id: "checker",
-                destinationPath: "scripts/{{script_slug}}.py",
-                isExecutable: true,
-                contents: """
-                    #!/usr/bin/env python3
-                    import sys
-
-                    print("::error::Bundled Swift Quality Gate seed is missing. Reinstall or rebuild CI Scope.")
-                    sys.exit(2)
-
-                    """
+                contents: fallbackCallerWorkflow(jobID: "swift-quality-gate", gate: "swift-quality.yml")
             ),
         ]
     }
@@ -199,22 +171,19 @@ enum AutomationScriptSeedProvider {
     private static var fallbackSwiftCompileGateFiles: [AutomationScriptFile] {
         [
             AutomationScriptFile(
-                id: "checker",
-                destinationPath: "scripts/{{script_slug}}.py",
-                isExecutable: true,
-                contents: """
-                    #!/usr/bin/env python3
-                    import sys
-
-                    print("::error::Bundled Swift Compile Gate seed is missing. Reinstall or rebuild CI Scope.")
-                    sys.exit(2)
-
-                    """
+                id: "workflow",
+                destinationPath: ".github/workflows/{{script_slug}}.yml",
+                isExecutable: false,
+                contents: fallbackCallerWorkflow(jobID: "swift-compile-gate", gate: "swift-compile.yml")
             )
         ]
     }
 
     private static var fallbackWorkflow: String {
+        fallbackCallerWorkflow(jobID: "readability", gate: "readability.yml")
+    }
+
+    private static func fallbackCallerWorkflow(jobID: String, gate: String) -> String {
         """
         name: {{script_title}}
 
@@ -222,13 +191,16 @@ enum AutomationScriptSeedProvider {
           pull_request:
           workflow_dispatch:
 
+        permissions:
+          contents: read
+
         jobs:
-          readability:
-            name: {{script_title}}
-            runs-on: [{{runner_labels}}]
-            steps:
-              - uses: actions/checkout@v6
-              - run: python3 scripts/{{script_slug}}.py --config .{{script_slug}}.json --mode all
+          \(jobID):
+            uses: ForkHorizon/ci-gates/.github/workflows/\(gate)@main
+            with:
+              config: .{{script_slug}}.json
+              runs-on: '{{runner_labels_json}}'
+
         """
     }
 

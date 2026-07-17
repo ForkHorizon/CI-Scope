@@ -126,7 +126,9 @@ final class AutomationScriptStore: ObservableObject {
         return urls.filter { $0.pathExtension == "json" }.compactMap { url in
             guard let data = try? Data(contentsOf: url) else { return nil }
             guard let script = try? decoder.decode(AutomationScript.self, from: data) else { return nil }
-            let migratedScript = migratedSwiftQualityGateScript(migratedLegacyReadabilityScript(script))
+            let migratedScript = migratedCallerBasedScript(
+                migratedSwiftQualityGateScript(migratedLegacyReadabilityScript(script))
+            )
             if migratedScript != script {
                 try? write(migratedScript)
             }
