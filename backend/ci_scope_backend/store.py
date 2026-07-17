@@ -67,7 +67,11 @@ class SQLiteStore:
             ).rowcount
             if inserted == 0:
                 row = db.execute("select id from events where delivery_id = ?", (delivery_id,)).fetchone()
-                return {"duplicate": True, "eventId": int(row["id"]) if row else self.latest_event_id(db), "normalized": normalized}
+                return {
+                    "duplicate": True,
+                    "eventId": int(row["id"]) if row else self.latest_event_id(db),
+                    "normalized": normalized,
+                }
 
             self.upsert_records(db, installation_id, normalized)
             event_id = int(db.execute("select last_insert_rowid()").fetchone()[0])
@@ -145,18 +149,9 @@ class SQLiteStore:
     def snapshot(self) -> dict[str, Any]:
         with self.connect() as db:
             event_id = self.latest_event_id(db)
-            repositories = [
-                dict(row)
-                for row in db.execute(SNAPSHOT_REPOSITORIES_SQL)
-            ]
-            runs = [
-                self.run_from_row(row)
-                for row in db.execute(SNAPSHOT_RUNS_SQL)
-            ]
-            jobs = [
-                self.job_from_row(row)
-                for row in db.execute(SNAPSHOT_JOBS_SQL)
-            ]
+            repositories = [dict(row) for row in db.execute(SNAPSHOT_REPOSITORIES_SQL)]
+            runs = [self.run_from_row(row) for row in db.execute(SNAPSHOT_RUNS_SQL)]
+            jobs = [self.job_from_row(row) for row in db.execute(SNAPSHOT_JOBS_SQL)]
         return {
             "version": 1,
             "generatedAt": now_iso(),

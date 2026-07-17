@@ -4,7 +4,6 @@ import asyncio
 import json
 import os
 from pathlib import Path
-from typing import Optional
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -24,7 +23,7 @@ def create_app() -> FastAPI:
     return app
 
 
-def require_client(authorization: Optional[str], client_token: str) -> None:
+def require_client(authorization: str | None, client_token: str) -> None:
     if not client_token:
         return
     expected = f"Bearer {client_token}"
@@ -75,7 +74,7 @@ def register_webhook_route(app: FastAPI, store: SQLiteStore, webhook_secret: str
 
 def register_snapshot_route(app: FastAPI, store: SQLiteStore, client_token: str) -> None:
     @app.get("/v1/snapshot")
-    def snapshot(authorization: Optional[str] = Header(default=None)) -> dict[str, object]:
+    def snapshot(authorization: str | None = Header(default=None)) -> dict[str, object]:
         require_client(authorization, client_token)
         return store.snapshot()
 
@@ -87,7 +86,7 @@ def register_admin_route(
     active_sse_clients: dict[str, int],
 ) -> None:
     @app.get("/v1/admin/status")
-    def admin_status(authorization: Optional[str] = Header(default=None)) -> dict[str, object]:
+    def admin_status(authorization: str | None = Header(default=None)) -> dict[str, object]:
         require_client(authorization, client_token)
         return store.admin_status(active_sse_clients["count"])
 
@@ -101,8 +100,8 @@ def register_stream_route(
     @app.get("/v1/events/stream")
     async def events_stream(
         last_event_id: int = 0,
-        authorization: Optional[str] = Header(default=None),
-        last_event_id_header: Optional[str] = Header(default=None, alias="Last-Event-ID"),
+        authorization: str | None = Header(default=None),
+        last_event_id_header: str | None = Header(default=None, alias="Last-Event-ID"),
     ) -> StreamingResponse:
         require_client(authorization, client_token)
         cursor = event_cursor(last_event_id, last_event_id_header)
@@ -112,7 +111,7 @@ def register_stream_route(
         )
 
 
-def event_cursor(last_event_id: int, last_event_id_header: Optional[str]) -> int:
+def event_cursor(last_event_id: int, last_event_id_header: str | None) -> int:
     try:
         return int(last_event_id_header or last_event_id or 0)
     except ValueError:

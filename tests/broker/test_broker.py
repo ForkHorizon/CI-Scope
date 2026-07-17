@@ -11,9 +11,7 @@ import hashlib
 broker_dir = Path(__file__).parent.parent.parent / "CI Scope" / "Broker"
 sys.path.insert(0, str(broker_dir))
 
-loader = importlib.machinery.SourceFileLoader(
-    "broker", str(broker_dir / "CI Scope Broker")
-)
+loader = importlib.machinery.SourceFileLoader("broker", str(broker_dir / "CI Scope Broker"))
 spec = importlib.util.spec_from_loader("broker", loader)
 broker = importlib.util.module_from_spec(spec)
 loader.exec_module(broker)
@@ -30,9 +28,7 @@ def test_prune_webhook_queued():
     # Add a job that is fresh
     broker.WEBHOOK_QUEUED_AT["job_1"] = now
     # Add a job that is old
-    broker.WEBHOOK_QUEUED_AT["job_2"] = (
-        now - broker.WEBHOOK_QUEUE_GRACE_SECONDS - 10
-    )
+    broker.WEBHOOK_QUEUED_AT["job_2"] = now - broker.WEBHOOK_QUEUE_GRACE_SECONDS - 10
 
     broker.prune_webhook_queued()
 
@@ -45,24 +41,18 @@ def test_verify_signature():
     body = b'{"hello": "world"}'
 
     # Valid signature
-    digest = hmac.new(
-        secret.encode("utf-8"), body, hashlib.sha256
-    ).hexdigest()
+    digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
     valid_signature = f"sha256={digest}"
     assert broker.verify_signature(body, valid_signature, secret) is True
 
     # Invalid signature (wrong secret)
-    wrong_digest = hmac.new(
-        b"wrong-secret", body, hashlib.sha256
-    ).hexdigest()
+    wrong_digest = hmac.new(b"wrong-secret", body, hashlib.sha256).hexdigest()
     wrong_signature = f"sha256={wrong_digest}"
     assert broker.verify_signature(body, wrong_signature, secret) is False
 
     # Replay (or wrong body)
     wrong_body = b'{"hello": "there"}'
-    assert broker.verify_signature(
-        wrong_body, valid_signature, secret
-    ) is False
+    assert broker.verify_signature(wrong_body, valid_signature, secret) is False
 
     # Malformed
     assert broker.verify_signature(body, "malformed", secret) is False
@@ -130,9 +120,7 @@ def test_save_state(monkeypatch):
     profiles = []
     webhook = {}
 
-    state = broker.save_state(
-        actives, queue, statuses, error, retries, profiles, webhook
-    )
+    state = broker.save_state(actives, queue, statuses, error, retries, profiles, webhook)
 
     assert len(state["queue"]) == 1
     assert state["queue"][0]["id"] == "job_1"

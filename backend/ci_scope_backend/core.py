@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Any
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def verify_signature(body: bytes, signature: str, secret: str) -> bool:
@@ -123,12 +123,7 @@ def job_record(
     run_id = workflow_job.get("run_id") or workflow_run.get("id")
     if job_id is None or run_id is None:
         return None
-    workflow_name = (
-        workflow_job.get("workflow_name")
-        or workflow_run.get("name")
-        or workflow.get("name")
-        or "Workflow"
-    )
+    workflow_name = workflow_job.get("workflow_name") or workflow_run.get("name") or workflow.get("name") or "Workflow"
     return {
         "id": int(job_id),
         "runId": int(run_id),
@@ -162,4 +157,3 @@ def run_from_job(job: dict[str, Any]) -> dict[str, Any]:
         "createdAt": job["createdAt"],
         "updatedAt": now_iso(),
     }
-
