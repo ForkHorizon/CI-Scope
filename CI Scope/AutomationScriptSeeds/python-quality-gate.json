@@ -1,0 +1,26 @@
+{
+  "branchName": "ci-scope/install-{{script_id}}",
+  "commitMessage": "Add {{script_title}}",
+  "defaultSeedID": "python-quality-gate",
+  "detail": "Installs a thin GitHub Actions workflow that calls the shared Python gate in ForkHorizon/ci-gates: ruff check and ruff format --check. Uses the repo's own ruff config when present, otherwise the strict fallback config from ci-gates.",
+  "files": [
+    {
+      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: python-quality-gate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  python-quality-gate:\n    uses: ForkHorizon/ci-gates/.github/workflows/python-quality.yml@main\n    with:\n      runs-on: '{{runner_labels_json}}'\n",
+      "destinationPath": ".github/workflows/{{script_slug}}.yml",
+      "id": "workflow",
+      "isExecutable": false
+    }
+  ],
+  "id": "python-quality-gate",
+  "pullRequestBody": "Adds {{script_title}} managed by CI Scope.\n\nThis PR adds:\n- `.github/workflows/{{script_slug}}.yml`\n\nThe workflow calls the shared gate in `ForkHorizon/ci-gates`, so gate logic updates roll out from that repository automatically. It runs ruff lint and format checks, using the repo's own ruff config when present and a strict fallback otherwise.",
+  "pullRequestTitle": "Add {{script_title}}",
+  "runnerLabels": [
+    "self-hosted",
+    "macOS",
+    "ARM64",
+    "ci-scope"
+  ],
+  "summary": "Runs ruff lint and format checks with a strict anti-slop fallback config.",
+  "title": "Python Quality Gate",
+  "variables": []
+}
