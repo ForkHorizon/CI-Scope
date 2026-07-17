@@ -146,7 +146,7 @@ enum AutomationScriptSeedProvider {
                       "fallback_swift_format_config": ".ci-scope-swift-format.json",
                       "dead_code_enabled": true,
                       "dead_code_install_periphery": true,
-                      "periphery_arguments": []
+                      "periphery_arguments": ["--retain-codable-properties"]
                     }
 
                     """

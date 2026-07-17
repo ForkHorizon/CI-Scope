@@ -196,9 +196,6 @@ struct BrokerJob: Identifiable, Codable, Equatable {
             headBranch: headBranch,
             status: status,
             url: url,
-            createdAt: createdAt,
-            labels: labels,
-            assemblerID: profileID,
             assemblerTitle: profileTitle,
             assemblerScope: profileScope
         )

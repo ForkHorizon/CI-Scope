@@ -35,13 +35,15 @@ actor GitHubRateLimitGate {
         guard result.exitCode != 0, Self.looksRateLimited(result.output) else { return }
 
         if Self.isSecondary(result.output) {
-            arm(until: Date().addingTimeInterval(60),
+            arm(
+                until: Date().addingTimeInterval(60),
                 reason: "GitHub secondary rate limit — backing off 60s")
             return
         }
 
         let reset = await Self.coreResetDate(config: config)
-        arm(until: reset ?? Date().addingTimeInterval(60),
+        arm(
+            until: reset ?? Date().addingTimeInterval(60),
             reason: "GitHub API rate limit exhausted — paused until reset")
     }
 
