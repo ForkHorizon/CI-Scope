@@ -1,0 +1,36 @@
+{
+  "branchName": "ci-scope/install-{{script_id}}",
+  "commitMessage": "Add {{script_title}}",
+  "defaultSeedID": "web-quality-gate",
+  "detail": "Installs a thin GitHub Actions workflow that calls the shared web gate in ForkHorizon/ci-gates: dependency install, tsc --noEmit, ESLint when the repo has a config, knip for dead code and unused dependencies, and jscpd copy-paste detection.",
+  "files": [
+    {
+      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: web-quality-gate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  web-quality-gate:\n    uses: ForkHorizon/ci-gates/.github/workflows/web-quality.yml@main\n    with:\n      runs-on: '{{runner_labels_json}}'\n      duplication-threshold: \"{{duplication_threshold}}\"\n",
+      "destinationPath": ".github/workflows/{{script_slug}}.yml",
+      "id": "workflow",
+      "isExecutable": false
+    }
+  ],
+  "id": "web-quality-gate",
+  "pullRequestBody": "Adds {{script_title}} managed by CI Scope.\n\nThis PR adds:\n- `.github/workflows/{{script_slug}}.yml`\n\nThe workflow calls the shared gate in `ForkHorizon/ci-gates`, so gate logic updates roll out from that repository automatically. It typechecks the project, runs ESLint when the repo has a config, and blocks dead code (knip) and copy-paste above the configured threshold (jscpd).",
+  "pullRequestTitle": "Add {{script_title}}",
+  "runnerLabels": [
+    "self-hosted",
+    "macOS",
+    "ARM64",
+    "ci-scope"
+  ],
+  "summary": "Typechecks TS/JS and blocks dead code, unused dependencies, and copy-paste.",
+  "title": "Web Quality Gate",
+  "variables": [
+    {
+      "defaultValue": "2",
+      "help": "Max allowed duplicated-code percentage before the gate fails.",
+      "id": "duplication_threshold",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Duplication threshold %"
+    }
+  ]
+}
