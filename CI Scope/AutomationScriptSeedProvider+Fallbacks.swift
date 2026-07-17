@@ -242,6 +242,30 @@ extension AutomationScriptSeedProvider {
         )
     }
 
+    static func fallbackSlopReviewSeed() -> AutomationScript {
+        AutomationScript(
+            id: "slop-review",
+            title: "Slop Review",
+            summary: "Advisory local-LLM review of PR diffs for AI-slop; never blocks the merge.",
+            detail: "Installs a workflow calling the shared advisory ci-gates slop reviewer.",
+            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
+            branchName: "ci-scope/install-{{script_id}}",
+            commitMessage: "Add {{script_title}}",
+            pullRequestTitle: "Add {{script_title}}",
+            pullRequestBody: fallbackPullRequestBody,
+            variables: [],
+            files: [
+                AutomationScriptFile(
+                    id: "workflow",
+                    destinationPath: ".github/workflows/{{script_slug}}.yml",
+                    isExecutable: false,
+                    contents: fallbackCallerWorkflow(jobID: "slop-review", gate: "slop-review.yml", withConfig: false)
+                )
+            ],
+            defaultSeedID: "slop-review"
+        )
+    }
+
     static var fallbackPullRequestBody: String {
         """
         Adds {{script_title}} managed by CI Scope.
