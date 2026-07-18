@@ -31,8 +31,27 @@ extension ContentView {
                     }
                 }
             )
+        case .coverage:
+            GateMatrixView(
+                projects: projectStore.projects,
+                gateScripts: gateScripts,
+                installViewModel: scriptInstallViewModel,
+                onInstalled: { project in
+                    Task {
+                        await projectCIViewModel.load(project)
+                    }
+                }
+            )
+            .padding(14)
         case .settings:
             SettingsView(store: settingsStore)
+        }
+    }
+
+    /// The managed gates in canonical order, for the coverage matrix columns.
+    var gateScripts: [AutomationScript] {
+        AutomationScriptSeedProvider.defaultSeedIDs.compactMap { id in
+            scriptStore.scripts.first { $0.defaultSeedID == id }
         }
     }
 
