@@ -330,10 +330,41 @@ def server_heartbeat() -> None:
         "activeJobIds": active_ids,
     }
     try:
-        server_post_json("/api/ci/local/heartbeat", payload)
+        response = server_post_json("/api/ci/local/heartbeat", payload)
         record_backend_status(connected=True, last_error=None)
+        process_pending_reruns(response.get("pendingReruns") or [])
     except Exception as exc:
         record_backend_status(connected=False, last_error=str(exc))
+
+
+def process_pending_reruns(reruns: list) -> None:
+    """Re-run runs the server flagged as infra failures (machine died mid-job,
+    not a real test failure). We ack whether or not gh succeeds: the server
+    already caps how many times a run is offered, so acking on attempt keeps a
+    permanently un-rerunnable run from looping every heartbeat."""
+    attempted = []
+    for item in reruns:
+        slug = item.get("repositorySlug")
+        run_id = item.get("runId")
+        if slug and run_id:
+            rerun_github_run(slug, run_id)
+            attempted.append({"repositorySlug": slug, "runId": run_id})
+    if attempted:
+        try:
+            server_post_json("/api/ci/local/reruns/ack", {"machineId": MACHINE_ID, "reruns": attempted})
+        except Exception as exc:
+            print(f"[ci-scope] rerun ack failed: {exc}", flush=True)
+
+
+def rerun_github_run(slug: str, run_id: object) -> bool:
+    command = ["gh", "run", "rerun", str(run_id), "--repo", str(slug), "--failed"]
+    completed = subprocess.run(command, text=True, capture_output=True, timeout=60)
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip()[:300]
+        print(f"[ci-scope] rerun {slug} #{run_id} failed: {detail}", flush=True)
+        return False
+    print(f"[ci-scope] re-ran {slug} #{run_id} after infra failure", flush=True)
+    return True
 
 
 def server_claim_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
