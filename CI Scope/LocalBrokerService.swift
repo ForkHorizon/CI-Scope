@@ -152,6 +152,21 @@ struct LocalBrokerService {
         try! brokerDirectory.safelyAppendingPathComponent("workflow-runs.json")
     }
 
+    /// Touched by the app while it is open; the broker drains and exits when it
+    /// goes stale. See app_is_active() in the broker script.
+    var appHeartbeatURL: URL {
+        try! brokerDirectory.safelyAppendingPathComponent("app-heartbeat")
+    }
+
+    func writeAppHeartbeat() {
+        try? fileManager.createDirectory(at: brokerDirectory, withIntermediateDirectories: true)
+        try? Date().timeIntervalSince1970.description.write(to: appHeartbeatURL, atomically: true, encoding: .utf8)
+    }
+
+    func clearAppHeartbeat() {
+        try? fileManager.removeItem(at: appHeartbeatURL)
+    }
+
     var logsDirectory: URL {
         try! fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
             .safelyAppendingPathComponent("Logs/CI Scope/Broker", isDirectory: true)
