@@ -11,6 +11,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     localComputerSection
                     githubIntakeSection
+                    gateInstallSection
                     if let message {
                         Text(message)
                             .font(.caption.monospaced())
@@ -93,6 +94,24 @@ struct SettingsView: View {
             Text("Attaching a project auto-creates its repo webhook (if missing) using this secret.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.055))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var gateInstallSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Gate installs", systemImage: "checklist")
+                .font(.callout.weight(.semibold))
+
+            Toggle("Auto-merge gate PRs when checks pass", isOn: $store.autoMergeGatePRs)
+
+            Text(
+                "Enables GitHub auto-merge on PRs this app opens, so gate installs land once their checks pass. Best effort — needs auto-merge allowed on the repo; otherwise the PR stays open for you to merge."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .padding(10)
         .background(Color.secondary.opacity(0.055))
