@@ -10,6 +10,7 @@ struct ProjectCIPanel: View {
     let removalSnapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
     let onAttachToBroker: () -> Void
     let onRemoveScript: (AutomationScript) -> Void
+    @ObservedObject var installViewModel: AutomationScriptInstallViewModel
 
     var body: some View {
         PanelShell(title: "GitHub CI", icon: "point.3.connected.trianglepath.dotted") {
@@ -82,6 +83,16 @@ struct ProjectCIPanel: View {
                             title: "MacBook runner", value: localRunnerSummary, icon: "desktopcomputer",
                             state: snapshot?.localRunner.state ?? .unknown)
                         brokerAccessRow
+                    }
+
+                    HStack {
+                        RecommendedGatesButton(
+                            project: project,
+                            scripts: scripts,
+                            isInstalled: { $0.matchingWorkflow(in: snapshot) != nil },
+                            installViewModel: installViewModel
+                        )
+                        Spacer()
                     }
 
                     if let error = snapshot?.error {

@@ -51,6 +51,36 @@ final class AutomationScriptInstallViewModel: ObservableObject {
         }
     }
 
+    func installBundle(
+        scripts: [AutomationScript],
+        project: CIProject?,
+        mode: AutomationScriptInstallMode,
+        onSuccess: @escaping () -> Void = {}
+    ) {
+        guard !snapshots.values.contains(where: \.isInstalling) else { return }
+        let snapshotKey = bundleKey(project)
+        guard let project else {
+            snapshots[snapshotKey] = .failed(AutomationScriptError.missingProject.localizedDescription)
+            return
+        }
+        guard !scripts.isEmpty else { return }
+
+        snapshots[snapshotKey] = .installingBundle(count: scripts.count)
+        Task {
+            do {
+                let result = try await installer.installBundle(scripts: scripts, project: project, mode: mode)
+                snapshots[snapshotKey] = .succeeded(result)
+                onSuccess()
+            } catch {
+                snapshots[snapshotKey] = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func bundleSnapshot(for project: CIProject) -> AutomationScriptInstallSnapshot {
+        snapshots[bundleKey(project)] ?? .idle
+    }
+
     func remove(
         script: AutomationScript,
         project: CIProject?,
@@ -88,6 +118,10 @@ final class AutomationScriptInstallViewModel: ObservableObject {
 
     private func installKey(_ script: AutomationScript) -> String {
         "install:\(script.id)"
+    }
+
+    private func bundleKey(_ project: CIProject?) -> String {
+        "bundle:\(project?.id ?? "-")"
     }
 
     private func removeKey(_ script: AutomationScript, project: CIProject) -> String {
