@@ -4,6 +4,7 @@ enum AutomationScriptSeedProvider {
     static let defaultSeedIDs = [
         "ai-readability", "swift-quality-gate", "swift-compile-gate",
         "web-quality-gate", "python-quality-gate", "unity-quality-gate",
+        "slop-review",
     ]
 
     static func loadDefaultScripts() throws -> [AutomationScript] {
@@ -27,6 +28,8 @@ enum AutomationScriptSeedProvider {
             return fallbackPythonQualityGateSeed()
         case "unity-quality-gate":
             return fallbackUnityQualityGateSeed()
+        case "slop-review":
+            return fallbackSlopReviewSeed()
         default:
             throw AutomationScriptError.missingSeed(id)
         }
