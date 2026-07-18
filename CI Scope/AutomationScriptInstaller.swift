@@ -130,7 +130,7 @@ struct AutomationScriptInstaller {
         return removalReadyResult(script, pullRequestURL: pullRequestURL)
     }
 
-    private func defaultBranch(for project: CIProject) async throws -> String {
+    func defaultBranch(for project: CIProject) async throws -> String {
         let output = try await run(
             "gh repo view \(quoted(project.repositorySlug)) --json defaultBranchRef --jq '.defaultBranchRef.name'",
             step: "Read default branch"
@@ -142,7 +142,7 @@ struct AutomationScriptInstaller {
         return branch
     }
 
-    private func clone(project: CIProject, defaultBranch: String, into repoURL: URL) async throws {
+    func clone(project: CIProject, defaultBranch: String, into repoURL: URL) async throws {
         _ = try await run(
             "gh repo clone \(quoted(project.repositorySlug)) \(quoted(repoURL.path)) -- --depth 1 --branch \(quoted(defaultBranch))",
             timeout: 180,
@@ -150,12 +150,12 @@ struct AutomationScriptInstaller {
         )
     }
 
-    private func remoteBranchExists(_ branch: String, cwd: URL) async -> Bool {
+    func remoteBranchExists(_ branch: String, cwd: URL) async -> Bool {
         let result = await shell("git ls-remote --exit-code --heads origin \(quoted(branch))", cwd: cwd)
         return result.exitCode == 0
     }
 
-    private func checkoutBranch(_ branch: String, exists: Bool, cwd: URL) async throws {
+    func checkoutBranch(_ branch: String, exists: Bool, cwd: URL) async throws {
         if exists {
             try await checkoutExistingBranch(branch, cwd: cwd)
         } else {
@@ -177,7 +177,7 @@ struct AutomationScriptInstaller {
         )
     }
 
-    private func write(_ files: [AutomationScriptFile], to repoURL: URL) throws {
+    func write(_ files: [AutomationScriptFile], to repoURL: URL) throws {
         for file in files {
             let destinationURL = try repoURL.safelyAppendingPathComponent(file.destinationPath)
             try fileManager.createDirectory(
@@ -188,11 +188,11 @@ struct AutomationScriptInstaller {
         }
     }
 
-    private func stage(_ files: [AutomationScriptFile], cwd: URL) async throws {
+    func stage(_ files: [AutomationScriptFile], cwd: URL) async throws {
         _ = try await run(stageCommand(for: files), cwd: cwd, step: "Stage automation files")
     }
 
-    private func remove(_ files: [AutomationScriptFile], cwd: URL) async throws {
+    func remove(_ files: [AutomationScriptFile], cwd: URL) async throws {
         guard !files.isEmpty else { return }
         _ = try await run(
             "git rm -f --ignore-unmatch -- \(gitPaths(files))",
@@ -209,12 +209,12 @@ struct AutomationScriptInstaller {
         return "set -euo pipefail\n\(chmod)git add -f -- \(paths)\n\(stageExecutable)"
     }
 
-    private func hasStagedChanges(files: [AutomationScriptFile], cwd: URL) async throws -> Bool {
+    func hasStagedChanges(files: [AutomationScriptFile], cwd: URL) async throws -> Bool {
         guard !files.isEmpty else { return false }
         return try await diffHasChanges("git diff --cached --quiet -- \(gitPaths(files))", cwd: cwd, step: "Check staged changes")
     }
 
-    private func obsoleteInstalledFiles(
+    func obsoleteInstalledFiles(
         for script: AutomationScript,
         currentFiles: [AutomationScriptFile],
         cwd: URL
@@ -278,7 +278,7 @@ struct AutomationScriptInstaller {
         )
     }
 
-    private func branchDiffersFromDefault(defaultBranch: String, cwd: URL) async throws -> Bool {
+    func branchDiffersFromDefault(defaultBranch: String, cwd: URL) async throws -> Bool {
         try await diffHasChanges(
             "git diff --quiet \(quoted("refs/remotes/origin/\(defaultBranch)")) HEAD --",
             cwd: cwd,
