@@ -22,6 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.request import urlopen
 
+SERVICE_LABEL = "com.ci-scope.local-mac-broker"
 ORG_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope"]
 ORG_BROKER_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
 PRIVATE_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
@@ -84,11 +85,6 @@ BACKEND_FALLBACK_MAX_SECONDS = max(
 )
 BACKEND_CONNECT_TIMEOUT = max(1, int(os.environ.get("CI_SCOPE_BACKEND_CONNECT_TIMEOUT", "8")))
 BACKEND_SSE_RETRY_SECONDS = max(1, int(os.environ.get("CI_SCOPE_BACKEND_SSE_RETRY_SECONDS", "5")))
-# The broker only runs while the CI Scope app is open. The app touches this
-# heartbeat file every few seconds; an empty path keeps the legacy always-on
-# behaviour (old plist without the env var).
-APP_HEARTBEAT_PATH = os.environ.get("CI_SCOPE_APP_HEARTBEAT_PATH", "")
-APP_HEARTBEAT_STALE_SECONDS = max(5, int(os.environ.get("CI_SCOPE_APP_HEARTBEAT_STALE", "15")))
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
 RETRY_RESET_SECONDS = int(os.environ.get("CI_SCOPE_RETRY_RESET_SECONDS", "300"))
@@ -108,6 +104,12 @@ LOG_DIR = Path.home() / "Library/Logs/CI Scope/Broker"
 WEBHOOK_PORT = int(os.environ.get("CI_SCOPE_WEBHOOK_PORT", "8765"))
 WEBHOOK_PATH = os.environ.get("CI_SCOPE_WEBHOOK_PATH", "/github/workflow-job")
 WEBHOOK_SECRET_PATH = Path(os.environ.get("CI_SCOPE_WEBHOOK_SECRET_PATH", ROOT / "webhook-secret"))
+# PID of the CI Scope.app process that (re)installed this LaunchAgent, if any.
+# Lets the broker notice its owner quit or crashed even when no SIGTERM ever
+# arrives, so it can tear itself down instead of running on as an orphan.
+OWNER_PID = int(os.environ.get("CI_SCOPE_APP_PID", "0") or 0)
+LOG_RETENTION_SECONDS = max(1, int(os.environ.get("CI_SCOPE_LOG_RETENTION_DAYS", "14"))) * 86400
+IDLE_SWEEP_SECONDS = 30
 
 STATE_LOCK = threading.RLock()
 # Guards workflow-runs.json (the dashboard snapshot), kept separate from
@@ -159,22 +161,23 @@ def main() -> int:
     last_backend_snapshot = -BACKEND_SNAPSHOT_SECONDS
     last_server_claim = -5
     last_server_heartbeat = -30
+    last_idle_sweep = -IDLE_SWEEP_SECONDS
+    last_log_prune = -86400.0
     backend_failures = 0
     while True:
+        if not owner_app_alive():
+            shutdown_for_owner_exit()
         try:
             registry = read_registry()
             profiles = enabled_profiles(registry)
             polled = None
             monotonic_now = time.monotonic()
-            if not app_is_active():
-                # App closed: take no new work, keep monitoring so in-flight
-                # jobs finish, then exit once nothing is running. launchd won't
-                # relaunch us (KeepAlive is off); the app kickstarts us again.
-                tick(None, profiles, dispatch_new=False)
-                if not (read_state().get("actives") or []):
-                    return 0
-                time.sleep(SCHEDULER_SECONDS)
-                continue
+            if monotonic_now - last_log_prune >= 86400:
+                prune_old_logs()
+                last_log_prune = monotonic_now
+            idle_sweep_due = monotonic_now - last_idle_sweep >= IDLE_SWEEP_SECONDS
+            if idle_sweep_due:
+                last_idle_sweep = monotonic_now
             if SERVER_MODE and backend_enabled():
                 if monotonic_now - last_server_heartbeat >= 30:
                     server_heartbeat()
@@ -214,7 +217,7 @@ def main() -> int:
             # the lock, runs all gh-api work lock-free, then re-acquires only to
             # publish. Calling it here without the lock keeps the webhook handler
             # responsive while a runner is being dispatched.
-            tick(polled, profiles)
+            tick(polled, profiles, idle_sweep_due)
         except Exception as exc:
             with STATE_LOCK:
                 state = read_state()
@@ -223,6 +226,34 @@ def main() -> int:
                 state["webhook"] = webhook_status(state.get("webhook"))
                 write_state(state)
         time.sleep(SCHEDULER_SECONDS)
+
+
+def owner_app_alive() -> bool:
+    if not OWNER_PID:
+        return True
+    return process_alive(OWNER_PID)
+
+
+def shutdown_for_owner_exit() -> None:
+    # CI_SCOPE_APP_PID died without ever sending us a SIGTERM (force-quit or a
+    # crash), so nothing else will trigger cleanup. Kill every runner this
+    # broker owns, then bootout ourselves so launchd's KeepAlive doesn't just
+    # relaunch a broker with no app left to answer to.
+    terminate_all_runners()
+    subprocess.run(
+        ["launchctl", "bootout", f"gui/{os.getuid()}/{SERVICE_LABEL}"],
+        capture_output=True,
+    )
+    sys.exit(0)
+
+
+def terminate_all_runners() -> None:
+    with STATE_LOCK:
+        actives = list(read_state().get("actives") or [])
+    for active in actives:
+        if active.get("pid"):
+            terminate_active_process(active)
+        remove_runner_dir(active.get("id"))
 
 
 def backend_enabled() -> bool:
@@ -332,9 +363,21 @@ def server_heartbeat() -> None:
     try:
         response = server_post_json("/api/ci/local/heartbeat", payload)
         record_backend_status(connected=True, last_error=None)
+        ping_id = response.get("pendingPingId")
+        if ping_id:
+            ack_ping(ping_id)
         process_pending_reruns(response.get("pendingReruns") or [])
     except Exception as exc:
         record_backend_status(connected=False, last_error=str(exc))
+
+
+def ack_ping(ping_id: str) -> None:
+    # Answers the admin dashboard's "Test task" button: proof the broker is
+    # alive and this heartbeat round-trip actually reaches the server.
+    try:
+        server_post_json(f"/api/ci/local/ping/{urllib.parse.quote(ping_id, safe='')}/ack", {"machineId": MACHINE_ID})
+    except Exception:
+        pass
 
 
 def process_pending_reruns(reruns: list) -> None:
@@ -607,20 +650,7 @@ def backend_status(
     return status
 
 
-def app_is_active() -> bool:
-    """Whether the CI Scope app is currently open. The app touches its heartbeat
-    file every few seconds; when it quits, crashes, or the Mac sleeps the file
-    goes stale (or is deleted on a clean quit) and the broker drains and exits.
-    An empty heartbeat path means the feature is off — keep running as before."""
-    if not APP_HEARTBEAT_PATH:
-        return True
-    try:
-        return (time.time() - os.path.getmtime(APP_HEARTBEAT_PATH)) <= APP_HEARTBEAT_STALE_SECONDS
-    except OSError:
-        return False
-
-
-def tick(polled: tuple | None, profiles: list[dict], dispatch_new: bool = True) -> dict:
+def tick(polled: tuple | None, profiles: list[dict], idle_sweep_due: bool = True) -> dict:
     # Snapshot the bits we need under the lock, then release it for every
     # gh-api call below. tick used to run entirely inside STATE_LOCK, but its
     # subprocess calls (runner-registration cleanup, JIT config generation,
@@ -647,6 +677,7 @@ def tick(polled: tuple | None, profiles: list[dict], dispatch_new: bool = True) 
             if active_timed_out(active):
                 terminate_active_process(active)
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+                remove_runner_dir(active.get("id"))
                 retries = update_retry(active, retries)
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
                 removed_ids.add(active.get("id"))
@@ -657,16 +688,25 @@ def tick(polled: tuple | None, profiles: list[dict], dispatch_new: bool = True) 
                 # actually finishing. Releasing lets it be retried through the
                 # normal retry-limited claim flow.
                 server_post_status(active, "released", last_error)
-            elif polled is not None and active_idle_too_long(active) and runner_is_idle(active):
+            elif (
+                (polled is not None or idle_sweep_due)
+                and active_idle_too_long(active)
+                and runner_is_idle(active)
+            ):
                 # The runner connected but GitHub never handed it a job (its job
                 # was already serviced by another runner). Reap it now instead of
-                # squatting a slot until the watchdog fires. Bump the retry so a
-                # job that keeps producing idle runners (nothing ever picks it
-                # up) is eventually backed off instead of churning
-                # dispatch->idle->reap forever; for an already-done job the id
-                # never returns and prune_retries drops the counter.
+                # squatting a slot until the watchdog fires. idle_sweep_due keeps
+                # this check alive even when `polled` stays None every tick (e.g.
+                # server mode with no free capacity) — otherwise a stuck runner
+                # would occupy the only slot for the full MAX_ACTIVE_SECONDS
+                # instead of IDLE_RUNNER_SECONDS. Bump the retry so a job that
+                # keeps producing idle runners (nothing ever picks it up) is
+                # eventually backed off instead of churning dispatch->idle->reap
+                # forever; for an already-done job the id never returns and
+                # prune_retries drops the counter.
                 terminate_active_process(active)
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+                remove_runner_dir(active.get("id"))
                 retries = update_retry(active, retries)
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
                 removed_ids.add(active.get("id"))
@@ -698,8 +738,7 @@ def tick(polled: tuple | None, profiles: list[dict], dispatch_new: bool = True) 
     work_queue = [job for job in work_queue if job.get("id") not in surviving_ids]
 
     heavy_running = sum(1 for active in surviving if job_is_heavy(active))
-    # While draining (app closed) we finish in-flight jobs but start no new ones.
-    dispatchable = [job for job in work_queue if retries.get(job["id"], 0) < MAX_RETRIES] if dispatch_new else []
+    dispatchable = [job for job in work_queue if retries.get(job["id"], 0) < MAX_RETRIES]
     working_actives = list(surviving)
     dispatched_actives = []
     dispatched = False
@@ -810,18 +849,21 @@ def active_is_running(active: dict) -> bool:
 
 
 def terminate_active_process(active: dict) -> None:
+    # active_is_running (checked by every caller, moments earlier in the same
+    # tick) already confirmed a live process owns this pid — via ACTIVE_PROCESSES
+    # if we started it, or via process_alive(pid) if it's a runner restored from
+    # state after a broker restart. Either way it's safe to signal by pid: we
+    # always start runners with start_new_session=True, so pid == its own
+    # process group leader, and the alive-check just ran. Restored actives used
+    # to be left untouched here, which meant a genuinely stuck runner could
+    # never actually be stopped once the broker restarted — it just silently
+    # dropped off the dashboard while continuing to run and hold its job
+    # directory open.
     pid = active.get("pid")
     if not pid:
         return
 
     process = ACTIVE_PROCESSES.get(pid)
-    if process is None:
-        # Not a runner this broker instance started (e.g. an active restored
-        # from state after a restart). The OS may have recycled the pid, so
-        # killing it could hit an unrelated process group. Leave it — the
-        # caller still deregisters our runner on GitHub by name, and the old
-        # ephemeral runner exits on its own.
-        return
     try:
         os.killpg(pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -838,6 +880,10 @@ def terminate_active_process(active: dict) -> None:
             return
         except subprocess.TimeoutExpired:
             pass
+    else:
+        time.sleep(5)
+        if not process_alive(pid):
+            return
 
     time.sleep(1)
     if not process_alive(pid):
@@ -849,6 +895,11 @@ def terminate_active_process(active: dict) -> None:
             os.kill(pid, signal.SIGKILL)
         except OSError:
             return
+    if process is not None:
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            pass
 
 
 def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
@@ -1822,6 +1873,39 @@ def ensure_dirs() -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
     JOBS_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+    prune_orphan_job_dirs()
+    prune_old_logs()
+
+
+def prune_old_logs() -> None:
+    # Every dispatched job writes its own {job-id}.log to LOG_DIR and nothing
+    # ever removed them (490+ files/1.9MB observed going back to May). Bounded
+    # by age rather than count since a single verbose job can dwarf a hundred
+    # quiet ones.
+    cutoff = time.time() - LOG_RETENTION_SECONDS
+    for path in LOG_DIR.glob("*.log"):
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+        except OSError:
+            continue
+
+
+def prune_orphan_job_dirs() -> None:
+    # Each dispatched job clones a ~430MB runner template into JOBS_DIR
+    # (prepare_runner_dir) and is normally removed by remove_runner_dir when it
+    # finishes, times out, or is idle-reaped. A crash between cloning the dir
+    # and persisting the active to state — or a bug in one of those cleanup
+    # paths — can still strand one. Run only at startup: mid-run, a dir with no
+    # matching active could belong to a runner this same process just dispatched
+    # a moment ago, before tick() got a chance to publish it.
+    if not JOBS_DIR.exists():
+        return
+    with STATE_LOCK:
+        keep = {safe_name(active["id"]) for active in (read_state().get("actives") or []) if active.get("id")}
+    for entry in JOBS_DIR.iterdir():
+        if entry.is_dir() and entry.name not in keep:
+            shutil.rmtree(entry, ignore_errors=True)
 
 
 def ensure_webhook_secret() -> str:
@@ -1833,6 +1917,11 @@ def ensure_webhook_secret() -> str:
 
 
 def shutdown(*_) -> None:
+    # Runs on SIGTERM (launchctl bootout — from the Settings restart button or
+    # the app's own quit handler). Without this, every deliberate broker
+    # restart orphaned any in-flight runner: it kept running, untracked, and
+    # its job directory was never freed.
+    terminate_all_runners()
     sys.exit(0)
 
 
