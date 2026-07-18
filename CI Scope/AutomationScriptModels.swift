@@ -115,6 +115,16 @@ struct AutomationScriptInstallSnapshot: Equatable {
         )
     }
 
+    static func installingBundle(count: Int) -> AutomationScriptInstallSnapshot {
+        AutomationScriptInstallSnapshot(
+            state: .warning,
+            title: "Installing \(count) gate\(count == 1 ? "" : "s")",
+            detail: "Rendering the recommended gates into one pull request.",
+            isInstalling: true,
+            pullRequestURL: nil
+        )
+    }
+
     static func removing(_ script: AutomationScript) -> AutomationScriptInstallSnapshot {
         AutomationScriptInstallSnapshot(
             state: .warning,

@@ -56,7 +56,8 @@ extension ContentView {
                         scriptInstallViewModel.remove(script: script, project: selectedProject) {
                             refreshSelectedProject()
                         }
-                    }
+                    },
+                    installViewModel: scriptInstallViewModel
                 )
                 .frame(minHeight: 260, maxHeight: .infinity)
             }
