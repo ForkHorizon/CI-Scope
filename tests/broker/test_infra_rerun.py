@@ -55,7 +55,11 @@ class InfraRerunTests(unittest.TestCase):
     def test_skips_malformed_entries(self):
         gh_calls = []
         with (
-            patch.object(self.broker.subprocess, "run", lambda command, **_k: gh_calls.append(command) or SimpleNamespace(returncode=0, stdout="", stderr="")),
+            patch.object(
+                self.broker.subprocess,
+                "run",
+                lambda command, **_k: gh_calls.append(command) or SimpleNamespace(returncode=0, stdout="", stderr=""),
+            ),
             patch.object(self.broker, "server_post_json", lambda path, payload: {}),
         ):
             self.broker.process_pending_reruns([{"repositorySlug": "a/b"}, {"runId": 5}, {}])
