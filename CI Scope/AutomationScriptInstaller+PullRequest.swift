@@ -78,7 +78,22 @@ extension AutomationScriptInstaller {
             timeout: 60,
             step: "Create automation script pull request"
         )
-        return URL(string: output.trimmed)
+        let pullRequestURL = URL(string: output.trimmed)
+        await enableAutoMergeIfConfigured(project: project, pullRequestURL: pullRequestURL)
+        return pullRequestURL
+    }
+
+    /// Best effort: turns on GitHub auto-merge when the user opted in. Never
+    /// throws — a repo that doesn't allow auto-merge just leaves the PR open.
+    private func enableAutoMergeIfConfigured(project: CIProject, pullRequestURL: URL?) async {
+        guard
+            UserDefaults.standard.bool(forKey: CIQueueSettingsStore.autoMergeDefaultsKey),
+            let pullRequestURL
+        else { return }
+        _ = await shell(
+            "gh pr merge --auto --squash --repo \(quoted(project.repositorySlug)) \(quoted(pullRequestURL.absoluteString))",
+            timeout: 30
+        )
     }
 
     func alreadyInstalledResult(_ script: AutomationScript, defaultBranch: String) -> AutomationScriptInstallResult {
