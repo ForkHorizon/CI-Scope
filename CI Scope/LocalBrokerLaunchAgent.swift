@@ -143,9 +143,12 @@ extension LocalBrokerService {
             <string>\(executableURL.path)</string>
           </array>
           <key>RunAtLoad</key>
-          <true/>
+          <false/>
           <key>KeepAlive</key>
-          <true/>
+          <dict>
+            <key>SuccessfulExit</key>
+            <false/>
+          </dict>
           <key>EnvironmentVariables</key>
           <dict>
             <key>PATH</key>
@@ -156,6 +159,8 @@ extension LocalBrokerService {
             <string>\(secretURL.path)</string>
             <key>CI_SCOPE_WEBHOOK_PATH</key>
             <string>\(LocalBrokerConstants.webhookPath)</string>
+            <key>CI_SCOPE_APP_HEARTBEAT_PATH</key>
+            <string>\(appHeartbeatURL.path)</string>
             \(backendEnvironmentPlistEntries())
           </dict>
           <key>StandardOutPath</key>
