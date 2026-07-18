@@ -42,6 +42,9 @@ final class CIQueueSettingsStore: ObservableObject {
             persist()
         }
     }
+    @Published var autoMergeGatePRs = false { didSet { persist() } }
+
+    static let autoMergeDefaultsKey = "ciScope.queue.autoMergeGatePRs"
 
     private let defaults: UserDefaults
 
@@ -56,6 +59,7 @@ final class CIQueueSettingsStore: ObservableObject {
         machineName = snapshot.machineName
         labelsText = snapshot.labelsText
         capacity = snapshot.capacity
+        autoMergeGatePRs = defaults.bool(forKey: Self.autoMergeDefaultsKey)
         persist()
     }
 
@@ -122,6 +126,7 @@ final class CIQueueSettingsStore: ObservableObject {
         defaults.set(machineName, forKey: "ciScope.queue.machineName")
         defaults.set(labelsText, forKey: "ciScope.queue.labelsText")
         defaults.set(capacity, forKey: "ciScope.queue.capacity")
+        defaults.set(autoMergeGatePRs, forKey: Self.autoMergeDefaultsKey)
     }
 
     private func persistSecrets() {
