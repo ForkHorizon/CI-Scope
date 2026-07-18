@@ -84,6 +84,11 @@ BACKEND_FALLBACK_MAX_SECONDS = max(
 )
 BACKEND_CONNECT_TIMEOUT = max(1, int(os.environ.get("CI_SCOPE_BACKEND_CONNECT_TIMEOUT", "8")))
 BACKEND_SSE_RETRY_SECONDS = max(1, int(os.environ.get("CI_SCOPE_BACKEND_SSE_RETRY_SECONDS", "5")))
+# The broker only runs while the CI Scope app is open. The app touches this
+# heartbeat file every few seconds; an empty path keeps the legacy always-on
+# behaviour (old plist without the env var).
+APP_HEARTBEAT_PATH = os.environ.get("CI_SCOPE_APP_HEARTBEAT_PATH", "")
+APP_HEARTBEAT_STALE_SECONDS = max(5, int(os.environ.get("CI_SCOPE_APP_HEARTBEAT_STALE", "15")))
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
 RETRY_RESET_SECONDS = int(os.environ.get("CI_SCOPE_RETRY_RESET_SECONDS", "300"))
@@ -161,6 +166,15 @@ def main() -> int:
             profiles = enabled_profiles(registry)
             polled = None
             monotonic_now = time.monotonic()
+            if not app_is_active():
+                # App closed: take no new work, keep monitoring so in-flight
+                # jobs finish, then exit once nothing is running. launchd won't
+                # relaunch us (KeepAlive is off); the app kickstarts us again.
+                tick(None, profiles, dispatch_new=False)
+                if not (read_state().get("actives") or []):
+                    return 0
+                time.sleep(SCHEDULER_SECONDS)
+                continue
             if SERVER_MODE and backend_enabled():
                 if monotonic_now - last_server_heartbeat >= 30:
                     server_heartbeat()
@@ -562,7 +576,20 @@ def backend_status(
     return status
 
 
-def tick(polled: tuple | None, profiles: list[dict]) -> dict:
+def app_is_active() -> bool:
+    """Whether the CI Scope app is currently open. The app touches its heartbeat
+    file every few seconds; when it quits, crashes, or the Mac sleeps the file
+    goes stale (or is deleted on a clean quit) and the broker drains and exits.
+    An empty heartbeat path means the feature is off — keep running as before."""
+    if not APP_HEARTBEAT_PATH:
+        return True
+    try:
+        return (time.time() - os.path.getmtime(APP_HEARTBEAT_PATH)) <= APP_HEARTBEAT_STALE_SECONDS
+    except OSError:
+        return False
+
+
+def tick(polled: tuple | None, profiles: list[dict], dispatch_new: bool = True) -> dict:
     # Snapshot the bits we need under the lock, then release it for every
     # gh-api call below. tick used to run entirely inside STATE_LOCK, but its
     # subprocess calls (runner-registration cleanup, JIT config generation,
@@ -640,7 +667,8 @@ def tick(polled: tuple | None, profiles: list[dict]) -> dict:
     work_queue = [job for job in work_queue if job.get("id") not in surviving_ids]
 
     heavy_running = sum(1 for active in surviving if job_is_heavy(active))
-    dispatchable = [job for job in work_queue if retries.get(job["id"], 0) < MAX_RETRIES]
+    # While draining (app closed) we finish in-flight jobs but start no new ones.
+    dispatchable = [job for job in work_queue if retries.get(job["id"], 0) < MAX_RETRIES] if dispatch_new else []
     working_actives = list(surviving)
     dispatched_actives = []
     dispatched = False
