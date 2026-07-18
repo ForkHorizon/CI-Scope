@@ -36,6 +36,16 @@ extension LocalBrokerService {
         return executableURL.path
     }
 
+    /// Tears the broker down at app quit: the broker's own SIGTERM handler
+    /// kills any in-flight runner and frees its job directory, then this
+    /// unloads the LaunchAgent so nothing is left running once the app is
+    /// gone. Best-effort with a short timeout — quitting shouldn't hang on it.
+    /// The broker's own owner-pid watchdog (CI_SCOPE_APP_PID) covers a crash
+    /// or force-quit that never reaches this call at all.
+    func uninstallLaunchAgent() async {
+        _ = await ShellClient.run(bootoutCommand, timeout: 8, config: config)
+    }
+
     private func stopStandaloneRunnerLaunchAgents() async {
         let uid = geteuid()
         for runnerConfig in config.actionsRunners {
@@ -143,12 +153,9 @@ extension LocalBrokerService {
             <string>\(executableURL.path)</string>
           </array>
           <key>RunAtLoad</key>
-          <false/>
+          <true/>
           <key>KeepAlive</key>
-          <dict>
-            <key>SuccessfulExit</key>
-            <false/>
-          </dict>
+          <true/>
           <key>EnvironmentVariables</key>
           <dict>
             <key>PATH</key>
@@ -159,8 +166,8 @@ extension LocalBrokerService {
             <string>\(secretURL.path)</string>
             <key>CI_SCOPE_WEBHOOK_PATH</key>
             <string>\(LocalBrokerConstants.webhookPath)</string>
-            <key>CI_SCOPE_APP_HEARTBEAT_PATH</key>
-            <string>\(appHeartbeatURL.path)</string>
+            <key>CI_SCOPE_APP_PID</key>
+            <string>\(ProcessInfo.processInfo.processIdentifier)</string>
             \(backendEnvironmentPlistEntries())
           </dict>
           <key>StandardOutPath</key>
