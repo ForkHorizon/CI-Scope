@@ -22,14 +22,14 @@ final class ProjectCIViewModel: ObservableObject {
         snapshots[projectID]
     }
 
-    func load(_ project: CIProject) async {
+    func load(_ project: CIProject, forceRefresh: Bool = false) async {
         invalidatedProjectIDs.remove(project.id)
         loadingProjectID = project.id
         let generation = (loadGeneration[project.id] ?? 0) + 1
         loadGeneration[project.id] = generation
         let brokerSeqAtStart = brokerWriteSeq[project.id] ?? 0
 
-        var snapshot = await service.loadSnapshot(for: project)
+        var snapshot = await service.loadSnapshot(for: project, forceRefresh: forceRefresh)
         guard !invalidatedProjectIDs.contains(project.id),
             loadGeneration[project.id] == generation
         else { return }

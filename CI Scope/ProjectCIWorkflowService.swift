@@ -36,6 +36,12 @@ private final class ProjectCIResponseCache {
         }
     }
 
+    func invalidateWorkflows(slug: String) {
+        locked {
+            workflows[slug.lowercased()] = nil
+        }
+    }
+
     func cachedRuns(slug: String, maxAge: TimeInterval) -> LoadResponse<[GitHubRun]>? {
         locked {
             guard let cached = runs[slug.lowercased()],
@@ -59,6 +65,13 @@ private final class ProjectCIResponseCache {
 }
 
 extension ProjectCIService {
+    /// Drops the cached `gh workflow list` result for a repo so the next load
+    /// sees a just-installed/removed workflow instead of a stale pre-change
+    /// snapshot (cache TTL is 900s, longer than anyone will wait after an install).
+    static func invalidateWorkflowsCache(forRepositorySlug slug: String) {
+        ProjectCIResponseCache.shared.invalidateWorkflows(slug: slug)
+    }
+
     func loadAuthStatus() async -> GitHubAuthSnapshot {
         if let cached = ProjectCIResponseCache.shared.cachedAuth(maxAge: 900) {
             return cached
@@ -89,8 +102,8 @@ extension ProjectCIService {
         return snapshot
     }
 
-    func loadWorkflows(for project: CIProject) async -> LoadResponse<[GitHubWorkflow]> {
-        if let cached = ProjectCIResponseCache.shared.cachedWorkflows(slug: project.repositorySlug, maxAge: 900) {
+    func loadWorkflows(for project: CIProject, forceRefresh: Bool = false) async -> LoadResponse<[GitHubWorkflow]> {
+        if !forceRefresh, let cached = ProjectCIResponseCache.shared.cachedWorkflows(slug: project.repositorySlug, maxAge: 900) {
             return cached
         }
         if await GitHubRateLimitGate.shared.isPaused() {
