@@ -2,7 +2,7 @@
   "branchName": "ci-scope/install-{{script_id}}",
   "commitMessage": "Add {{script_title}}",
   "defaultSeedID": "go-quality-gate",
-  "detail": "Installs a thin GitHub Actions workflow that calls the shared Go gate in ForkHorizon/ci-gates: go vet, staticcheck/golangci-lint, and go test ./....",
+  "detail": "Installs a thin GitHub Actions workflow that calls the shared Go gate in ForkHorizon/ci-gates: go vet, gofmt, and golangci-lint. Test execution stays with the repo's own CI.",
   "files": [
     {
       "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: go-quality-gate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  go-quality-gate:\n    uses: ForkHorizon/ci-gates/.github/workflows/go-quality.yml@main\n    with:\n      runs-on: '{{runner_labels_json}}'\n",
@@ -12,7 +12,7 @@
     }
   ],
   "id": "go-quality-gate",
-  "pullRequestBody": "Adds {{script_title}} managed by CI Scope.\n\nThis PR adds:\n- `.github/workflows/{{script_slug}}.yml`\n\nThe workflow calls the shared gate in `ForkHorizon/ci-gates`, so gate logic updates roll out from that repository automatically. It runs `go vet`, `staticcheck`/`golangci-lint`, and `go test ./...`.",
+  "pullRequestBody": "Adds {{script_title}} managed by CI Scope.\n\nThis PR adds:\n- `.github/workflows/{{script_slug}}.yml`\n\nThe workflow calls the shared gate in `ForkHorizon/ci-gates`, so gate logic updates roll out from that repository automatically. It runs `go vet`, `gofmt`, and `golangci-lint`. Test execution stays with the repo's own CI.",
   "pullRequestTitle": "Add {{script_title}}",
   "runnerLabels": [
     "self-hosted",
@@ -20,7 +20,7 @@
     "ARM64",
     "ci-scope"
   ],
-  "summary": "Runs go vet, staticcheck/golangci-lint, and go test ./....",
+  "summary": "Runs go vet, gofmt, and golangci-lint.",
   "title": "Go Quality Gate",
   "variables": []
 }

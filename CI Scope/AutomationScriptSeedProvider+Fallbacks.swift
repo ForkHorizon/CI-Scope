@@ -246,8 +246,8 @@ extension AutomationScriptSeedProvider {
         AutomationScript(
             id: "go-quality-gate",
             title: "Go Quality Gate",
-            summary: "Runs go vet, staticcheck/golangci-lint, and go test ./....",
-            detail: "Installs a workflow calling the shared ci-gates Go gate: vet, lint, and tests.",
+            summary: "Runs go vet, gofmt, and golangci-lint.",
+            detail: "Installs a workflow calling the shared ci-gates Go gate: vet, format, and lint. Test execution stays with the repo's own CI.",
             runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
