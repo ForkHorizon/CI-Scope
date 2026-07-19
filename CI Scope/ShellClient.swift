@@ -41,7 +41,11 @@ enum ShellClient {
                 continuation.resume(returning: ShellResult(exitCode: process.terminationStatus, output: sanitizedOutput))
             }
         }
-        let durationMs = Int(Date().timeIntervalSince(start) * 1000)
+        logResult(loggedCommand, result, durationMs: Int(Date().timeIntervalSince(start) * 1000))
+        return result
+    }
+
+    private static func logResult(_ loggedCommand: String, _ result: ShellResult, durationMs: Int) {
         if result.exitCode == 0 {
             AppLogger.shared.debug(
                 "shell.run", "\(loggedCommand) -> exit 0",
@@ -56,7 +60,6 @@ enum ShellClient {
                 ]
             )
         }
-        return result
     }
 
     /// Best-effort masking so a logged command line never carries a live

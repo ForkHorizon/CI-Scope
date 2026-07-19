@@ -60,10 +60,6 @@ final class AppLogger {
         log(.warn, event: event, message, context: context)
     }
 
-    func error(_ event: String, _ message: String, context: [String: Any] = [:]) {
-        log(.error, event: event, message, context: context)
-    }
-
     /// Synchronous by design: called from the uncaught-exception handler,
     /// which may have only moments before the process dies.
     func crash(_ event: String, _ message: String, context: [String: Any] = [:]) {
