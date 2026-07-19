@@ -13,7 +13,9 @@ enum ShellClient {
         timeout: TimeInterval = 20,
         config: DashboardConfig
     ) async -> ShellResult {
-        await withCheckedContinuation { continuation in
+        let loggedCommand = redactSecrets(command)
+        let start = Date()
+        let result: ShellResult = await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
                 let process = configuredProcess(
                     command: command,
@@ -39,6 +41,37 @@ enum ShellClient {
                 continuation.resume(returning: ShellResult(exitCode: process.terminationStatus, output: sanitizedOutput))
             }
         }
+        let durationMs = Int(Date().timeIntervalSince(start) * 1000)
+        if result.exitCode == 0 {
+            AppLogger.shared.debug(
+                "shell.run", "\(loggedCommand) -> exit 0",
+                context: ["command": loggedCommand, "exitCode": 0, "durationMs": durationMs]
+            )
+        } else {
+            AppLogger.shared.warn(
+                "shell.run_failed", "\(loggedCommand) -> exit \(result.exitCode)",
+                context: [
+                    "command": loggedCommand, "exitCode": result.exitCode, "durationMs": durationMs,
+                    "output": String(result.output.prefix(2000)),
+                ]
+            )
+        }
+        return result
+    }
+
+    /// Best-effort masking so a logged command line never carries a live
+    /// token/secret — commands often embed `Authorization: Bearer …` or
+    /// `-H "..."` auth headers passed straight to gh/curl.
+    private static func redactSecrets(_ command: String) -> String {
+        var redacted = command
+        for pattern in [
+            "(Bearer\\s+)[A-Za-z0-9._-]+",
+            "(ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9]+",
+            "([Tt]oken[\"'=:\\s]+)[A-Za-z0-9._-]{8,}",
+        ] {
+            redacted = redacted.replacingOccurrences(of: pattern, with: "$1<redacted>", options: .regularExpression)
+        }
+        return redacted
     }
 
     private static func sanitizeOutput(_ output: String) -> String {
