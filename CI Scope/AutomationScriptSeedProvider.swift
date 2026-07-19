@@ -3,8 +3,8 @@ import Foundation
 enum AutomationScriptSeedProvider {
     static let defaultSeedIDs = [
         "ai-readability", "swift-quality-gate", "swift-compile-gate",
-        "web-quality-gate", "python-quality-gate", "unity-quality-gate",
-        "slop-review",
+        "web-quality-gate", "python-quality-gate", "go-quality-gate",
+        "unity-quality-gate", "slop-review",
     ]
 
     static func loadDefaultScripts() throws -> [AutomationScript] {
@@ -26,6 +26,8 @@ enum AutomationScriptSeedProvider {
             return fallbackWebQualityGateSeed()
         case "python-quality-gate":
             return fallbackPythonQualityGateSeed()
+        case "go-quality-gate":
+            return fallbackGoQualityGateSeed()
         case "unity-quality-gate":
             return fallbackUnityQualityGateSeed()
         case "slop-review":

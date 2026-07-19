@@ -242,6 +242,30 @@ extension AutomationScriptSeedProvider {
         )
     }
 
+    static func fallbackGoQualityGateSeed() -> AutomationScript {
+        AutomationScript(
+            id: "go-quality-gate",
+            title: "Go Quality Gate",
+            summary: "Runs go vet, staticcheck/golangci-lint, and go test ./....",
+            detail: "Installs a workflow calling the shared ci-gates Go gate: vet, lint, and tests.",
+            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
+            branchName: "ci-scope/install-{{script_id}}",
+            commitMessage: "Add {{script_title}}",
+            pullRequestTitle: "Add {{script_title}}",
+            pullRequestBody: fallbackPullRequestBody,
+            variables: [],
+            files: [
+                AutomationScriptFile(
+                    id: "workflow",
+                    destinationPath: ".github/workflows/{{script_slug}}.yml",
+                    isExecutable: false,
+                    contents: fallbackCallerWorkflow(jobID: "go-quality-gate", gate: "go-quality.yml", withConfig: false)
+                )
+            ],
+            defaultSeedID: "go-quality-gate"
+        )
+    }
+
     static func fallbackSlopReviewSeed() -> AutomationScript {
         AutomationScript(
             id: "slop-review",
