@@ -136,6 +136,7 @@ struct GateMatrixView: View {
         case "swift-quality-gate": "Quality"
         case "web-quality-gate": "Web"
         case "python-quality-gate": "Python"
+        case "go-quality-gate": "Go"
         case "unity-quality-gate": "Unity"
         case "slop-review": "Slop"
         default: String(script.title.prefix(7))

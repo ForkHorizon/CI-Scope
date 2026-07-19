@@ -168,101 +168,86 @@ extension AutomationScriptSeedProvider {
         """
     }
 
-    static func fallbackWebQualityGateSeed() -> AutomationScript {
+    /// Shared shape for gates that are just one caller workflow file plus the generic PR body.
+    static func fallbackSimpleGateSeed(
+        id: String,
+        title: String,
+        summary: String,
+        detail: String,
+        gate: String,
+        withConfig: Bool = false
+    ) -> AutomationScript {
         AutomationScript(
+            id: id,
+            title: title,
+            summary: summary,
+            detail: detail,
+            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
+            branchName: "ci-scope/install-{{script_id}}",
+            commitMessage: "Add {{script_title}}",
+            pullRequestTitle: "Add {{script_title}}",
+            pullRequestBody: fallbackPullRequestBody,
+            variables: [],
+            files: [
+                AutomationScriptFile(
+                    id: "workflow",
+                    destinationPath: ".github/workflows/{{script_slug}}.yml",
+                    isExecutable: false,
+                    contents: fallbackCallerWorkflow(jobID: id, gate: gate, withConfig: withConfig)
+                )
+            ],
+            defaultSeedID: id
+        )
+    }
+
+    static func fallbackWebQualityGateSeed() -> AutomationScript {
+        fallbackSimpleGateSeed(
             id: "web-quality-gate",
             title: "Web Quality Gate",
             summary: "Typechecks TS/JS and blocks dead code, unused dependencies, and copy-paste.",
             detail: "Installs a workflow calling the shared ci-gates web gate: tsc, ESLint, knip, jscpd.",
-            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
-            branchName: "ci-scope/install-{{script_id}}",
-            commitMessage: "Add {{script_title}}",
-            pullRequestTitle: "Add {{script_title}}",
-            pullRequestBody: fallbackPullRequestBody,
-            variables: [],
-            files: [
-                AutomationScriptFile(
-                    id: "workflow",
-                    destinationPath: ".github/workflows/{{script_slug}}.yml",
-                    isExecutable: false,
-                    contents: fallbackCallerWorkflow(jobID: "web-quality-gate", gate: "web-quality.yml", withConfig: false)
-                )
-            ],
-            defaultSeedID: "web-quality-gate"
+            gate: "web-quality.yml"
         )
     }
 
     static func fallbackUnityQualityGateSeed() -> AutomationScript {
-        AutomationScript(
+        fallbackSimpleGateSeed(
             id: "unity-quality-gate",
             title: "Unity Quality Gate",
             summary: "Compiles Unity C# with analyzers and blocks warnings and copy-paste in first-party code.",
-            detail: "Installs a workflow calling the shared ci-gates Unity gate: dotnet build with Unity analyzers, jscpd.",
-            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
-            branchName: "ci-scope/install-{{script_id}}",
-            commitMessage: "Add {{script_title}}",
-            pullRequestTitle: "Add {{script_title}}",
-            pullRequestBody: fallbackPullRequestBody,
-            variables: [],
-            files: [
-                AutomationScriptFile(
-                    id: "workflow",
-                    destinationPath: ".github/workflows/{{script_slug}}.yml",
-                    isExecutable: false,
-                    contents: fallbackCallerWorkflow(
-                        jobID: "unity-quality-gate", gate: "unity-quality.yml", withConfig: true)
-                )
-            ],
-            defaultSeedID: "unity-quality-gate"
+            detail: "Installs a workflow calling the shared ci-gates Unity gate: dotnet build with analyzers, jscpd.",
+            gate: "unity-quality.yml",
+            withConfig: true
         )
     }
 
     static func fallbackPythonQualityGateSeed() -> AutomationScript {
-        AutomationScript(
+        fallbackSimpleGateSeed(
             id: "python-quality-gate",
             title: "Python Quality Gate",
             summary: "Runs ruff lint and format checks with a strict anti-slop fallback config.",
             detail: "Installs a workflow calling the shared ci-gates Python gate: ruff check and format.",
-            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
-            branchName: "ci-scope/install-{{script_id}}",
-            commitMessage: "Add {{script_title}}",
-            pullRequestTitle: "Add {{script_title}}",
-            pullRequestBody: fallbackPullRequestBody,
-            variables: [],
-            files: [
-                AutomationScriptFile(
-                    id: "workflow",
-                    destinationPath: ".github/workflows/{{script_slug}}.yml",
-                    isExecutable: false,
-                    contents: fallbackCallerWorkflow(
-                        jobID: "python-quality-gate", gate: "python-quality.yml", withConfig: false)
-                )
-            ],
-            defaultSeedID: "python-quality-gate"
+            gate: "python-quality.yml"
+        )
+    }
+
+    static func fallbackGoQualityGateSeed() -> AutomationScript {
+        fallbackSimpleGateSeed(
+            id: "go-quality-gate",
+            title: "Go Quality Gate",
+            summary: "Runs go vet, gofmt, and golangci-lint.",
+            detail: "Installs a workflow calling the shared ci-gates Go gate: vet, format, lint (no go test).",
+            gate: "go-quality.yml"
         )
     }
 
     static func fallbackSlopReviewSeed() -> AutomationScript {
-        AutomationScript(
+        fallbackSimpleGateSeed(
             id: "slop-review",
             title: "Slop Review",
             summary: "Advisory local-LLM review of PR diffs for AI-slop; never blocks the merge.",
             detail: "Installs a workflow calling the shared advisory ci-gates slop reviewer.",
-            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
-            branchName: "ci-scope/install-{{script_id}}",
-            commitMessage: "Add {{script_title}}",
-            pullRequestTitle: "Add {{script_title}}",
-            pullRequestBody: fallbackPullRequestBody,
-            variables: [],
-            files: [
-                AutomationScriptFile(
-                    id: "workflow",
-                    destinationPath: ".github/workflows/{{script_slug}}.yml",
-                    isExecutable: false,
-                    contents: fallbackCallerWorkflow(jobID: "slop-review", gate: "slop-review.yml", withConfig: false)
-                )
-            ],
-            defaultSeedID: "slop-review"
+            gate: "slop-review.yml"
         )
     }
 
