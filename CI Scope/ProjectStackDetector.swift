@@ -20,12 +20,17 @@ struct ProjectStackDetector {
             ids.insert("swift-compile-gate")
             ids.insert("swift-quality-gate")
         }
+        // Language stats count bytes anywhere in the repo (e.g. a JS subfolder in a
+        // Go backend), which isn't what the gate needs — it runs npm at repo root.
         // A Unity project is also C#/JS-heavy; don't also recommend the web gate.
-        if !isUnity, !languages.isDisjoint(with: ["typescript", "javascript"]) {
+        if !isUnity, await hasRootPackageJSON(project) {
             ids.insert("web-quality-gate")
         }
         if languages.contains("python") {
             ids.insert("python-quality-gate")
+        }
+        if languages.contains("go") {
+            ids.insert("go-quality-gate")
         }
         return ordered(ids)
     }
@@ -43,6 +48,15 @@ struct ProjectStackDetector {
     private func hasUnityMarker(_ project: CIProject) async -> Bool {
         let result = await ShellClient.run(
             "gh api repos/\(quoted(project.repositorySlug))/contents/ProjectSettings/ProjectVersion.txt --jq '.name'",
+            timeout: 30,
+            config: config
+        )
+        return result.exitCode == 0 && !result.output.trimmed.isEmpty
+    }
+
+    private func hasRootPackageJSON(_ project: CIProject) async -> Bool {
+        let result = await ShellClient.run(
+            "gh api repos/\(quoted(project.repositorySlug))/contents/package.json --jq '.name'",
             timeout: 30,
             config: config
         )
