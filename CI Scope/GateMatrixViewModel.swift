@@ -11,11 +11,11 @@ final class GateMatrixViewModel: ObservableObject {
 
     private let service = ProjectCIService(config: DashboardConfig())
 
-    func load(_ projects: [CIProject]) async {
+    func load(_ projects: [CIProject], forceRefresh: Bool = false) async {
         isLoading = true
         var result: [String: [GitHubWorkflow]] = [:]
         for project in projects {
-            let response = await service.loadWorkflows(for: project)
+            let response = await service.loadWorkflows(for: project, forceRefresh: forceRefresh)
             result[project.id] = response.value ?? []
         }
         workflowsByProject = result

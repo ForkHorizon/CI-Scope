@@ -40,7 +40,7 @@ struct GateMatrixView: View {
                 ProgressView().controlSize(.small)
             }
             Button {
-                Task { await model.load(projects) }
+                Task { await model.load(projects, forceRefresh: true) }
             } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
                     .font(.caption.weight(.semibold))
@@ -121,7 +121,7 @@ struct GateMatrixView: View {
             mode: .localBroker
         ) {
             onInstalled(project)
-            Task { await model.load(projects) }
+            Task { await model.load(projects, forceRefresh: true) }
         }
     }
 

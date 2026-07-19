@@ -27,7 +27,7 @@ extension ContentView {
                 selectedProject: selectedProject,
                 onInstallSuccess: { project in
                     Task {
-                        await projectCIViewModel.load(project)
+                        await projectCIViewModel.load(project, forceRefresh: true)
                     }
                 }
             )
@@ -38,7 +38,7 @@ extension ContentView {
                 installViewModel: scriptInstallViewModel,
                 onInstalled: { project in
                     Task {
-                        await projectCIViewModel.load(project)
+                        await projectCIViewModel.load(project, forceRefresh: true)
                     }
                 }
             )

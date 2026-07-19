@@ -43,6 +43,7 @@ final class AutomationScriptInstallViewModel: ObservableObject {
                     variableValues: variableValues,
                     mode: mode
                 )
+                ProjectCIService.invalidateWorkflowsCache(forRepositorySlug: project.repositorySlug)
                 snapshots[snapshotKey] = .succeeded(result)
                 onSuccess()
             } catch {
@@ -69,6 +70,7 @@ final class AutomationScriptInstallViewModel: ObservableObject {
         Task {
             do {
                 let result = try await installer.installBundle(scripts: scripts, project: project, mode: mode)
+                ProjectCIService.invalidateWorkflowsCache(forRepositorySlug: project.repositorySlug)
                 snapshots[snapshotKey] = .succeeded(result)
                 onSuccess()
             } catch {
@@ -97,6 +99,7 @@ final class AutomationScriptInstallViewModel: ObservableObject {
                     project: project,
                     variableValues: defaultValues(for: script)
                 )
+                ProjectCIService.invalidateWorkflowsCache(forRepositorySlug: project.repositorySlug)
                 snapshots[snapshotKey] = .succeeded(result)
                 onSuccess()
             } catch {
