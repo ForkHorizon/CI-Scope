@@ -5,6 +5,8 @@ import glob
 import hashlib
 import hmac
 import json
+import logging
+import logging.handlers
 import os
 import shutil
 import signal
@@ -134,6 +136,91 @@ BACKEND_LAST_EVENT_ID = 0
 BACKEND_SYNC_LOCK = threading.Lock()
 UNSET = object()
 
+# Structured event log: every dispatch/terminate/backend-call/webhook/crash
+# lands here as one JSON object per line, so a stress test that produces
+# thousands of lines stays greppable/jq-able instead of a wall of prose. Sized
+# to stay bounded (unlike the launchd-redirected stdout/stderr files, which
+# just append forever) — rotates at CI_SCOPE_LOG_MAX_BYTES, keeps
+# CI_SCOPE_LOG_BACKUPS old copies. broker-errors.jsonl mirrors WARNING+ only,
+# so "what went wrong" is a small file to skim instead of the full firehose.
+EVENT_LOG_PATH = LOG_DIR / "broker.jsonl"
+ERROR_LOG_PATH = LOG_DIR / "broker-errors.jsonl"
+LOG_MAX_BYTES = int(os.environ.get("CI_SCOPE_LOG_MAX_BYTES", str(20 * 1024 * 1024)))
+LOG_BACKUP_COUNT = int(os.environ.get("CI_SCOPE_LOG_BACKUPS", "5"))
+
+
+class JsonLogFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "component": "broker",
+            "event": getattr(record, "event", record.funcName),
+            "msg": record.getMessage(),
+        }
+        context = getattr(record, "context", None)
+        if context:
+            payload["context"] = context
+        if record.exc_info:
+            payload["exc"] = self.formatException(record.exc_info)
+        return json.dumps(payload, default=str)
+
+
+def setup_logging() -> logging.Logger:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger("ci-scope-broker")
+    logger.setLevel(os.environ.get("CI_SCOPE_LOG_LEVEL", "INFO"))
+    logger.propagate = False
+    if logger.handlers:
+        return logger
+
+    formatter = JsonLogFormatter()
+    main_handler = logging.handlers.RotatingFileHandler(
+        EVENT_LOG_PATH, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
+    )
+    main_handler.setFormatter(formatter)
+    logger.addHandler(main_handler)
+
+    error_handler = logging.handlers.RotatingFileHandler(
+        ERROR_LOG_PATH, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
+    )
+    error_handler.setLevel(logging.WARNING)
+    error_handler.setFormatter(formatter)
+    logger.addHandler(error_handler)
+    return logger
+
+
+LOGGER = setup_logging()
+
+
+def log_event(level: int, event: str, message: str, **context) -> None:
+    LOGGER.log(level, message, extra={"event": event, "context": context or None})
+
+
+def _log_uncaught_exception(exc_type, exc_value, exc_tb) -> None:
+    # Last-chance net: whatever escapes main() entirely still leaves a record
+    # of exactly when and why the broker died, instead of just vanishing.
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+        return
+    LOGGER.critical(
+        "Unhandled exception, broker process is exiting",
+        exc_info=(exc_type, exc_value, exc_tb),
+        extra={"event": "process.crash", "context": None},
+    )
+
+
+def _log_thread_exception(args) -> None:
+    LOGGER.error(
+        f"Unhandled exception in thread {args.thread.name if args.thread else '?'}",
+        exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+        extra={"event": "thread.crash", "context": None},
+    )
+
+
+sys.excepthook = _log_uncaught_exception
+threading.excepthook = _log_thread_exception
+
 
 def main() -> int:
     if "--help" in sys.argv or "-h" in sys.argv:
@@ -152,6 +239,24 @@ def main() -> int:
         ]
     )
     ensure_dirs()
+    LOGGER.info(
+        "Broker starting",
+        extra={
+            "event": "broker.start",
+            "context": {
+                "serverMode": SERVER_MODE,
+                "machineId": MACHINE_ID,
+                "machineName": MACHINE_NAME,
+                "labels": MACHINE_LABELS,
+                "capacity": MACHINE_CAPACITY,
+                "backendEnabled": backend_enabled(),
+                "maxConcurrentJobs": MAX_CONCURRENT_JOBS,
+                "webhookPort": WEBHOOK_PORT,
+                "pid": os.getpid(),
+                "ownerPid": OWNER_PID,
+            },
+        },
+    )
     if not backend_enabled() or not SERVER_MODE:
         start_webhook_server()
     if backend_enabled() and not SERVER_MODE:
@@ -219,6 +324,7 @@ def main() -> int:
             # responsive while a runner is being dispatched.
             tick(polled, profiles, idle_sweep_due)
         except Exception as exc:
+            LOGGER.exception("Scheduler tick failed", extra={"event": "tick.error", "context": None})
             with STATE_LOCK:
                 state = read_state()
                 state["lastError"] = str(exc)
@@ -239,6 +345,10 @@ def shutdown_for_owner_exit() -> None:
     # crash), so nothing else will trigger cleanup. Kill every runner this
     # broker owns, then bootout ourselves so launchd's KeepAlive doesn't just
     # relaunch a broker with no app left to answer to.
+    LOGGER.warning(
+        f"Owner app (pid {OWNER_PID}) is gone; terminating all runners and tearing down broker",
+        extra={"event": "broker.owner_exit", "context": {"ownerPid": OWNER_PID}},
+    )
     terminate_all_runners()
     subprocess.run(
         ["launchctl", "bootout", f"gui/{os.getuid()}/{SERVICE_LABEL}"],
@@ -252,7 +362,7 @@ def terminate_all_runners() -> None:
         actives = list(read_state().get("actives") or [])
     for active in actives:
         if active.get("pid"):
-            terminate_active_process(active)
+            terminate_active_process(active, reason="broker_teardown")
         remove_runner_dir(active.get("id"))
 
 
@@ -323,9 +433,19 @@ def sync_backend_snapshot(reason: str) -> bool:
 
 
 def backend_get_json(path: str) -> dict:
+    start = time.monotonic()
     request = backend_request(path)
-    with urllib.request.urlopen(request, timeout=BACKEND_CONNECT_TIMEOUT) as response:
-        return json.loads(response.read().decode("utf-8") or "{}")
+    try:
+        with urllib.request.urlopen(request, timeout=BACKEND_CONNECT_TIMEOUT) as response:
+            status = response.status
+            body = json.loads(response.read().decode("utf-8") or "{}")
+    except Exception as exc:
+        log_event(logging.WARNING, "backend.request_error", f"GET {path} failed: {exc}",
+                   method="GET", path=path, durationMs=round((time.monotonic() - start) * 1000))
+        raise
+    log_event(logging.INFO, "backend.request", f"GET {path} -> {status}",
+              method="GET", path=path, status=status, durationMs=round((time.monotonic() - start) * 1000))
+    return body
 
 
 def backend_request(path: str, last_event_id: int | None = None) -> urllib.request.Request:
@@ -396,7 +516,7 @@ def process_pending_reruns(reruns: list) -> None:
         try:
             server_post_json("/api/ci/local/reruns/ack", {"machineId": MACHINE_ID, "reruns": attempted})
         except Exception as exc:
-            print(f"[ci-scope] rerun ack failed: {exc}", flush=True)
+            log_event(logging.WARNING, "job.rerun_ack_failed", f"rerun ack failed: {exc}")
 
 
 def rerun_github_run(slug: str, run_id: object) -> bool:
@@ -404,9 +524,9 @@ def rerun_github_run(slug: str, run_id: object) -> bool:
     completed = subprocess.run(command, text=True, capture_output=True, timeout=60)
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout).strip()[:300]
-        print(f"[ci-scope] rerun {slug} #{run_id} failed: {detail}", flush=True)
+        log_event(logging.WARNING, "job.rerun_failed", f"rerun {slug} #{run_id} failed: {detail}", repo=slug, runId=run_id)
         return False
-    print(f"[ci-scope] re-ran {slug} #{run_id} after infra failure", flush=True)
+    log_event(logging.INFO, "job.rerun", f"re-ran {slug} #{run_id} after infra failure", repo=slug, runId=run_id)
     return True
 
 
@@ -497,13 +617,23 @@ def server_post_status(job: dict, status: str, error: str | None = None) -> None
 
 
 def server_post_json(path: str, payload: dict) -> dict:
+    start = time.monotonic()
     data = json.dumps(payload).encode("utf-8")
     request = backend_request(path)
     request.add_header("Content-Type", "application/json")
     request.data = data
     request.method = "POST"
-    with urllib.request.urlopen(request, timeout=BACKEND_CONNECT_TIMEOUT) as response:
-        return json.loads(response.read().decode("utf-8") or "{}")
+    try:
+        with urllib.request.urlopen(request, timeout=BACKEND_CONNECT_TIMEOUT) as response:
+            status = response.status
+            body = json.loads(response.read().decode("utf-8") or "{}")
+    except Exception as exc:
+        log_event(logging.WARNING, "backend.request_error", f"POST {path} failed: {exc}",
+                   method="POST", path=path, durationMs=round((time.monotonic() - start) * 1000))
+        raise
+    log_event(logging.INFO, "backend.request", f"POST {path} -> {status}",
+              method="POST", path=path, status=status, durationMs=round((time.monotonic() - start) * 1000))
+    return body
 
 
 def backend_snapshot_to_polled(payload: dict, registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -675,7 +805,7 @@ def tick(polled: tuple | None, profiles: list[dict], idle_sweep_due: bool = True
             # status — only the watchdog may stop a genuinely stuck one. A slot
             # frees when the runner process exits on its own (the else branch).
             if active_timed_out(active):
-                terminate_active_process(active)
+                terminate_active_process(active, reason=f"timed_out:{MAX_ACTIVE_SECONDS}s")
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
                 remove_runner_dir(active.get("id"))
                 retries = update_retry(active, retries)
@@ -704,7 +834,7 @@ def tick(polled: tuple | None, profiles: list[dict], idle_sweep_due: bool = True
                 # eventually backed off instead of churning dispatch->idle->reap
                 # forever; for an already-done job the id never returns and
                 # prune_retries drops the counter.
-                terminate_active_process(active)
+                terminate_active_process(active, reason=f"idle_too_long:{IDLE_RUNNER_SECONDS}s")
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
                 remove_runner_dir(active.get("id"))
                 retries = update_retry(active, retries)
@@ -848,7 +978,14 @@ def active_is_running(active: dict) -> bool:
     return process_alive(pid)
 
 
-def terminate_active_process(active: dict) -> None:
+def terminate_active_process(active: dict, reason: str = "unspecified") -> None:
+    LOGGER.info(
+        f"Terminating runner for {active.get('id')} ({reason})",
+        extra={
+            "event": "job.terminate",
+            "context": {"jobId": active.get("id"), "repo": active.get("repositorySlug"), "pid": active.get("pid"), "reason": reason},
+        },
+    )
     # active_is_running (checked by every caller, moments earlier in the same
     # tick) already confirmed a live process owns this pid — via ACTIVE_PROCESSES
     # if we started it, or via process_alive(pid) if it's a runner restored from
@@ -929,6 +1066,19 @@ def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
         retries = clear_retry(active.get("id"), retries)
     cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
     remove_runner_dir(active.get("id"))
+    LOGGER.info(
+        f"Runner for {active.get('id')} exited ({active.get('status')}, exit={active.get('exitCode')})",
+        extra={
+            "event": "job.finish",
+            "context": {
+                "jobId": active.get("id"),
+                "repo": active.get("repositorySlug"),
+                "status": active.get("status"),
+                "exitCode": active.get("exitCode"),
+                "remoteStatus": refreshed.get("status"),
+            },
+        },
+    )
     return retries, refreshed.get("lastError")
 
 
@@ -1034,13 +1184,27 @@ def start_runner(job: dict) -> subprocess.Popen:
     log_handle = open(log_file, "a", encoding="utf-8")
     log_handle.write(f"[{now()}] starting JIT runner for {job['id']}\n")
     log_handle.flush()
-    return subprocess.Popen(
+    process = subprocess.Popen(
         ["./run.sh", "--jitconfig", encoded],
         cwd=runner_dir,
         stdout=log_handle,
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
+    LOGGER.info(
+        f"Dispatched runner for {job['id']} (pid {process.pid})",
+        extra={
+            "event": "job.dispatch",
+            "context": {
+                "jobId": job.get("id"),
+                "repo": job.get("repositorySlug"),
+                "pid": process.pid,
+                "labels": job.get("labels"),
+                "profile": job.get("profileId"),
+            },
+        },
+    )
+    return process
 
 
 def generate_jit_config(job: dict) -> str:
@@ -1342,6 +1506,7 @@ class GitHubWebhookHandler(BaseHTTPRequestHandler):
     server_version = "CI Scope Broker"
 
     def do_POST(self) -> None:
+        self._start = time.monotonic()
         if self.path != WEBHOOK_PATH:
             self.respond(404, "not found")
             return
@@ -1375,6 +1540,10 @@ class GitHubWebhookHandler(BaseHTTPRequestHandler):
         delivery_id = self.headers.get("X-GitHub-Delivery") or ""
         if event == "workflow_job":
             apply_workflow_job_event(payload, delivery_id)
+            log_event(
+                logging.INFO, "webhook.workflow_job", f"Processed workflow_job delivery {delivery_id}",
+                deliveryId=delivery_id, action=payload.get("action"),
+            )
         # Dashboard recording is best-effort: it must never affect job dispatch,
         # so a failure here is swallowed rather than rejecting the delivery.
         try:
@@ -1390,8 +1559,16 @@ class GitHubWebhookHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+        duration_ms = round((time.monotonic() - getattr(self, "_start", time.monotonic())) * 1000)
+        log_event(
+            logging.INFO if status < 400 else logging.WARNING,
+            "webhook.request", f"POST {self.path} -> {status} ({text})",
+            path=self.path, status=status, durationMs=duration_ms,
+        )
 
     def log_message(self, format: str, *args) -> None:
+        # BaseHTTPRequestHandler's default writes plain text to stderr; we log
+        # structured access lines from respond() instead, so silence this.
         return
 
 
@@ -1921,6 +2098,7 @@ def shutdown(*_) -> None:
     # the app's own quit handler). Without this, every deliberate broker
     # restart orphaned any in-flight runner: it kept running, untracked, and
     # its job directory was never freed.
+    LOGGER.info("Received SIGTERM; terminating all runners and exiting", extra={"event": "broker.sigterm", "context": None})
     terminate_all_runners()
     sys.exit(0)
 
