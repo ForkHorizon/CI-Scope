@@ -3,9 +3,9 @@ import Foundation
 struct ProjectCIService {
     let config: DashboardConfig
 
-    func loadSnapshot(for project: CIProject) async -> ProjectCISnapshot {
+    func loadSnapshot(for project: CIProject, forceRefresh: Bool = false) async -> ProjectCISnapshot {
         async let authResult = loadAuthStatus()
-        async let workflowsResult = loadWorkflows(for: project)
+        async let workflowsResult = loadWorkflows(for: project, forceRefresh: forceRefresh)
         async let runsResult = loadRuns(for: project)
         async let localRunnerResult = loadLocalRunner(for: project)
 

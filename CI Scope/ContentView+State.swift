@@ -132,7 +132,7 @@ extension ContentView {
         }
 
         Task {
-            await projectCIViewModel.load(selectedProject)
+            await projectCIViewModel.load(selectedProject, forceRefresh: true)
         }
     }
 
@@ -148,7 +148,7 @@ extension ContentView {
     func attachToBroker(_ project: CIProject) {
         Task {
             try? await LocalBrokerService(config: DashboardConfig()).attach(project: project)
-            await projectCIViewModel.load(project)
+            await projectCIViewModel.load(project, forceRefresh: true)
             await runnerFleetViewModel.load()
         }
     }
