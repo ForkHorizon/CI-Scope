@@ -2127,12 +2127,18 @@ def ensure_webhook_secret() -> str:
 
 
 def shutdown(*_) -> None:
-    # Runs on SIGTERM (launchctl bootout — from the Settings restart button or
-    # the app's own quit handler). Without this, every deliberate broker
-    # restart orphaned any in-flight runner: it kept running, untracked, and
-    # its job directory was never freed.
-    LOGGER.info("Received SIGTERM; terminating all runners and exiting", extra={"event": "broker.sigterm", "context": None})
-    terminate_all_runners()
+    # Runs on SIGTERM (launchctl bootout/kickstart — from the Settings restart
+    # button or the app's own quit handler). Deliberately does NOT touch active
+    # runners: each runs in its own process group (start_new_session=True) and
+    # keeps talking to GitHub Actions directly, independent of this process.
+    # Whichever broker instance ticks next (the replacement this same restart
+    # is about to launch, or the next app launch) reconciles them straight out
+    # of persisted state — active_is_running() falls back to process_alive(pid)
+    # for actives it didn't fork itself, so a restart no longer needs to kill
+    # in-flight jobs just to avoid leaking them. shutdown_for_owner_exit() still
+    # kills everything for the crash/force-quit path, where no future broker is
+    # coming back to do that reconciliation.
+    LOGGER.info("Received SIGTERM; exiting without touching active runners", extra={"event": "broker.sigterm", "context": None})
     sys.exit(0)
 
 
