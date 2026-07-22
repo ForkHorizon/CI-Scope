@@ -96,6 +96,7 @@ struct RunnerWorkItem: Identifiable {
     let url: String
     let assemblerTitle: String?
     let assemblerScope: String?
+    let progress: BrokerJobProgress?
 
     init(
         id: String,
@@ -107,7 +108,8 @@ struct RunnerWorkItem: Identifiable {
         status: String,
         url: String,
         assemblerTitle: String? = nil,
-        assemblerScope: String? = nil
+        assemblerScope: String? = nil,
+        progress: BrokerJobProgress? = nil
     ) {
         self.id = id
         self.repositorySlug = repositorySlug
@@ -119,6 +121,7 @@ struct RunnerWorkItem: Identifiable {
         self.url = url
         self.assemblerTitle = assemblerTitle
         self.assemblerScope = assemblerScope
+        self.progress = progress
     }
 }
 
