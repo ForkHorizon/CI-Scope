@@ -797,6 +797,7 @@ def tick(polled: tuple | None, profiles: list[dict], idle_sweep_due: bool = True
     last_error = None
     removed_ids: set = set()
     surviving = []
+    progress_by_id: dict = {}
     for active in actives_snapshot:
         if active.get("pid") and active_is_running(active):
             # Ephemeral JIT runners pick up whichever queued job matches their
@@ -842,6 +843,9 @@ def tick(polled: tuple | None, profiles: list[dict], idle_sweep_due: bool = True
                 removed_ids.add(active.get("id"))
                 server_post_status(active, "released", f"Runner stayed idle for {IDLE_RUNNER_SECONDS}s.")
             else:
+                marker = read_last_progress_marker(active.get("id"))
+                if marker:
+                    progress_by_id[active.get("id")] = marker
                 surviving.append(active)
         else:
             retries, error = finish_active(active, retries)
@@ -917,7 +921,14 @@ def tick(polled: tuple | None, profiles: list[dict], idle_sweep_due: bool = True
     # save_state strips any dispatched job from the queue (it is now active).
     with STATE_LOCK:
         fresh = read_state()
-        final_actives = [active for active in (fresh.get("actives") or []) if active.get("id") not in removed_ids]
+        final_actives = []
+        for active in fresh.get("actives") or []:
+            if active.get("id") in removed_ids:
+                continue
+            marker = progress_by_id.get(active.get("id"))
+            if marker:
+                active = {**active, "progress": marker}
+            final_actives.append(active)
         final_actives.extend(dispatched_actives)
 
         if polled is not None:
@@ -2040,6 +2051,33 @@ def process_alive(pid: int) -> bool:
 
 def safe_name(value: str) -> str:
     return "".join(char if char.isalnum() or char in "-_." else "-" for char in value)
+
+
+PROGRESS_MARKER_PREFIX = "::ci-scope-progress:: "
+PROGRESS_TAIL_BYTES = 4096
+
+
+def read_last_progress_marker(job_id: str) -> dict | None:
+    # Gate scripts print a `::ci-scope-progress:: {json}` line as they work;
+    # the runner's stdout is already redirected into this log by start_runner.
+    # Only the last ~4KB is read since the marker we want is always the most
+    # recent line and this runs once per active job every tick.
+    path = LOG_DIR / f"{safe_name(job_id)}.log"
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            handle.seek(max(0, size - PROGRESS_TAIL_BYTES))
+            tail = handle.read().decode("utf-8", errors="ignore")
+    except OSError:
+        return None
+    for line in reversed(tail.splitlines()):
+        if line.startswith(PROGRESS_MARKER_PREFIX):
+            try:
+                return json.loads(line[len(PROGRESS_MARKER_PREFIX):])
+            except json.JSONDecodeError:
+                return None
+    return None
 
 
 def now() -> str:

@@ -202,3 +202,73 @@ def test_queue_active_save_state_transitions(monkeypatch):
     assert len(final_state["actives"]) == 1
     assert final_state["actives"][0]["id"] == "job_1"
     assert final_state["actives"][0]["status"] == "in_progress"
+
+
+def test_read_last_progress_marker(tmp_path, monkeypatch):
+    monkeypatch.setattr(broker, "LOG_DIR", tmp_path)
+    log_path = tmp_path / f"{broker.safe_name('job_1')}.log"
+    log_path.write_text(
+        "Compiling...\n"
+        '::ci-scope-progress:: {"step": "lint", "current": 1, "total": 20, "detail": "a.py"}\n'
+        "some other line\n"
+        '::ci-scope-progress:: {"step": "lint", "current": 2, "total": 20, "detail": "b.py"}\n'
+    )
+
+    marker = broker.read_last_progress_marker("job_1")
+    assert marker == {"step": "lint", "current": 2, "total": 20, "detail": "b.py"}
+
+    # No log file at all -> None, not an exception
+    assert broker.read_last_progress_marker("missing-job") is None
+
+
+def test_tick_attaches_progress_marker(monkeypatch):
+    # Guards against the fresh-rebuild pitfall in tick(): final_actives is
+    # rebuilt from a fresh re-read of state rather than from the `surviving`
+    # list mutated in the first loop, so progress must be merged back in at
+    # that rebuild step or it silently never reaches broker-state.json.
+    calls = []
+
+    def mock_write_state(state):
+        calls.append(state)
+
+    def mock_read_state():
+        return {
+            "version": 1,
+            "actives": [
+                {
+                    "id": "job_1",
+                    "repositorySlug": "test/repo",
+                    "createdAt": "2023-01-01T10:00:00Z",
+                    "labels": [],
+                    "pid": 4242,
+                    "status": "in_progress",
+                }
+            ],
+            "queue": [],
+            "repos": [],
+            "retries": {},
+            "webhook": {},
+        }
+
+    monkeypatch.setattr(broker, "write_state", mock_write_state)
+    monkeypatch.setattr(broker, "read_state", mock_read_state)
+    monkeypatch.setattr(broker, "now", lambda: "2023-01-01T00:00:00Z")
+    monkeypatch.setattr(broker, "active_is_running", lambda active: True)
+    monkeypatch.setattr(broker, "active_timed_out", lambda active: False)
+    monkeypatch.setattr(broker, "active_idle_too_long", lambda active: False)
+    monkeypatch.setattr(
+        broker,
+        "read_last_progress_marker",
+        lambda job_id: {"step": "lint", "current": 3, "total": 20, "detail": "foo.py"},
+    )
+
+    broker.tick(polled=None, profiles=[])
+
+    final_state = calls[-1]
+    assert len(final_state["actives"]) == 1
+    assert final_state["actives"][0]["progress"] == {
+        "step": "lint",
+        "current": 3,
+        "total": 20,
+        "detail": "foo.py",
+    }
