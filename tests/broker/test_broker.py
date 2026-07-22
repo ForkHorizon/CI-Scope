@@ -227,31 +227,24 @@ def test_tick_attaches_progress_marker(monkeypatch):
     # list mutated in the first loop, so progress must be merged back in at
     # that rebuild step or it silently never reaches broker-state.json.
     calls = []
+    state = {
+        "version": 1,
+        "actives": [{
+            "id": "job_1",
+            "repositorySlug": "test/repo",
+            "createdAt": "2023-01-01T10:00:00Z",
+            "labels": [],
+            "pid": 4242,
+            "status": "in_progress",
+        }],
+        "queue": [],
+        "repos": [],
+        "retries": {},
+        "webhook": {},
+    }
 
-    def mock_write_state(state):
-        calls.append(state)
-
-    def mock_read_state():
-        return {
-            "version": 1,
-            "actives": [
-                {
-                    "id": "job_1",
-                    "repositorySlug": "test/repo",
-                    "createdAt": "2023-01-01T10:00:00Z",
-                    "labels": [],
-                    "pid": 4242,
-                    "status": "in_progress",
-                }
-            ],
-            "queue": [],
-            "repos": [],
-            "retries": {},
-            "webhook": {},
-        }
-
-    monkeypatch.setattr(broker, "write_state", mock_write_state)
-    monkeypatch.setattr(broker, "read_state", mock_read_state)
+    monkeypatch.setattr(broker, "write_state", calls.append)
+    monkeypatch.setattr(broker, "read_state", lambda: state)
     monkeypatch.setattr(broker, "now", lambda: "2023-01-01T00:00:00Z")
     monkeypatch.setattr(broker, "active_is_running", lambda active: True)
     monkeypatch.setattr(broker, "active_timed_out", lambda active: False)
