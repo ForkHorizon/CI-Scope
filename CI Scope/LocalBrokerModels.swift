@@ -169,6 +169,19 @@ struct BrokerRepoStatus: Identifiable, Codable, Equatable {
     }
 }
 
+struct BrokerJobProgress: Codable, Equatable {
+    var step: String
+    var current: Int?
+    var total: Int?
+    var detail: String?
+
+    var caption: String {
+        let counted = (current != nil && total != nil) ? "\(step) \(current!)/\(total!)" : step
+        guard let detail, !detail.isEmpty else { return counted }
+        return "\(counted) · \(detail)"
+    }
+}
+
 struct BrokerJob: Identifiable, Codable, Equatable {
     var id: String
     var repositorySlug: String
@@ -185,6 +198,7 @@ struct BrokerJob: Identifiable, Codable, Equatable {
     var profileID: String?
     var profileTitle: String?
     var profileScope: String?
+    var progress: BrokerJobProgress?
 
     var workItem: RunnerWorkItem {
         RunnerWorkItem(
@@ -197,7 +211,8 @@ struct BrokerJob: Identifiable, Codable, Equatable {
             status: status,
             url: url,
             assemblerTitle: profileTitle,
-            assemblerScope: profileScope
+            assemblerScope: profileScope,
+            progress: progress
         )
     }
 
@@ -217,5 +232,6 @@ struct BrokerJob: Identifiable, Codable, Equatable {
         case profileID = "profileId"
         case profileTitle
         case profileScope
+        case progress
     }
 }
