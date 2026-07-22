@@ -229,14 +229,16 @@ def test_tick_attaches_progress_marker(monkeypatch):
     calls = []
     state = {
         "version": 1,
-        "actives": [{
-            "id": "job_1",
-            "repositorySlug": "test/repo",
-            "createdAt": "2023-01-01T10:00:00Z",
-            "labels": [],
-            "pid": 4242,
-            "status": "in_progress",
-        }],
+        "actives": [
+            {
+                "id": "job_1",
+                "repositorySlug": "test/repo",
+                "createdAt": "2023-01-01T10:00:00Z",
+                "labels": [],
+                "pid": 4242,
+                "status": "in_progress",
+            }
+        ],
         "queue": [],
         "repos": [],
         "retries": {},
