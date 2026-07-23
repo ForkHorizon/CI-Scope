@@ -136,6 +136,11 @@ BACKEND_LAST_EVENT_ID = 0
 BACKEND_SYNC_LOCK = threading.Lock()
 UNSET = object()
 
+
+def effective_runner_capacity() -> int:
+    """The maximum number of JIT runners this broker may have alive at once."""
+    return min(MACHINE_CAPACITY, MAX_CONCURRENT_JOBS)
+
 # Structured event log: every dispatch/terminate/backend-call/webhook/crash
 # lands here as one JSON object per line, so a stress test that produces
 # thousands of lines stays greppable/jq-able instead of a wall of prose. Sized
@@ -463,7 +468,7 @@ def backend_request(path: str, last_event_id: int | None = None) -> urllib.reque
 def server_has_capacity() -> bool:
     with STATE_LOCK:
         active_count = len(read_state().get("actives") or [])
-    return active_count < min(MACHINE_CAPACITY, MAX_CONCURRENT_JOBS)
+    return active_count < effective_runner_capacity()
 
 
 def server_heartbeat() -> None:
@@ -474,9 +479,9 @@ def server_heartbeat() -> None:
     payload = {
         "machineId": MACHINE_ID,
         "name": MACHINE_NAME,
-        "status": "busy" if len(active) >= min(MACHINE_CAPACITY, MAX_CONCURRENT_JOBS) else "online",
+        "status": "busy" if len(active) >= effective_runner_capacity() else "online",
         "labels": MACHINE_LABELS,
-        "capacity": min(MACHINE_CAPACITY, MAX_CONCURRENT_JOBS),
+        "capacity": effective_runner_capacity(),
         "activeJobId": active_ids[0] if active_ids else None,
         "activeJobIds": active_ids,
     }
@@ -535,7 +540,7 @@ def server_claim_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict]
         "machineId": MACHINE_ID,
         "name": MACHINE_NAME,
         "labels": MACHINE_LABELS,
-        "capacity": min(MACHINE_CAPACITY, MAX_CONCURRENT_JOBS),
+        "capacity": effective_runner_capacity(),
     }
     try:
         response = server_post_json("/api/ci/local/claim", payload)
@@ -877,7 +882,7 @@ def tick(polled: tuple | None, profiles: list[dict], idle_sweep_due: bool = True
     dispatched_actives = []
     dispatched = False
     for job in dispatchable:
-        if len(working_actives) >= MAX_CONCURRENT_JOBS:
+        if len(working_actives) >= effective_runner_capacity():
             break
         heavy = job_is_heavy(job)
         if heavy and heavy_running >= MAX_CONCURRENT_HEAVY:
@@ -1258,9 +1263,11 @@ def cleanup_stale_runners(job: dict) -> None:
     prefix = f"ci-scope-{job.get('jobId') or job.get('runId') or 'run'}-"
     for runner in list_repo_runners(job["repositorySlug"]):
         name = str(runner.get("name") or "")
-        if not name.startswith(prefix):
-            continue
-        if runner.get("busy"):
+        # An online idle JIT runner can be assigned a matching job immediately
+        # after this list call. Removing it races GitHub's dispatcher and kills
+        # that unrelated job mid-step. Only clean up runners GitHub has already
+        # marked offline; live runners are reaped by their owning process.
+        if not name.startswith(prefix) or runner.get("busy") or runner.get("status") != "offline":
             continue
         try:
             gh_json(f"repos/{job['repositorySlug']}/actions/runners/{runner['id']}", method="DELETE")
