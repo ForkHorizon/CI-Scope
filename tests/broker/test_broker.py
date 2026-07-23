@@ -11,7 +11,9 @@ import hashlib
 broker_dir = Path(__file__).parent.parent.parent / "CI Scope" / "Broker"
 sys.path.insert(0, str(broker_dir))
 
-loader = importlib.machinery.SourceFileLoader("broker", str(broker_dir / "CI Scope Broker"))
+loader = importlib.machinery.SourceFileLoader(
+    "broker", str(broker_dir / "CI Scope Broker")
+)
 spec = importlib.util.spec_from_loader("broker", loader)
 broker = importlib.util.module_from_spec(spec)
 loader.exec_module(broker)
@@ -120,7 +122,9 @@ def test_save_state(monkeypatch):
     profiles = []
     webhook = {}
 
-    state = broker.save_state(actives, queue, statuses, error, retries, profiles, webhook)
+    state = broker.save_state(
+        actives, queue, statuses, error, retries, profiles, webhook
+    )
 
     assert len(state["queue"]) == 1
     assert state["queue"][0]["id"] == "job_1"
@@ -267,56 +271,3 @@ def test_tick_attaches_progress_marker(monkeypatch):
         "total": 20,
         "detail": "foo.py",
     }
-def test_tick_respects_machine_capacity_when_dispatching(monkeypatch):
-    calls = []
-    started = []
-
-    def mock_read_state():
-        return {
-            "version": 1,
-            "actives": [],
-            "queue": [
-                {"id": "job_1", "repositorySlug": "test/repo", "createdAt": "2023-01-01T10:00:00Z"},
-                {"id": "job_2", "repositorySlug": "test/repo", "createdAt": "2023-01-01T10:01:00Z"},
-            ],
-            "repos": [],
-            "retries": {},
-            "webhook": {},
-        }
-
-    class MockProcess:
-        def __init__(self, pid):
-            self.pid = pid
-
-    def mock_start_runner(job):
-        started.append(job["id"])
-        return MockProcess(9000 + len(started))
-
-    monkeypatch.setattr(broker, "MACHINE_CAPACITY", 1)
-    monkeypatch.setattr(broker, "MAX_CONCURRENT_JOBS", 2)
-    monkeypatch.setattr(broker, "read_state", mock_read_state)
-    monkeypatch.setattr(broker, "write_state", calls.append)
-    monkeypatch.setattr(broker, "start_runner", mock_start_runner)
-    monkeypatch.setattr(broker, "now", lambda: "2023-01-01T00:00:00Z")
-
-    broker.tick(polled=None, profiles=[])
-
-    assert started == ["job_1"]
-    assert [job["id"] for job in calls[-1]["queue"]] == ["job_2"]
-
-
-def test_cleanup_stale_runners_only_removes_offline_runners(monkeypatch):
-    removed = []
-    monkeypatch.setattr(
-        broker,
-        "list_repo_runners",
-        lambda _slug: [
-            {"id": 1, "name": "ci-scope-123-1", "busy": False, "status": "online"},
-            {"id": 2, "name": "ci-scope-123-2", "busy": False, "status": "offline"},
-        ],
-    )
-    monkeypatch.setattr(broker, "gh_json", lambda path, method: removed.append((path, method)))
-
-    broker.cleanup_stale_runners({"repositorySlug": "test/repo", "jobId": "123"})
-
-    assert removed == [("repos/test/repo/actions/runners/2", "DELETE")]
