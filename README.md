@@ -158,7 +158,15 @@ Repository -> Settings -> Actions -> Runners
 
 CI Scope shows job arrivals through an in-app Liquid Glass notification banner and also sends a native macOS notification when notification permission is available. The banner self-dismisses after five seconds and can be dismissed manually.
 
-The MacBook Runner broker now supports a free webhook-first path for faster queue updates:
+The broker also supports **Server mode**: point it at a backend implementing
+its `/api/ci/local/*` protocol (heartbeat, queue/run snapshot sync) and it
+reads state from the backend instead of polling GitHub directly, using SSE
+only as a wakeup signal. In production that backend is
+`https://ci.forkhorizon.com`, served by the separate `ForkHorizon/WebSite`
+repo — not part of this repository. See `develop`'s README for the current
+Server mode setup details; that work hasn't been backported to `main` yet.
+
+Without Server mode configured, the MacBook Runner broker supports a free webhook-first path for faster queue updates:
 
 ```text
 POST http://127.0.0.1:8765/github/workflow-job
