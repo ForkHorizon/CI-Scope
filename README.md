@@ -158,33 +158,25 @@ Repository -> Settings -> Actions -> Runners
 
 CI Scope shows job arrivals through an in-app Liquid Glass notification banner and also sends a native macOS notification when notification permission is available. The banner self-dismisses after five seconds and can be dismissed manually.
 
-The MacBook Runner broker is designed to avoid GitHub polling in normal use.
-The production path is a GitHub App backend:
+The MacBook Runner broker is designed to avoid GitHub polling in normal use,
+through **Server mode**: point it at a backend that speaks its
+`/api/ci/local/*` protocol (heartbeat, queue/run snapshot sync, pending
+infra-rerun acks — see `CIQueueSettingsStore.swift` /
+`LocalBrokerLaunchAgent.swift`).
 
 ```text
-GitHub App webhook -> CI Scope backend -> outbound SSE -> local broker -> Swift UI
+GitHub App webhook -> CI Scope backend -> outbound SSE -> local broker (Server mode) -> Swift UI
 ```
 
-The backend lives in `backend/` and stores normalized GitHub webhook state in
-SQLite. GitHub should call this backend directly; do not add per-workflow
-`curl` steps for CI Scope events. Configure the GitHub App webhook URL to:
+**In production, that backend is `https://ci.forkhorizon.com`** — served by
+the separate `ForkHorizon/WebSite` repo
+(`src/products/ci-scope/backend.ts`), not by this repository. It already
+implements failure classification (infra vs. test, by runner heartbeat
+freshness) and auto-retry of infra-classified failures. Configure Server
+mode with:
 
 ```text
-https://your-backend.example.com/github/webhook
-```
-
-Subscribe the GitHub App to:
-
-- `workflow_job`
-- `workflow_run`
-- `push`
-- `repository`
-- `installation_repositories`
-
-Start the local broker with:
-
-```text
-CI_SCOPE_BACKEND_URL=https://your-backend.example.com
+CI_SCOPE_BACKEND_URL=https://ci.forkhorizon.com
 CI_SCOPE_BACKEND_TOKEN=<shared client token>
 ```
 
@@ -193,7 +185,17 @@ startup, then uses SSE only as a wakeup signal to sync a fresh snapshot. If the
 backend is down, the broker falls back to slow GitHub reconciliation polling
 instead of the old tight loop.
 
-Without `CI_SCOPE_BACKEND_URL`, the broker still supports a localhost-only
+> **`backend/` in this repo is a separate, earlier prototype and is not
+> deployed.** It's a standalone Python/FastAPI GitHub-App-webhook receiver
+> (`/github/webhook`, its own SQLite store) built before the `ci.forkhorizon.com`
+> backend above existed, and its wire protocol doesn't match what the broker's
+> Server mode actually calls (`/api/ci/local/heartbeat` etc.) — its own
+> `backend/README.md` still points at the placeholder domain
+> `your-backend.example.com`, and there's no nginx route to it anywhere on the
+> production VPS. Treat it as historical/experimental, not a second production
+> path, until it's either wired up for real or removed.
+
+Without Server mode configured, the broker still supports a localhost-only
 webhook path for ad-hoc setups:
 
 ```text
