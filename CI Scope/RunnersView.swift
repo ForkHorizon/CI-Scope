@@ -183,19 +183,41 @@ private struct RunnerCard: View {
                 .help("Queued jobs from organization and private sub-runners. Only one job is dispatched at a time.")
             }
 
-            RunnerWebhookStrip(webhook: runner.webhook)
+            VStack(alignment: .leading, spacing: 7) {
+                Label("Running now", systemImage: "waveform.path.ecg")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
 
-            RunnerWorkSection(
-                title: "Running Now", emptyText: runner.isBusy ? "Busy, job not visible yet" : "Idle", items: runner.activeJobs)
-            RunnerWorkSection(title: "Queue", emptyText: "No queued jobs", items: runner.queuedJobs)
-
-            RunnerSubRunnerDisclosure(subRunners: runner.subRunners)
-
-            if !runner.missingLabels.isEmpty {
-                RunnerWarningLine(text: "Missing labels: \(runner.missingLabels.joined(separator: ", "))")
+                if runner.activeJobs.isEmpty {
+                    if runner.isBusy {
+                        RunnerBusyWorkCard()
+                    } else {
+                        RunnerWorkEmptyRow(text: "Idle")
+                    }
+                } else {
+                    ForEach(runner.activeJobs) { item in
+                        LiveWorkCard(item: item)
+                    }
+                }
             }
 
-            RunnerLabelStrip(labels: runner.labels)
+            RunnerQueueTimeline(title: "Up next", emptyText: "No queued jobs", items: runner.queuedJobs)
+
+            DisclosureGroup("Runner health") {
+                VStack(alignment: .leading, spacing: 10) {
+                    RunnerWebhookStrip(webhook: runner.webhook)
+                    RunnerSubRunnerDisclosure(subRunners: runner.subRunners)
+
+                    if !runner.missingLabels.isEmpty {
+                        RunnerWarningLine(text: "Missing labels: \(runner.missingLabels.joined(separator: ", "))")
+                    }
+
+                    RunnerLabelStrip(labels: runner.labels)
+                }
+                .padding(.top, 8)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
         }
         .padding(12)
         .background(Color(nsColor: .windowBackgroundColor))

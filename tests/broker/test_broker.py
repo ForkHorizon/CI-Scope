@@ -221,6 +221,22 @@ def test_read_last_progress_marker(tmp_path, monkeypatch):
     assert broker.read_last_progress_marker("missing-job") is None
 
 
+def test_read_last_progress_marker_skips_malformed_latest_marker(tmp_path, monkeypatch):
+    monkeypatch.setattr(broker, "LOG_DIR", tmp_path)
+    log_path = tmp_path / f"{broker.safe_name('job_1')}.log"
+    log_path.write_text(
+        '::ci-scope-progress:: {"step": "lint", "current": 2, "total": 10, "detail": "good.swift"}\n'
+        '::ci-scope-progress:: {"step": "lint", "current": "three", "total": 10}\n'
+    )
+
+    assert broker.read_last_progress_marker("job_1") == {
+        "step": "lint",
+        "current": 2,
+        "total": 10,
+        "detail": "good.swift",
+    }
+
+
 def test_tick_attaches_progress_marker(monkeypatch):
     # Guards against the fresh-rebuild pitfall in tick(): final_actives is
     # rebuilt from a fresh re-read of state rather than from the `surviving`

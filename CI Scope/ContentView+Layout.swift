@@ -63,6 +63,7 @@ extension ContentView {
                     project: selectedProject,
                     snapshot: projectCIViewModel.snapshot(for: selectedProject.id),
                     isLoading: projectCIViewModel.loadingProjectID == selectedProject.id,
+                    liveJobs: liveJobs(for: selectedProject),
                     scripts: scriptStore.scripts,
                     isBrokerManaged: isBrokerManaged(selectedProject),
                     removalSnapshot: { script in
@@ -87,6 +88,12 @@ extension ContentView {
             }
             .padding(14)
         }
+    }
+
+    func liveJobs(for project: CIProject) -> [RunnerWorkItem] {
+        runnerFleetViewModel.snapshot.runners
+            .flatMap(\.activeJobs)
+            .filter { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
     }
 
     var header: some View {
