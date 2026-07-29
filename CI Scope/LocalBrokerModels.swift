@@ -180,6 +180,22 @@ struct BrokerJobProgress: Codable, Equatable {
         guard let detail, !detail.isEmpty else { return counted }
         return "\(counted) · \(detail)"
     }
+
+    var fraction: Double? {
+        guard let current, let total, total > 0 else { return nil }
+        return min(max(Double(current) / Double(total), 0), 1)
+    }
+
+    var countLabel: String? {
+        guard let current, let total, total > 0 else { return nil }
+        return "\(current) of \(total)"
+    }
+
+    var phaseLabel: String {
+        step
+            .replacingOccurrences(of: "-", with: " ")
+            .capitalized
+    }
 }
 
 struct BrokerJob: Identifiable, Codable, Equatable {

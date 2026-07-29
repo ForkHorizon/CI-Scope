@@ -2074,10 +2074,30 @@ def read_last_progress_marker(job_id: str) -> dict | None:
     for line in reversed(tail.splitlines()):
         if line.startswith(PROGRESS_MARKER_PREFIX):
             try:
-                return json.loads(line[len(PROGRESS_MARKER_PREFIX):])
+                marker = json.loads(line[len(PROGRESS_MARKER_PREFIX):])
             except json.JSONDecodeError:
-                return None
+                continue
+            if valid_progress_marker(marker):
+                return marker
     return None
+
+
+def valid_progress_marker(marker: object) -> bool:
+    if not isinstance(marker, dict):
+        return False
+    step = marker.get("step")
+    if not isinstance(step, str) or not step.strip() or len(step) > 80:
+        return False
+    detail = marker.get("detail")
+    if detail is not None and not isinstance(detail, str):
+        return False
+    for key in ("current", "total"):
+        value = marker.get(key)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+            return False
+    current = marker.get("current")
+    total = marker.get("total")
+    return not (current is not None and total is not None and total > 0 and current > total)
 
 
 def now() -> str:
