@@ -5,6 +5,7 @@ struct ProjectCIPanel: View {
     let project: CIProject
     let snapshot: ProjectCISnapshot?
     let isLoading: Bool
+    let liveJobs: [RunnerWorkItem]
     let scripts: [AutomationScript]
     let isBrokerManaged: Bool
     let removalSnapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
@@ -97,6 +98,10 @@ struct ProjectCIPanel: View {
 
                     if let error = snapshot?.error {
                         ErrorBox(text: error)
+                    }
+
+                    if !liveJobs.isEmpty {
+                        ProjectLiveWorkSection(items: liveJobs)
                     }
 
                     if !installedScripts.isEmpty {
@@ -242,6 +247,22 @@ struct ProjectCIPanel: View {
 
     func openGitHubRepository() {
         NSWorkspace.shared.open(githubURL)
+    }
+}
+
+private struct ProjectLiveWorkSection: View {
+    let items: [RunnerWorkItem]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label("Running now", systemImage: "waveform.path.ecg")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+
+            ForEach(items) { item in
+                LiveWorkCard(item: item, compact: true)
+            }
+        }
     }
 }
 

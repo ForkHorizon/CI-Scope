@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-struct RunnerWorkSection: View {
+struct RunnerQueueTimeline: View {
     let title: String
     let emptyText: String
     let items: [RunnerWorkItem]
@@ -35,7 +35,7 @@ struct RunnerWorkSection: View {
     }
 }
 
-private struct RunnerWorkEmptyRow: View {
+struct RunnerWorkEmptyRow: View {
     let text: String
 
     var body: some View {
