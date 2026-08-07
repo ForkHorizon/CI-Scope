@@ -36,6 +36,21 @@ extension LocalBrokerService {
         return executableURL.path
     }
 
+    /// Tears the broker down at app quit: writes the quit marker so the
+    /// broker's own SIGTERM handler kills any in-flight runner, then unloads
+    /// the LaunchAgent. Routine restarts (Settings button, app launch) go
+    /// through installOrUpdateLaunchAgent's kickstart instead, which never
+    /// writes this marker, so they leave an active runner alone. Best-effort
+    /// with a short timeout — quitting shouldn't hang on it.
+    func uninstallLaunchAgent() async {
+        try? "1".write(to: quitMarkerURL, atomically: true, encoding: .utf8)
+        _ = await ShellClient.run(bootoutCommand, timeout: 8, config: config)
+    }
+
+    private var quitMarkerURL: URL {
+        try! brokerDirectory.safelyAppendingPathComponent("quit-requested")
+    }
+
     private func stopStandaloneRunnerLaunchAgents() async {
         let uid = geteuid()
         for runnerConfig in config.actionsRunners {
