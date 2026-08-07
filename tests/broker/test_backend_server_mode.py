@@ -131,7 +131,7 @@ class BrokerServerModeTests(unittest.TestCase):
                 repositorySlug="ForkHorizon/moodling",
                 labels=["self-hosted", "macOS", "ARM64", "moodling"],
             ),
-            ["self-hosted", "macOS", "ARM64", "ci-scope-broker", "moodling", "ollama"],
+            ["self-hosted", "macOS", "ARM64", "ci-scope-broker", "moodling", "deepseek"],
         )
         self.assertEqual(job["labels"], ["self-hosted", "macOS", "ARM64", "moodling"])
 

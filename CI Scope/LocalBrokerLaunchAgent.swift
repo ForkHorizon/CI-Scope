@@ -199,6 +199,9 @@ extension LocalBrokerService {
             values["CI_SCOPE_MACHINE_LABELS"] = settings.labels.joined(separator: ",")
             values["CI_SCOPE_MACHINE_CAPACITY"] = String(settings.capacity)
         }
+        if !settings.deepSeekAPIKey.isEmpty {
+            values["DEEPSEEK_API_KEY"] = settings.deepSeekAPIKey
+        }
 
         return values.keys.sorted().compactMap { key in
             guard let value = values[key], !value.isEmpty else { return nil }

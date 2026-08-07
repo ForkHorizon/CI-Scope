@@ -245,8 +245,8 @@ extension AutomationScriptSeedProvider {
         fallbackSimpleGateSeed(
             id: "slop-review",
             title: "Slop Review",
-            summary: "Advisory local-LLM review of PR diffs for AI-slop; never blocks the merge.",
-            detail: "Installs a workflow calling the shared advisory ci-gates slop reviewer.",
+            summary: "Advisory DeepSeek LLM review of PR diffs for AI-slop; never blocks the merge.",
+            detail: "Installs a workflow calling the shared advisory ci-gates slop reviewer using DeepSeek.",
             gate: "slop-review.yml"
         )
     }

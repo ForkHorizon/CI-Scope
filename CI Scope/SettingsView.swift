@@ -12,6 +12,7 @@ struct SettingsView: View {
                     localComputerSection
                     githubIntakeSection
                     gateInstallSection
+                    aiReviewSection
                     if let message {
                         Text(message)
                             .font(.caption.monospaced())
@@ -109,6 +110,31 @@ struct SettingsView: View {
 
             Text(
                 "Enables GitHub auto-merge on PRs this app opens, so gate installs land once their checks pass. Best effort — needs auto-merge allowed on the repo; otherwise the PR stays open for you to merge."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.055))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var aiReviewSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("AI slop review", systemImage: "sparkles")
+                .font(.callout.weight(.semibold))
+
+            HStack(spacing: 8) {
+                Text("DeepSeek key")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 92, alignment: .leading)
+                SecureField("sk-...", text: $store.deepSeekAPIKey)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            Text(
+                "Passed to the broker as DEEPSEEK_API_KEY, so JIT runners can call it for ci-gates' advisory slop-review step. Empty means that step just skips itself — it never blocks a merge either way. Restart the broker after changing this."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
