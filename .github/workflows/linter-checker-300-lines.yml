@@ -1,4 +1,4 @@
-name: Linter Checker 300 lines
+name: Code Structure Linter
 
 on:
   pull_request:

@@ -5,8 +5,8 @@ extension AutomationScriptSeedProvider {
     static func fallbackReadabilitySeed() -> AutomationScript {
         AutomationScript(
             id: "ai-readability",
-            title: "Linter Checker 300 Lines",
-            summary: "Checks max source file length and function length.",
+            title: "Code Structure Linter",
+            summary: "Checks file & function length, nesting depth, parameter counts, comment blocks, and type counts.",
             detail: "Installs a GitHub workflow that calls the shared readability gate in ForkHorizon/ci-gates.",
             runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
