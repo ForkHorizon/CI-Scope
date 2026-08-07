@@ -106,6 +106,16 @@ LOG_DIR = Path.home() / "Library/Logs/CI Scope/Broker"
 WEBHOOK_PORT = int(os.environ.get("CI_SCOPE_WEBHOOK_PORT", "8765"))
 WEBHOOK_PATH = os.environ.get("CI_SCOPE_WEBHOOK_PATH", "/github/workflow-job")
 WEBHOOK_SECRET_PATH = Path(os.environ.get("CI_SCOPE_WEBHOOK_SECRET_PATH", ROOT / "webhook-secret"))
+# Written by the app right before it boots the LaunchAgent out on a real quit,
+# deleted here once consumed. Its presence is what tells shutdown() this
+# SIGTERM is a quit (kill active runners) rather than a routine restart
+# (Settings button, app launch, kickstart -k all send the same signal).
+QUIT_MARKER_PATH = ROOT / "quit-requested"
+# PID of the CI Scope.app process that (re)installed this LaunchAgent, if any.
+# Lets the broker notice its owner force-quit or crashed even when no SIGTERM
+# ever arrives (that only happens on a clean quit), so it can tear itself
+# down instead of running on as an orphan nobody asked for.
+OWNER_PID = int(os.environ.get("CI_SCOPE_APP_PID", "0") or 0)
 LOG_RETENTION_SECONDS = max(1, int(os.environ.get("CI_SCOPE_LOG_RETENTION_DAYS", "14"))) * 86400
 IDLE_SWEEP_SECONDS = 30
 
@@ -270,6 +280,8 @@ def main() -> int:
     last_log_prune = -86400.0
     backend_failures = 0
     while True:
+        if not owner_app_alive():
+            shutdown_for_owner_exit()
         try:
             registry = read_registry()
             profiles = enabled_profiles(registry)
@@ -2118,17 +2130,70 @@ def ensure_webhook_secret() -> str:
     return WEBHOOK_SECRET_PATH.read_text(encoding="utf-8").strip()
 
 
+def kill_active_runners_for_app_gone(reason: str) -> None:
+    """Kills every runner this broker has in flight because the app that owns
+    it is gone (quit or crashed/force-quit) and nothing should keep running
+    without it. Reports each as "released" so the queue can retry it on
+    whichever machine picks it up next, same as a timeout or idle-reap."""
+    with STATE_LOCK:
+        actives = list(read_state().get("actives") or [])
+    for active in actives:
+        if active.get("pid") and active_is_running(active):
+            terminate_active_process(active, reason=reason)
+            cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+            remove_runner_dir(active.get("id"))
+            server_post_status(active, "released", f"Stopped: {reason}.")
+    with STATE_LOCK:
+        state = read_state()
+        state["actives"] = []
+        write_state(state)
+
+
+def owner_app_alive() -> bool:
+    if not OWNER_PID:
+        return True
+    return process_alive(OWNER_PID)
+
+
+def shutdown_for_owner_exit() -> None:
+    # CI_SCOPE_APP_PID died without ever sending us a SIGTERM (force-quit or a
+    # crash skip applicationShouldTerminate entirely), so nothing else will
+    # trigger cleanup. Kill every runner this broker owns, then bootout
+    # ourselves so KeepAlive doesn't just relaunch a broker with no app left
+    # to answer to.
+    LOGGER.info(
+        f"Owner app (pid {OWNER_PID}) is gone; killing active runners and shutting down",
+        extra={"event": "broker.owner_exit", "context": {"ownerPid": OWNER_PID}},
+    )
+    kill_active_runners_for_app_gone("app_gone")
+    subprocess.run(
+        ["launchctl", "bootout", f"gui/{os.getuid()}/{SERVICE_LABEL}"],
+        capture_output=True,
+    )
+    sys.exit(0)
+
+
 def shutdown(*_) -> None:
-    # Runs on SIGTERM (launchctl bootout/kickstart — from the Settings restart
-    # button or the app's own quit handler). Deliberately does NOT touch active
-    # runners: each runs in its own process group (start_new_session=True) and
-    # keeps talking to GitHub Actions directly, independent of this process.
-    # Whichever broker instance ticks next (the replacement this same restart
-    # is about to launch, or the next app launch) reconciles them straight out
-    # of persisted state — active_is_running() falls back to process_alive(pid)
-    # for actives it didn't fork itself, so a restart never needs to kill an
-    # in-flight job just to avoid leaking it.
-    LOGGER.info("Received SIGTERM; exiting without touching active runners", extra={"event": "broker.sigterm", "context": None})
+    # Runs on SIGTERM. Routine restarts (Settings button, app launch,
+    # kickstart -k) send the exact same signal as a real app quit, so by
+    # default this deliberately does NOT touch active runners — each runs in
+    # its own process group (start_new_session=True) and keeps talking to
+    # GitHub Actions directly, independent of this process; the next broker
+    # instance reconciles them straight out of persisted state.
+    # QUIT_MARKER_PATH is the one case that should kill jobs: the app writes
+    # it immediately before booting the LaunchAgent out on a genuine quit.
+    if QUIT_MARKER_PATH.exists():
+        LOGGER.info(
+            "Received SIGTERM for app quit; killing active runners",
+            extra={"event": "broker.sigterm.quit", "context": None},
+        )
+        kill_active_runners_for_app_gone("app_quit")
+        try:
+            QUIT_MARKER_PATH.unlink()
+        except OSError:
+            pass
+    else:
+        LOGGER.info("Received SIGTERM; exiting without touching active runners", extra={"event": "broker.sigterm", "context": None})
     sys.exit(0)
 
 
