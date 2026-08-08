@@ -1,5 +1,6 @@
 """Stand-ins for the subprocess and SSE stream the broker talks to."""
 
+
 class MockProcess:
     pid = 9999
 
