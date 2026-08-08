@@ -40,7 +40,7 @@ struct GateMatrixView: View {
                 ProgressView().controlSize(.small)
             }
             Button {
-                Task { await model.load(projects, forceRefresh: true) }
+                Task { await model.load(projects) }
             } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
                     .font(.caption.weight(.semibold))
@@ -121,7 +121,7 @@ struct GateMatrixView: View {
             mode: .localBroker
         ) {
             onInstalled(project)
-            Task { await model.load(projects, forceRefresh: true) }
+            Task { await model.load(projects) }
         }
     }
 
@@ -131,7 +131,7 @@ struct GateMatrixView: View {
 
     private func shortName(_ script: AutomationScript) -> String {
         switch script.defaultSeedID ?? script.id {
-        case "code-linter": "300 L"
+        case "code-linter": "Linter"
         case "swift-compile-gate": "Compile"
         case "swift-quality-gate": "Quality"
         case "web-quality-gate": "Web"
