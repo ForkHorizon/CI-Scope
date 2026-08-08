@@ -5,9 +5,9 @@ extension AutomationScriptSeedProvider {
     static func fallbackReadabilitySeed() -> AutomationScript {
         AutomationScript(
             id: "ai-readability",
-            title: "Code Structure Linter",
+            title: "Code Linter",
             summary: "Checks file & function length, nesting depth, parameter counts, comment blocks, and type counts.",
-            detail: "Installs a GitHub workflow that calls the shared readability gate in ForkHorizon/ci-gates.",
+            detail: "Installs a GitHub workflow that calls the shared Code Linter in ForkHorizon/ci-gates.",
             runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
@@ -122,7 +122,7 @@ extension AutomationScriptSeedProvider {
     }
 
     static var fallbackWorkflow: String {
-        fallbackCallerWorkflow(jobID: "readability", gate: "readability.yml")
+        fallbackCallerWorkflow(jobID: "code-linter", gate: "code-linter.yml")
     }
 
     static func fallbackCallerWorkflow(jobID: String, gate: String, withConfig: Bool = true) -> String {

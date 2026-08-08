@@ -1,6 +1,6 @@
 import Foundation
 
-// Tunable limits the Code Structure Linter gate exposes in its install sheet.
+// Tunable limits the Code Linter gate exposes in its install sheet.
 // Mirrors the `variables` array in AutomationScriptSeeds/ai-readability.json.
 extension AutomationScriptSeedProvider {
     static var fallbackVariables: [AutomationScriptVariable] {

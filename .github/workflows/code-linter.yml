@@ -1,4 +1,4 @@
-name: Code Structure Linter
+name: Code Linter
 
 on:
   pull_request:
@@ -21,12 +21,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ai-readability-${{ github.workflow }}-${{ github.ref }}
+  group: code-linter-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  readability:
-    uses: ForkHorizon/ci-gates/.github/workflows/readability.yml@main
+  code-linter:
+    uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@main
     with:
       mode: ${{ inputs.mode || 'auto' }}
-      config: .code-structure-linter.json
+      config: .code-linter.json
