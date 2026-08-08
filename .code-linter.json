@@ -45,6 +45,8 @@
     "out",
     "target",
     "vendor",
+    "swift-compile-gate.py",
+    "swift-quality-gate.py",
     "*.designer.cs",
     "*.generated.*",
     "*.g.cs",

@@ -16,6 +16,9 @@ enum AutomationScriptLegacyPaths {
             // Title was "Linter Checker 300 Lines" until 2026-08-07.
             ".linter-checker-300-lines.json",
             ".github/workflows/linter-checker-300-lines.yml",
+            // …then "Code Structure Linter" for a day, before settling on "Code Linter".
+            ".code-structure-linter.json",
+            ".github/workflows/code-structure-linter.yml",
         ]
     ]
 
