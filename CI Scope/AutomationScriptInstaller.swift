@@ -31,7 +31,6 @@ struct AutomationScriptInstaller {
         defer { try? fileManager.removeItem(at: tempRoot) }
 
         let touchedFiles = try await renderAndStageInstall(
-            script: script,
             project: project,
             defaultBranch: defaultBranch,
             renderer: renderer,
@@ -68,7 +67,6 @@ struct AutomationScriptInstaller {
     }
 
     private func renderAndStageInstall(
-        script: AutomationScript,
         project: CIProject,
         defaultBranch: String,
         renderer: AutomationScriptRenderer,
