@@ -22,30 +22,8 @@ BACKEND_QUEUE_JOB = {
 }
 
 
-class MockProcess:
-    pid = 9999
-
-
 class StopLoop(Exception):
     pass
-
-
-class FakeSSEResponse:
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_):
-        return False
-
-    def __iter__(self):
-        return iter(
-            [
-                b"id: 12\n",
-                b"event: workflow_job\n",
-                b"data: {}\n",
-                b"\n",
-            ]
-        )
 
 
 def load_broker():

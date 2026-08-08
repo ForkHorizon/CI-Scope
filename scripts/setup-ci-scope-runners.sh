@@ -4,9 +4,9 @@ set -euo pipefail
 RUNNER_HOME="${RUNNER_HOME:-$HOME/actions-runners}"
 PERSONAL_RUNNER_ROOT="${PERSONAL_RUNNER_ROOT:-$HOME/actions-runner/moodling}"
 RUNNER_VERSION="${RUNNER_VERSION:-}"
-DEFAULT_LABELS="${DEFAULT_LABELS:-ci-scope,macbook-ci,ai-readability}"
+DEFAULT_LABELS="${DEFAULT_LABELS:-ci-scope,macbook-ci,code-linter}"
 ORG_EXTRA_LABELS="${ORG_EXTRA_LABELS:-nexus-doc-ai,nexus-unity-ci}"
-PERSONAL_EXTRA_LABELS="${PERSONAL_EXTRA_LABELS:-moodling,ollama}"
+PERSONAL_EXTRA_LABELS="${PERSONAL_EXTRA_LABELS:-moodling,deepseek}"
 
 usage() {
   cat <<'USAGE'
@@ -32,10 +32,10 @@ Environment overrides:
   PERSONAL_RUNNER_ROOT
                     default: $HOME/actions-runner/moodling
   RUNNER_VERSION    default: latest actions/runner release
-  DEFAULT_LABELS    default: ci-scope,macbook-ci,ai-readability
+  DEFAULT_LABELS    default: ci-scope,macbook-ci,code-linter
   ORG_EXTRA_LABELS  default: nexus-doc-ai,nexus-unity-ci
   PERSONAL_EXTRA_LABELS
-                    default: moodling,ollama
+                    default: moodling,deepseek
 USAGE
 }
 

@@ -19,8 +19,9 @@ struct CI_ScopeApp: App {
     }
 }
 
-/// The broker is a persistent LaunchAgent. It continues an accepted GitHub
-/// Actions job when the dashboard is closed, rebuilt, or force-quit.
+/// Tears the broker down when the app quits normally, killing any job it's
+/// mid-run on: CI only runs while the app is open. A crash or force-quit
+/// skips this entirely and leaves the broker running — not caught here.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hard crashes (force-unwrap, trap) aren't catchable in-process — macOS's
@@ -34,5 +35,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
         AppLogger.shared.info("app.launch", "CI Scope launched", context: ["pid": ProcessInfo.processInfo.processIdentifier])
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        AppLogger.shared.info("app.quit", "CI Scope quitting")
+        Task {
+            await LocalBrokerService(config: DashboardConfig()).uninstallLaunchAgent()
+            await MainActor.run {
+                sender.reply(toApplicationShouldTerminate: true)
+            }
+        }
+        return .terminateLater
     }
 }

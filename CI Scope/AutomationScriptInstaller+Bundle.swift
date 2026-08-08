@@ -60,11 +60,9 @@ extension AutomationScriptInstaller {
             )
             try renderer.validate()
             let files = try renderer.renderedFiles()
-            let obsolete = obsoleteInstalledFiles(for: script, currentFiles: files, cwd: repoURL)
-            try await remove(obsolete, cwd: repoURL)
             try write(files, to: repoURL)
             try await stage(files, cwd: repoURL)
-            touched += files + obsolete
+            touched += files
         }
         return touched
     }
@@ -95,14 +93,13 @@ extension AutomationScriptInstaller {
         if let existingURL = try await existingPullRequestURL(project: project, branch: branch) {
             return existingURL
         }
-        return try await createPullRequest(
-            project: project,
+        let draft = PullRequestDraft(
             base: defaultBranch,
             branch: branch,
             title: "Add CI Scope quality gates",
-            body: bundlePullRequestBody(for: scripts),
-            tempRoot: tempRoot
+            body: bundlePullRequestBody(for: scripts)
         )
+        return try await createPullRequest(project: project, draft: draft, tempRoot: tempRoot)
     }
 
     private func bundlePullRequestBody(for scripts: [AutomationScript]) -> String {

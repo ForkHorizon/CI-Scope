@@ -1,0 +1,87 @@
+{
+  "branchName": "ci-scope/install-{{script_id}}",
+  "commitMessage": "Add {{script_title}}",
+  "defaultSeedID": "code-linter",
+  "detail": "Installs a thin GitHub Actions workflow that calls the shared Code Linter in ForkHorizon/ci-gates, plus JSON limits. PR and merge queue runs scan changed files; manual and scheduled runs scan the whole repository.",
+  "files": [
+    {
+      "contents": "{\n  \"max_file_lines\": {{max_file_lines}},\n  \"max_function_lines\": {{max_function_lines}},\n  \"max_nesting_depth\": {{max_nesting_depth}},\n  \"max_parameters\": {{max_parameters}},\n  \"max_comment_lines\": {{max_comment_lines}},\n  \"max_types_per_file\": {{max_types_per_file}},\n  \"include_extensions\": [\n    \".cs\",\n    \".go\",\n    \".java\",\n    \".js\",\n    \".jsx\",\n    \".kt\",\n    \".kts\",\n    \".php\",\n    \".py\",\n    \".rb\",\n    \".rs\",\n    \".swift\",\n    \".ts\",\n    \".tsx\"\n  ],\n  \"ignore\": [\n    \".ci-gates\",\n    \".git\",\n    \".svn\",\n    \".hg\",\n    \".build\",\n    \".dart_tool\",\n    \".gradle\",\n    \".next\",\n    \".nuxt\",\n    \".pytest_cache\",\n    \".tox\",\n    \".venv\",\n    \"DerivedData\",\n    \"Pods\",\n    \"bin\",\n    \"build\",\n    \"coverage\",\n    \"dist\",\n    \"node_modules\",\n    \"obj\",\n    \"out\",\n    \"target\",\n    \"vendor\",\n    \"*.designer.cs\",\n    \"*.generated.*\",\n    \"*.g.cs\",\n    \"*.g.swift\",\n    \"*.gen.*\",\n    \"*.min.js\",\n    \"*.pb.*\",\n    \"*.snap\",\n    \"*.snapshot\"\n  ],\n  \"language_overrides\": {}\n}\n",
+      "destinationPath": ".{{script_slug}}.json",
+      "id": "config",
+      "isExecutable": false
+    },
+    {
+      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n    inputs:\n      mode:\n        description: Files to scan\n        required: false\n        default: all\n        type: choice\n        options:\n          - all\n          - changed\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: ci-scope-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  code-linter:\n    uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@main\n    with:\n      mode: ${{ inputs.mode || 'auto' }}\n      config: .{{script_slug}}.json\n      runs-on: '{{runner_labels_json}}'\n",
+      "destinationPath": ".github/workflows/{{script_slug}}.yml",
+      "id": "workflow",
+      "isExecutable": false
+    }
+  ],
+  "id": "code-linter",
+  "pullRequestBody": "Adds {{script_title}} managed by CI Scope.\n\nThis PR adds:\n- `.github/workflows/{{script_slug}}.yml`\n- `.{{script_slug}}.json`\n\nThe workflow calls the shared Code Linter in `ForkHorizon/ci-gates`, so gate logic updates roll out from that repository automatically. It checks changed files on pull requests and merge queue runs, and scans the full repository on manual or scheduled runs.",
+  "pullRequestTitle": "Add {{script_title}}",
+  "runnerLabels": [
+    "self-hosted",
+    "macOS",
+    "ARM64",
+    "ci-scope"
+  ],
+  "summary": "Checks file & function length, nesting depth, parameter counts, comment blocks, and type counts.",
+  "title": "Code Linter",
+  "variables": [
+    {
+      "defaultValue": "300",
+      "help": "Largest allowed source file length.",
+      "id": "max_file_lines",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Max file lines"
+    },
+    {
+      "defaultValue": "50",
+      "help": "Largest allowed function or method length.",
+      "id": "max_function_lines",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Max function lines"
+    },
+    {
+      "defaultValue": "4",
+      "help": "Deepest allowed control-flow nesting inside a function.",
+      "id": "max_nesting_depth",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Max nesting depth"
+    },
+    {
+      "defaultValue": "5",
+      "help": "Largest allowed parameter count on a function or method.",
+      "id": "max_parameters",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Max parameters"
+    },
+    {
+      "defaultValue": "5",
+      "help": "Longest allowed run of consecutive comment lines. Doc comments and the file header are exempt.",
+      "id": "max_comment_lines",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Max comment block lines"
+    },
+    {
+      "defaultValue": "2",
+      "help": "Largest allowed number of top-level types in one file. Nested types are not counted.",
+      "id": "max_types_per_file",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Max types per file"
+    }
+  ]
+}

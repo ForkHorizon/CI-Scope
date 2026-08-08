@@ -36,6 +36,21 @@ extension LocalBrokerService {
         return executableURL.path
     }
 
+    /// Tears the broker down at app quit: writes the quit marker so the
+    /// broker's own SIGTERM handler kills any in-flight runner, then unloads
+    /// the LaunchAgent. Routine restarts (Settings button, app launch) go
+    /// through installOrUpdateLaunchAgent's kickstart instead, which never
+    /// writes this marker, so they leave an active runner alone. Best-effort
+    /// with a short timeout — quitting shouldn't hang on it.
+    func uninstallLaunchAgent() async {
+        try? "1".write(to: quitMarkerURL, atomically: true, encoding: .utf8)
+        _ = await ShellClient.run(bootoutCommand, timeout: 8, config: config)
+    }
+
+    private var quitMarkerURL: URL {
+        try! brokerDirectory.safelyAppendingPathComponent("quit-requested")
+    }
+
     private func stopStandaloneRunnerLaunchAgents() async {
         let uid = geteuid()
         for runnerConfig in config.actionsRunners {
@@ -143,7 +158,7 @@ extension LocalBrokerService {
             <string>\(executableURL.path)</string>
           </array>
           <key>RunAtLoad</key>
-          <true/>
+          <false/>
           <key>KeepAlive</key>
           <true/>
           <key>EnvironmentVariables</key>
@@ -156,6 +171,8 @@ extension LocalBrokerService {
             <string>\(secretURL.path)</string>
             <key>CI_SCOPE_WEBHOOK_PATH</key>
             <string>\(LocalBrokerConstants.webhookPath)</string>
+            <key>CI_SCOPE_APP_PID</key>
+            <string>\(ProcessInfo.processInfo.processIdentifier)</string>
             \(backendEnvironmentPlistEntries())
           </dict>
           <key>StandardOutPath</key>
@@ -178,6 +195,9 @@ extension LocalBrokerService {
             values["CI_SCOPE_MACHINE_NAME"] = settings.machineName
             values["CI_SCOPE_MACHINE_LABELS"] = settings.labels.joined(separator: ",")
             values["CI_SCOPE_MACHINE_CAPACITY"] = String(settings.capacity)
+        }
+        if !settings.deepSeekAPIKey.isEmpty {
+            values["DEEPSEEK_API_KEY"] = settings.deepSeekAPIKey
         }
 
         return values.keys.sorted().compactMap { key in

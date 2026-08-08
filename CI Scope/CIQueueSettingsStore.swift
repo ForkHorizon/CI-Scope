@@ -7,6 +7,7 @@ struct CIQueueSettingsSnapshot {
     var serverURL: String
     var localToken: String
     var webhookSecret: String
+    var deepSeekAPIKey: String
     var machineID: String
     var machineName: String
     var labelsText: String
@@ -34,6 +35,10 @@ final class CIQueueSettingsStore: ObservableObject {
     @Published var serverURL = "" { didSet { persist() } }
     @Published var localToken = "" { didSet { persistSecrets() } }
     @Published var webhookSecret = "" { didSet { persistSecrets() } }
+    /// Passed to the broker's launchd environment as DEEPSEEK_API_KEY, which JIT
+    /// runner processes inherit — lets ci-gates' slop-review step call DeepSeek.
+    /// Empty means that advisory step just skips itself (it never fails the job).
+    @Published var deepSeekAPIKey = "" { didSet { persistSecrets() } }
     @Published var machineID = "" { didSet { persist() } }
     @Published var machineName = "" { didSet { persist() } }
     @Published var labelsText = "self-hosted, macOS, ARM64, ci-scope-broker" { didSet { persist() } }
@@ -55,6 +60,7 @@ final class CIQueueSettingsStore: ObservableObject {
         serverURL = snapshot.serverURL
         localToken = snapshot.localToken
         webhookSecret = snapshot.webhookSecret
+        deepSeekAPIKey = snapshot.deepSeekAPIKey
         machineID = snapshot.machineID
         machineName = snapshot.machineName
         labelsText = snapshot.labelsText
@@ -75,6 +81,7 @@ final class CIQueueSettingsStore: ObservableObject {
             serverURL: defaults.string(forKey: "ciScope.queue.serverURL") ?? "",
             localToken: CIQueueKeychain.read(account: "localToken") ?? "",
             webhookSecret: CIQueueKeychain.read(account: "webhookSecret") ?? "",
+            deepSeekAPIKey: CIQueueKeychain.read(account: "deepSeekAPIKey") ?? "",
             machineID: machineID,
             machineName: defaults.string(forKey: "ciScope.queue.machineName") ?? fallbackName,
             labelsText: defaults.string(forKey: "ciScope.queue.labelsText") ?? "self-hosted, macOS, ARM64, ci-scope-broker",
@@ -88,6 +95,7 @@ final class CIQueueSettingsStore: ObservableObject {
             serverURL: serverURL,
             localToken: localToken,
             webhookSecret: webhookSecret,
+            deepSeekAPIKey: deepSeekAPIKey,
             machineID: machineID,
             machineName: machineName,
             labelsText: labelsText,
@@ -132,38 +140,6 @@ final class CIQueueSettingsStore: ObservableObject {
     private func persistSecrets() {
         CIQueueKeychain.write(localToken, account: "localToken")
         CIQueueKeychain.write(webhookSecret, account: "webhookSecret")
-    }
-}
-
-enum CIQueueKeychain {
-    private static let service = "com.ForkHorizon.CI-Scope.queue"
-
-    static func read(account: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var item: CFTypeRef?
-        guard
-            SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-            let data = item as? Data
-        else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
-
-    static func write(_ value: String, account: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-        SecItemDelete(query as CFDictionary)
-        guard !value.isEmpty, let data = value.data(using: .utf8) else { return }
-        var item = query
-        item[kSecValueData as String] = data
-        SecItemAdd(item as CFDictionary, nil)
+        CIQueueKeychain.write(deepSeekAPIKey, account: "deepSeekAPIKey")
     }
 }

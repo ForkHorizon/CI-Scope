@@ -2,12 +2,12 @@ import Foundation
 
 /// Recommends the default gate set for a project from its GitHub languages plus
 /// a Unity marker file (project layout) or a Unity package manifest (UPM package
-/// layout). Readability and the advisory slop review apply to every stack; the
+/// layout). The Code Linter and the advisory slop review apply to every stack; the
 /// rest are added per detected language.
 struct ProjectStackDetector {
     let config: DashboardConfig
 
-    static let universalSeedIDs = ["ai-readability", "slop-review"]
+    static let universalSeedIDs = ["code-linter", "slop-review"]
 
     func recommendedSeedIDs(for project: CIProject) async -> [String] {
         let languages = await languages(for: project)
@@ -77,7 +77,7 @@ struct ProjectStackDetector {
         return result.exitCode == 0 && !result.output.trimmed.isEmpty
     }
 
-    /// Keep the canonical gate order (readability first, slop review last) so the
+    /// Keep the canonical gate order (Code Linter first, slop review last) so the
     /// preview and the resulting PR read consistently.
     private func ordered(_ ids: Set<String>) -> [String] {
         AutomationScriptSeedProvider.defaultSeedIDs.filter { ids.contains($0) }

@@ -29,7 +29,7 @@ struct InstalledAutomationScript: Identifiable {
 
 extension AutomationScript {
     var workflowDestinationPaths: Set<String> {
-        var paths = Set(
+        Set(
             files
                 .map { renderedDetectionPath($0.destinationPath).normalizedRepositoryPath }
                 .filter { path in
@@ -38,12 +38,6 @@ extension AutomationScript {
                         && !path.contains("{{")
                 }
         )
-
-        if managesLegacyReadabilityInstall {
-            paths.insert(".github/workflows/ai-readability.yml")
-        }
-
-        return paths
     }
 
     func matchingWorkflow(in snapshot: ProjectCISnapshot?) -> GitHubWorkflow? {
@@ -62,10 +56,6 @@ extension AutomationScript {
             .replacingOccurrences(of: "{{script_id}}", with: id)
             .replacingOccurrences(of: "{{script_slug}}", with: scriptSlug)
             .replacingOccurrences(of: "{{script_title}}", with: title)
-    }
-
-    private var managesLegacyReadabilityInstall: Bool {
-        defaultSeedID == "ai-readability" || id == "ai-readability"
     }
 }
 
