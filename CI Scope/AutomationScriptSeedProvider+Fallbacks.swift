@@ -2,9 +2,9 @@ import Foundation
 
 // Emergency fallbacks used when the bundled JSON seeds are missing.
 extension AutomationScriptSeedProvider {
-    static func fallbackReadabilitySeed() -> AutomationScript {
+    static func fallbackCodeLinterSeed() -> AutomationScript {
         AutomationScript(
-            id: "ai-readability",
+            id: "code-linter",
             title: "Code Linter",
             summary: "Checks file & function length, nesting depth, parameter counts, comment blocks, and type counts.",
             detail: "Installs a GitHub workflow that calls the shared Code Linter in ForkHorizon/ci-gates.",
@@ -15,7 +15,7 @@ extension AutomationScriptSeedProvider {
             pullRequestBody: fallbackPullRequestBody,
             variables: fallbackVariables,
             files: fallbackFiles,
-            defaultSeedID: "ai-readability"
+            defaultSeedID: "code-linter"
         )
     }
 

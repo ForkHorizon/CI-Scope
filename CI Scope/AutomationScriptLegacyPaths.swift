@@ -9,7 +9,7 @@ import Foundation
 /// installed" and a reinstall leaves the previous workflow behind, running twice.
 enum AutomationScriptLegacyPaths {
     static let bySeedID: [String: [String]] = [
-        "ai-readability": [
+        "code-linter": [
             ".ai-readability.json",
             ".github/workflows/ai-readability.yml",
             "scripts/ai-readability-check.py",

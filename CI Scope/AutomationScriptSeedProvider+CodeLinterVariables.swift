@@ -1,7 +1,7 @@
 import Foundation
 
 // Tunable limits the Code Linter gate exposes in its install sheet.
-// Mirrors the `variables` array in AutomationScriptSeeds/ai-readability.json.
+// Mirrors the `variables` array in AutomationScriptSeeds/code-linter.json.
 extension AutomationScriptSeedProvider {
     static var fallbackVariables: [AutomationScriptVariable] {
         [
