@@ -5,7 +5,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from backend_broker_testkit import BACKEND_QUEUE_JOB, FakeSSEResponse, MockProcess, StopLoop, load_broker
+from backend_broker_fakes import FakeSSEResponse, MockProcess
+from backend_broker_testkit import BACKEND_QUEUE_JOB, StopLoop, load_broker
 
 
 class BrokerBackendTests(unittest.TestCase):

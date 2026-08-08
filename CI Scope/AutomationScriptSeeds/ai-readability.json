@@ -5,7 +5,7 @@
   "detail": "Installs a thin GitHub Actions workflow that calls the shared readability gate in ForkHorizon/ci-gates, plus JSON limits. PR and merge queue runs scan changed files; manual and scheduled runs scan the whole repository.",
   "files": [
     {
-      "contents": "{\n  \"max_file_lines\": {{max_file_lines}},\n  \"max_function_lines\": {{max_function_lines}},\n  \"include_extensions\": [\n    \".cs\",\n    \".go\",\n    \".java\",\n    \".js\",\n    \".jsx\",\n    \".kt\",\n    \".kts\",\n    \".php\",\n    \".py\",\n    \".rb\",\n    \".rs\",\n    \".swift\",\n    \".ts\",\n    \".tsx\"\n  ],\n  \"ignore\": [\n    \".git\",\n    \".svn\",\n    \".hg\",\n    \".build\",\n    \".dart_tool\",\n    \".gradle\",\n    \".next\",\n    \".nuxt\",\n    \".pytest_cache\",\n    \".tox\",\n    \".venv\",\n    \"DerivedData\",\n    \"Pods\",\n    \"bin\",\n    \"build\",\n    \"coverage\",\n    \"dist\",\n    \"node_modules\",\n    \"obj\",\n    \"out\",\n    \"target\",\n    \"vendor\",\n    \"{{script_slug}}.py\",\n    \"linter.py\",\n    \"ai-readability-check.py\",\n    \"*.designer.cs\",\n    \"*.generated.*\",\n    \"*.g.cs\",\n    \"*.g.swift\",\n    \"*.gen.*\",\n    \"*.min.js\",\n    \"*.pb.*\",\n    \"*.snap\",\n    \"*.snapshot\"\n  ],\n  \"language_overrides\": {}\n}\n",
+      "contents": "{\n  \"max_file_lines\": {{max_file_lines}},\n  \"max_function_lines\": {{max_function_lines}},\n  \"max_nesting_depth\": {{max_nesting_depth}},\n  \"max_parameters\": {{max_parameters}},\n  \"max_comment_lines\": {{max_comment_lines}},\n  \"max_types_per_file\": {{max_types_per_file}},\n  \"include_extensions\": [\n    \".cs\",\n    \".go\",\n    \".java\",\n    \".js\",\n    \".jsx\",\n    \".kt\",\n    \".kts\",\n    \".php\",\n    \".py\",\n    \".rb\",\n    \".rs\",\n    \".swift\",\n    \".ts\",\n    \".tsx\"\n  ],\n  \"ignore\": [\n    \".ci-gates\",\n    \".git\",\n    \".svn\",\n    \".hg\",\n    \".build\",\n    \".dart_tool\",\n    \".gradle\",\n    \".next\",\n    \".nuxt\",\n    \".pytest_cache\",\n    \".tox\",\n    \".venv\",\n    \"DerivedData\",\n    \"Pods\",\n    \"bin\",\n    \"build\",\n    \"coverage\",\n    \"dist\",\n    \"node_modules\",\n    \"obj\",\n    \"out\",\n    \"target\",\n    \"vendor\",\n    \"*.designer.cs\",\n    \"*.generated.*\",\n    \"*.g.cs\",\n    \"*.g.swift\",\n    \"*.gen.*\",\n    \"*.min.js\",\n    \"*.pb.*\",\n    \"*.snap\",\n    \"*.snapshot\"\n  ],\n  \"language_overrides\": {}\n}\n",
       "destinationPath": ".{{script_slug}}.json",
       "id": "config",
       "isExecutable": false
@@ -46,6 +46,42 @@
       "kind": "number",
       "options": [],
       "title": "Max function lines"
+    },
+    {
+      "defaultValue": "4",
+      "help": "Deepest allowed control-flow nesting inside a function.",
+      "id": "max_nesting_depth",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Max nesting depth"
+    },
+    {
+      "defaultValue": "5",
+      "help": "Largest allowed parameter count on a function or method.",
+      "id": "max_parameters",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Max parameters"
+    },
+    {
+      "defaultValue": "5",
+      "help": "Longest allowed run of consecutive comment lines. Doc comments and the file header are exempt.",
+      "id": "max_comment_lines",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Max comment block lines"
+    },
+    {
+      "defaultValue": "2",
+      "help": "Largest allowed number of top-level types in one file. Nested types are not counted.",
+      "id": "max_types_per_file",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Max types per file"
     }
   ]
 }

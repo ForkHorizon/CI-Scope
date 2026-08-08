@@ -39,8 +39,8 @@ extension AutomationScript {
                 }
         )
 
-        if managesLegacyReadabilityInstall {
-            paths.insert(".github/workflows/ai-readability.yml")
+        for path in legacyInstallPaths where path.hasPrefix(".github/workflows/") {
+            paths.insert(path)
         }
 
         return paths
@@ -62,10 +62,6 @@ extension AutomationScript {
             .replacingOccurrences(of: "{{script_id}}", with: id)
             .replacingOccurrences(of: "{{script_slug}}", with: scriptSlug)
             .replacingOccurrences(of: "{{script_title}}", with: title)
-    }
-
-    private var managesLegacyReadabilityInstall: Bool {
-        defaultSeedID == "ai-readability" || id == "ai-readability"
     }
 }
 

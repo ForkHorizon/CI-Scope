@@ -162,11 +162,3 @@ struct LocalBrokerService {
             .safelyAppendingPathComponent("CI Scope", isDirectory: true)
     }
 }
-
-private struct GitHubWebhookSummary: Decodable {
-    let config: GitHubWebhookConfigSummary
-}
-
-private struct GitHubWebhookConfigSummary: Decodable {
-    let url: String?
-}
