@@ -29,3 +29,4 @@ jobs:
     uses: ForkHorizon/ci-gates/.github/workflows/readability.yml@main
     with:
       mode: ${{ inputs.mode || 'auto' }}
+      config: .code-structure-linter.json

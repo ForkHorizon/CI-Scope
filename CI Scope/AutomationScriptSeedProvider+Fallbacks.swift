@@ -53,29 +53,6 @@ extension AutomationScriptSeedProvider {
         )
     }
 
-    static var fallbackVariables: [AutomationScriptVariable] {
-        [
-            AutomationScriptVariable(
-                id: "max_file_lines",
-                title: "Max file lines",
-                kind: .number,
-                isRequired: true,
-                defaultValue: "300",
-                help: "Largest allowed source file length.",
-                options: []
-            ),
-            AutomationScriptVariable(
-                id: "max_function_lines",
-                title: "Max function lines",
-                kind: .number,
-                isRequired: true,
-                defaultValue: "50",
-                help: "Largest allowed function or method length.",
-                options: []
-            ),
-        ]
-    }
-
     static var fallbackFiles: [AutomationScriptFile] {
         [
             AutomationScriptFile(
@@ -170,18 +147,16 @@ extension AutomationScriptSeedProvider {
 
     /// Shared shape for gates that are just one caller workflow file plus the generic PR body.
     static func fallbackSimpleGateSeed(
-        id: String,
-        title: String,
-        summary: String,
-        detail: String,
+        _ blurb: GateBlurb,
         gate: String,
         withConfig: Bool = false
     ) -> AutomationScript {
-        AutomationScript(
+        let id = blurb.id
+        return AutomationScript(
             id: id,
-            title: title,
-            summary: summary,
-            detail: detail,
+            title: blurb.title,
+            summary: blurb.summary,
+            detail: blurb.detail,
             runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
@@ -202,20 +177,24 @@ extension AutomationScriptSeedProvider {
 
     static func fallbackWebQualityGateSeed() -> AutomationScript {
         fallbackSimpleGateSeed(
-            id: "web-quality-gate",
-            title: "Web Quality Gate",
-            summary: "Typechecks TS/JS and blocks dead code, unused dependencies, and copy-paste.",
-            detail: "Installs a workflow calling the shared ci-gates web gate: tsc, ESLint, knip, jscpd.",
+            GateBlurb(
+                id: "web-quality-gate",
+                title: "Web Quality Gate",
+                summary: "Typechecks TS/JS and blocks dead code, unused dependencies, and copy-paste.",
+                detail: "Installs a workflow calling the shared ci-gates web gate: tsc, ESLint, knip, jscpd."
+            ),
             gate: "web-quality.yml"
         )
     }
 
     static func fallbackUnityQualityGateSeed() -> AutomationScript {
         fallbackSimpleGateSeed(
-            id: "unity-quality-gate",
-            title: "Unity Quality Gate",
-            summary: "Compiles Unity C# with analyzers and blocks warnings and copy-paste in first-party code.",
-            detail: "Installs a workflow calling the shared ci-gates Unity gate: dotnet build with analyzers, jscpd.",
+            GateBlurb(
+                id: "unity-quality-gate",
+                title: "Unity Quality Gate",
+                summary: "Compiles Unity C# with analyzers and blocks warnings and copy-paste in first-party code.",
+                detail: "Installs a workflow calling the shared ci-gates Unity gate: dotnet build with analyzers, jscpd."
+            ),
             gate: "unity-quality.yml",
             withConfig: true
         )
@@ -223,30 +202,36 @@ extension AutomationScriptSeedProvider {
 
     static func fallbackPythonQualityGateSeed() -> AutomationScript {
         fallbackSimpleGateSeed(
-            id: "python-quality-gate",
-            title: "Python Quality Gate",
-            summary: "Runs ruff lint and format checks with a strict anti-slop fallback config.",
-            detail: "Installs a workflow calling the shared ci-gates Python gate: ruff check and format.",
+            GateBlurb(
+                id: "python-quality-gate",
+                title: "Python Quality Gate",
+                summary: "Runs ruff lint and format checks with a strict anti-slop fallback config.",
+                detail: "Installs a workflow calling the shared ci-gates Python gate: ruff check and format."
+            ),
             gate: "python-quality.yml"
         )
     }
 
     static func fallbackGoQualityGateSeed() -> AutomationScript {
         fallbackSimpleGateSeed(
-            id: "go-quality-gate",
-            title: "Go Quality Gate",
-            summary: "Runs go vet, gofmt, and golangci-lint.",
-            detail: "Installs a workflow calling the shared ci-gates Go gate: vet, format, lint (no go test).",
+            GateBlurb(
+                id: "go-quality-gate",
+                title: "Go Quality Gate",
+                summary: "Runs go vet, gofmt, and golangci-lint.",
+                detail: "Installs a workflow calling the shared ci-gates Go gate: vet, format, lint (no go test)."
+            ),
             gate: "go-quality.yml"
         )
     }
 
     static func fallbackSlopReviewSeed() -> AutomationScript {
         fallbackSimpleGateSeed(
-            id: "slop-review",
-            title: "Slop Review",
-            summary: "Advisory DeepSeek LLM review of PR diffs for AI-slop; never blocks the merge.",
-            detail: "Installs a workflow calling the shared advisory ci-gates slop reviewer using DeepSeek.",
+            GateBlurb(
+                id: "slop-review",
+                title: "Slop Review",
+                summary: "Advisory DeepSeek LLM review of PR diffs for AI-slop; never blocks the merge.",
+                detail: "Installs a workflow calling the shared advisory ci-gates slop reviewer using DeepSeek."
+            ),
             gate: "slop-review.yml"
         )
     }
