@@ -131,7 +131,7 @@ struct GateMatrixView: View {
 
     private func shortName(_ script: AutomationScript) -> String {
         switch script.defaultSeedID ?? script.id {
-        case "ai-readability": "300 L"
+        case "code-linter": "300 L"
         case "swift-compile-gate": "Compile"
         case "swift-quality-gate": "Quality"
         case "web-quality-gate": "Web"

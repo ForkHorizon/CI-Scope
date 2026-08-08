@@ -127,7 +127,9 @@ final class AutomationScriptStore: ObservableObject {
             guard let data = try? Data(contentsOf: url) else { return nil }
             guard let script = try? decoder.decode(AutomationScript.self, from: data) else { return nil }
             let migratedScript = migratedCallerBasedScript(
-                migratedSwiftQualityGateScript(migratedLegacyReadabilityScript(script))
+                migratedSwiftQualityGateScript(
+                    migratedCodeLinterRename(migratedPreCodeLinterScript(script))
+                )
             )
             if migratedScript != script {
                 try? write(migratedScript)

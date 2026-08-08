@@ -106,7 +106,7 @@ Both runners should run on this Mac and include these labels:
 self-hosted, macOS, ARM64, ci-scope
 ```
 
-The portable AI readability workflow targets those labels:
+The portable Code Linter workflow targets those labels:
 
 ```yaml
 runs-on: [self-hosted, macOS, ARM64, ci-scope]

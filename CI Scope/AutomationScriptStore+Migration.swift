@@ -2,14 +2,14 @@ import Foundation
 
 @MainActor
 extension AutomationScriptStore {
-    func migratedLegacyReadabilityScript(_ script: AutomationScript) -> AutomationScript {
-        guard script.destinationPathSet == Self.legacyReadabilityDestinationPaths else {
+    func migratedPreCodeLinterScript(_ script: AutomationScript) -> AutomationScript {
+        guard script.destinationPathSet == Self.preCodeLinterDestinationPaths else {
             return script
         }
 
         var migrated = script
         if migrated.defaultSeedID == nil {
-            migrated.defaultSeedID = "ai-readability"
+            migrated.defaultSeedID = "code-linter"
         }
         if migrated.summary == "Checks max source file length and function length for AI-readable code." {
             migrated.summary = "Checks max source file length and function length."
@@ -20,12 +20,12 @@ extension AutomationScriptStore {
         if migrated.pullRequestTitle == "Add AI readability gate" || migrated.pullRequestTitle == "Add 300-line linter gate" {
             migrated.pullRequestTitle = "Add {{script_title}}"
         }
-        migrated.pullRequestBody = migratedLegacyReadabilityBody(migrated.pullRequestBody)
-        migrated.files = migratedLegacyReadabilityFiles(migrated.files)
+        migrated.pullRequestBody = migratedPreCodeLinterBody(migrated.pullRequestBody)
+        migrated.files = migratedPreCodeLinterFiles(migrated.files)
         return migrated
     }
 
-    private func migratedLegacyReadabilityBody(_ body: String) -> String {
+    private func migratedPreCodeLinterBody(_ body: String) -> String {
         body
             .replacingOccurrences(
                 of: "Adds the portable AI Readability Gate managed by CI Scope.",
@@ -40,16 +40,16 @@ extension AutomationScriptStore {
             .replacingOccurrences(of: "scripts/ai-readability-check.py", with: "scripts/{{script_slug}}.py")
     }
 
-    private func migratedLegacyReadabilityFiles(_ files: [AutomationScriptFile]) -> [AutomationScriptFile] {
+    private func migratedPreCodeLinterFiles(_ files: [AutomationScriptFile]) -> [AutomationScriptFile] {
         files.map { file in
             var migratedFile = file
             migratedFile.destinationPath = migratedDestinationPath(for: migratedFile.destinationPath)
-            migratedFile.contents = migratedLegacyReadabilityContents(migratedFile.contents)
+            migratedFile.contents = migratedPreCodeLinterContents(migratedFile.contents)
             return migratedFile
         }
     }
 
-    private func migratedLegacyReadabilityContents(_ contents: String) -> String {
+    private func migratedPreCodeLinterContents(_ contents: String) -> String {
         contents
             .replacingOccurrences(of: "name: AI Readability", with: "name: {{script_title}}")
             .replacingOccurrences(of: "name: 300-line linter gate", with: "name: {{script_title}}")
@@ -71,10 +71,10 @@ extension AutomationScriptStore {
         let isSwiftQualityGate = script.defaultSeedID == "swift-quality-gate" || script.id == "swift-quality-gate"
         guard isSwiftQualityGate else { return script }
 
-        let hasOldReadabilitySettings = script.variables.contains { variable in
+        let hasOldLinterSettings = script.variables.contains { variable in
             variable.id == "max_file_lines" || variable.id == "max_function_lines"
         }
-        let hasOldReadabilityStage = script.files.contains { file in
+        let hasOldLinterStage = script.files.contains { file in
             file.contents.contains("--stage readability")
                 || file.contents.contains("max_file_lines")
                 || file.contents.contains("max_function_lines")
@@ -84,7 +84,7 @@ extension AutomationScriptStore {
                 && file.contents.contains("periphery")
                 && !file.contents.contains("\"--strict\"")
         }
-        guard hasOldReadabilitySettings || hasOldReadabilityStage || hasNonBlockingDeadCodeGate else {
+        guard hasOldLinterSettings || hasOldLinterStage || hasNonBlockingDeadCodeGate else {
             return script
         }
 
@@ -122,7 +122,7 @@ extension AutomationScriptStore {
         }
     }
 
-    private static let legacyReadabilityDestinationPaths: Set<String> = [
+    private static let preCodeLinterDestinationPaths: Set<String> = [
         ".ai-readability.json",
         ".github/workflows/ai-readability.yml",
         "scripts/ai-readability-check.py",
