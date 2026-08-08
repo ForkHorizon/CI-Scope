@@ -90,15 +90,12 @@ final class AutomationScriptStore: ObservableObject {
     }
 
     private func userScripts() -> [AutomationScript] {
-        guard let urls = try? FileManager.default.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) else {
-            return []
+        let contents = try? FileManager.default.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil)
+        return (contents ?? []).compactMap { url in
+            guard url.pathExtension == "json", url.lastPathComponent != Self.deletedDefaultsFileName else { return nil }
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return try? decoder.decode(AutomationScript.self, from: data)
         }
-        return urls
-            .filter { $0.pathExtension == "json" && $0.lastPathComponent != Self.deletedDefaultsFileName }
-            .compactMap { url in
-                guard let data = try? Data(contentsOf: url) else { return nil }
-                return try? decoder.decode(AutomationScript.self, from: data)
-            }
     }
 
     /// Seeds the user has neither hidden nor taken over with an edited copy.
