@@ -60,11 +60,9 @@ extension AutomationScriptInstaller {
             )
             try renderer.validate()
             let files = try renderer.renderedFiles()
-            let obsolete = obsoleteInstalledFiles(for: script, currentFiles: files, cwd: repoURL)
-            try await remove(obsolete, cwd: repoURL)
             try write(files, to: repoURL)
             try await stage(files, cwd: repoURL)
-            touched += files + obsolete
+            touched += files
         }
         return touched
     }

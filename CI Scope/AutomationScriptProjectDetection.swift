@@ -29,7 +29,7 @@ struct InstalledAutomationScript: Identifiable {
 
 extension AutomationScript {
     var workflowDestinationPaths: Set<String> {
-        var paths = Set(
+        Set(
             files
                 .map { renderedDetectionPath($0.destinationPath).normalizedRepositoryPath }
                 .filter { path in
@@ -38,12 +38,6 @@ extension AutomationScript {
                         && !path.contains("{{")
                 }
         )
-
-        for path in legacyInstallPaths where path.hasPrefix(".github/workflows/") {
-            paths.insert(path)
-        }
-
-        return paths
     }
 
     func matchingWorkflow(in snapshot: ProjectCISnapshot?) -> GitHubWorkflow? {
