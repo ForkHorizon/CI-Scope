@@ -78,11 +78,9 @@ struct AutomationScriptInstaller {
         let branchExists = await remoteBranchExists(renderer.branchName, cwd: repoURL)
         try await checkoutBranch(renderer.branchName, exists: branchExists, cwd: repoURL)
         let files = try renderer.renderedFiles()
-        let obsoleteFiles = obsoleteInstalledFiles(for: script, currentFiles: files, cwd: repoURL)
-        try await remove(obsoleteFiles, cwd: repoURL)
         try write(files, to: repoURL)
         try await stage(files, cwd: repoURL)
-        return files + obsoleteFiles
+        return files
     }
 
     func remove(
@@ -110,11 +108,9 @@ struct AutomationScriptInstaller {
         let branchExists = await remoteBranchExists(branchName, cwd: repoURL)
         try await checkoutBranch(branchName, exists: branchExists, cwd: repoURL)
         let files = try renderer.renderedFiles()
-        let obsoleteFiles = obsoleteInstalledFiles(for: script, currentFiles: files, cwd: repoURL)
-        let filesToRemove = files + obsoleteFiles
-        try await remove(filesToRemove, cwd: repoURL)
+        try await remove(files, cwd: repoURL)
 
-        if try await hasStagedChanges(files: filesToRemove, cwd: repoURL) {
+        if try await hasStagedChanges(files: files, cwd: repoURL) {
             try await commitAndPushRemoval(script: script, branchName: branchName, cwd: repoURL)
         }
         guard try await branchDiffersFromDefault(defaultBranch: defaultBranch, cwd: repoURL) else {
@@ -212,36 +208,6 @@ struct AutomationScriptInstaller {
     func hasStagedChanges(files: [AutomationScriptFile], cwd: URL) async throws -> Bool {
         guard !files.isEmpty else { return false }
         return try await diffHasChanges("git diff --cached --quiet -- \(gitPaths(files))", cwd: cwd, step: "Check staged changes")
-    }
-
-    func obsoleteInstalledFiles(
-        for script: AutomationScript,
-        currentFiles: [AutomationScriptFile],
-        cwd: URL
-    ) -> [AutomationScriptFile] {
-        let currentPaths = Set(currentFiles.map { normalizedPath($0.destinationPath) })
-        return
-            script.legacyInstallPaths
-            .filter { path in
-                !currentPaths.contains(normalizedPath(path))
-                    && fileManager.fileExists(atPath: (try? cwd.safelyAppendingPathComponent(path))?.path ?? "")
-            }
-            .map { path in
-                AutomationScriptFile(
-                    id: "obsolete-\(path)",
-                    destinationPath: path,
-                    isExecutable: false,
-                    contents: ""
-                )
-            }
-    }
-
-    private func normalizedPath(_ path: String) -> String {
-        path
-            .trimmed
-            .replacingOccurrences(of: "\\", with: "/")
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            .lowercased()
     }
 
     private func commitAndPush(renderer: AutomationScriptRenderer, cwd: URL) async throws {

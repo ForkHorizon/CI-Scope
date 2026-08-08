@@ -1,6 +1,13 @@
 import Foundation
 import Combine
 
+/// The gate definitions the app offers.
+///
+/// Default gates are read from the bundled seeds on every launch and are never
+/// copied to disk, so they cannot go stale: renaming a gate or changing what it
+/// installs takes effect immediately, with nothing to migrate. Disk holds only
+/// scripts the user authored or edited — an edited default keeps its
+/// `defaultSeedID` and shadows the seed until it is reset.
 @MainActor
 final class AutomationScriptStore: ObservableObject {
     @Published private(set) var scripts: [AutomationScript] = []
@@ -29,9 +36,8 @@ final class AutomationScriptStore: ObservableObject {
 
     func createScript() {
         let script = AutomationScript.empty(uniqueID: uniqueID(base: "custom-script"))
-        scripts.append(script)
-        selectedScriptID = script.id
-        _ = try? save(script, replacing: nil)
+        try? write(script)
+        reload(selecting: script.id)
     }
 
     @discardableResult
@@ -41,30 +47,77 @@ final class AutomationScriptStore: ObservableObject {
         try ensureUnique(storedScript.id, replacing: oldID)
         try write(storedScript)
         if let oldID, oldID != storedScript.id {
-            if let oldURL = try? url(for: oldID) { try? FileManager.default.removeItem(at: oldURL) }
+            removeStoredFile(for: oldID)
         }
-        reloadFromDisk(selecting: storedScript.id)
+        reload(selecting: storedScript.id)
         return storedScript
     }
 
     func deleteSelectedScript() {
         guard let selectedScript else { return }
-        if let seedID = defaultSeedID(for: selectedScript) {
+        if let seedID = seedID(for: selectedScript) {
             try? markDefaultSeedDeleted(seedID)
         }
-        if let scriptURL = try? url(for: selectedScript.id) { try? FileManager.default.removeItem(at: scriptURL) }
-        reloadFromDisk(selecting: nil)
+        removeStoredFile(for: selectedScript.id)
+        reload(selecting: nil)
     }
 
+    /// Drops the user's edits so the gate comes from the bundled seed again.
     func resetSelectedScriptToDefault() throws {
-        guard let selectedScript, let seedID = selectedScript.defaultSeedID else { return }
-        let seed = try AutomationScriptSeedProvider.loadSeed(seedID)
-        try write(seed)
+        guard let selectedScript, let seedID = seedID(for: selectedScript) else { return }
+        removeStoredFile(for: selectedScript.id)
         try unmarkDefaultSeedDeleted(seedID)
-        if selectedScript.id != seed.id {
-            if let scriptURL = try? url(for: selectedScript.id) { try? FileManager.default.removeItem(at: scriptURL) }
+        let seed = try AutomationScriptSeedProvider.loadSeed(seedID)
+        reload(selecting: seed.id)
+    }
+
+    private func load() {
+        do {
+            try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            reload(selecting: nil)
+        } catch {
+            errorMessage = error.localizedDescription
         }
-        reloadFromDisk(selecting: seed.id)
+    }
+
+    private func reload(selecting preferredID: String?) {
+        scripts = (userScripts() + availableSeeds())
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        selectedScriptID = preferredID ?? selectedScriptID ?? scripts.first?.id
+        if selectedScriptID.flatMap({ id in scripts.first { $0.id == id } }) == nil {
+            selectedScriptID = scripts.first?.id
+        }
+    }
+
+    private func userScripts() -> [AutomationScript] {
+        guard let urls = try? FileManager.default.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) else {
+            return []
+        }
+        return urls
+            .filter { $0.pathExtension == "json" && $0.lastPathComponent != Self.deletedDefaultsFileName }
+            .compactMap { url in
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                return try? decoder.decode(AutomationScript.self, from: data)
+            }
+    }
+
+    /// Seeds the user has neither hidden nor taken over with an edited copy.
+    private func availableSeeds() -> [AutomationScript] {
+        let stored = userScripts()
+        let shadowed = Set(stored.compactMap(\.defaultSeedID)).union(stored.map(\.id))
+        let deleted = deletedDefaultSeedIDs()
+        // Loaded one at a time so a single unreadable seed hides that gate
+        // instead of every gate.
+        return AutomationScriptSeedProvider.defaultSeedIDs
+            .filter { !shadowed.contains($0) && !deleted.contains($0) }
+            .compactMap { try? AutomationScriptSeedProvider.loadSeed($0) }
+    }
+
+    private func seedID(for script: AutomationScript) -> String? {
+        if let seedID = script.defaultSeedID, AutomationScriptSeedProvider.defaultSeedIDs.contains(seedID) {
+            return seedID
+        }
+        return AutomationScriptSeedProvider.defaultSeedIDs.contains(script.id) ? script.id : nil
     }
 
     private func normalizedForSave(_ script: AutomationScript, replacing oldID: String?) -> AutomationScript {
@@ -101,66 +154,6 @@ final class AutomationScriptStore: ObservableObject {
         isGeneratedID(id, from: "custom-script")
     }
 
-    private func load() {
-        do {
-            try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-            try seedDefaultsIfNeeded()
-            reloadFromDisk(selecting: nil)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func reloadFromDisk(selecting preferredID: String?) {
-        scripts = loadScriptsFromDisk().sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-        selectedScriptID = preferredID ?? selectedScriptID ?? scripts.first?.id
-        if selectedScriptID.flatMap({ id in scripts.first { $0.id == id } }) == nil {
-            selectedScriptID = scripts.first?.id
-        }
-    }
-
-    private func loadScriptsFromDisk() -> [AutomationScript] {
-        guard let urls = try? FileManager.default.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) else {
-            return []
-        }
-        return urls.filter { $0.pathExtension == "json" }.compactMap { url in
-            guard let data = try? Data(contentsOf: url) else { return nil }
-            guard let script = try? decoder.decode(AutomationScript.self, from: data) else { return nil }
-            let migratedScript = migratedCallerBasedScript(
-                migratedSwiftQualityGateScript(
-                    migratedCodeLinterRename(migratedPreCodeLinterScript(script))
-                )
-            )
-            if migratedScript != script {
-                try? write(migratedScript)
-            }
-            return migratedScript
-        }
-    }
-
-    private func seedDefaultsIfNeeded() throws {
-        let storedScripts = loadScriptsFromDisk()
-        let deletedSeedIDs = deletedDefaultSeedIDs()
-        let storedSeedIDs = Set(storedScripts.compactMap(\.defaultSeedID))
-        let storedScriptIDs = Set(storedScripts.map(\.id))
-
-        for seed in try AutomationScriptSeedProvider.loadDefaultScripts() {
-            let isAlreadyStored =
-                storedScriptIDs.contains(seed.id)
-                || storedSeedIDs.contains(seed.id)
-            if !isAlreadyStored, !deletedSeedIDs.contains(seed.id) {
-                try write(seed)
-            }
-        }
-    }
-
-    private func defaultSeedID(for script: AutomationScript) -> String? {
-        if let seedID = script.defaultSeedID {
-            return seedID
-        }
-        return AutomationScriptSeedProvider.defaultSeedIDs.contains(script.id) ? script.id : nil
-    }
-
     private func markDefaultSeedDeleted(_ seedID: String) throws {
         var ids = deletedDefaultSeedIDs()
         ids.insert(seedID)
@@ -193,6 +186,12 @@ final class AutomationScriptStore: ObservableObject {
         try data.write(to: try url(for: script.id), options: .atomic)
     }
 
+    private func removeStoredFile(for id: String) {
+        if let scriptURL = try? url(for: id) {
+            try? FileManager.default.removeItem(at: scriptURL)
+        }
+    }
+
     private func ensureUnique(_ id: String, replacing oldID: String?) throws {
         if oldID == id { return }
         guard !scripts.contains(where: { $0.id == id }) else {
@@ -218,8 +217,10 @@ final class AutomationScriptStore: ObservableObject {
         try directoryURL.safelyAppendingPathComponent("\(id).json")
     }
 
+    private static let deletedDefaultsFileName = "deleted-default-scripts.json"
+
     private var deletedDefaultsURL: URL {
-        try! directoryURL.safelyAppendingPathComponent("deleted-default-scripts.json")
+        try! directoryURL.safelyAppendingPathComponent(Self.deletedDefaultsFileName)
     }
 
     private static func storageDirectory(fileManager: FileManager) -> URL {

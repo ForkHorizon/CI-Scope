@@ -7,10 +7,6 @@ enum AutomationScriptSeedProvider {
         "unity-quality-gate", "slop-review",
     ]
 
-    static func loadDefaultScripts() throws -> [AutomationScript] {
-        try defaultSeedIDs.map { try loadSeed($0) }
-    }
-
     static func loadSeed(_ id: String) throws -> AutomationScript {
         if let script = try loadBundledSeed(id) {
             return script
