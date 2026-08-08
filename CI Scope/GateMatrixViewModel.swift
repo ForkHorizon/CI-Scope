@@ -1,9 +1,10 @@
 import Combine
 import Foundation
 
-/// Loads each project's workflow list so the coverage matrix can show which
-/// managed gates are installed where. Reuses the same detection the rest of the
-/// app uses (`AutomationScript.matchingWorkflow`), so results stay consistent.
+/// Loads each project's default-branch workflow files so the coverage matrix can
+/// show which managed gates are installed where. Detection itself is the same
+/// `AutomationScript.matchingWorkflow` the rest of the app uses; only the source
+/// is narrower, because a gate sitting in an unmerged install PR is not installed.
 @MainActor
 final class GateMatrixViewModel: ObservableObject {
     @Published private(set) var workflowsByProject: [String: [GitHubWorkflow]] = [:]
@@ -11,12 +12,11 @@ final class GateMatrixViewModel: ObservableObject {
 
     private let service = ProjectCIService(config: DashboardConfig())
 
-    func load(_ projects: [CIProject], forceRefresh: Bool = false) async {
+    func load(_ projects: [CIProject]) async {
         isLoading = true
         var result: [String: [GitHubWorkflow]] = [:]
         for project in projects {
-            let response = await service.loadWorkflows(for: project, forceRefresh: forceRefresh)
-            result[project.id] = response.value ?? []
+            result[project.id] = await service.defaultBranchWorkflows(for: project)
         }
         workflowsByProject = result
         isLoading = false

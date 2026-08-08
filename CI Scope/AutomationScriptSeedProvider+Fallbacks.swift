@@ -53,14 +53,33 @@ extension AutomationScriptSeedProvider {
         )
     }
 
+    /// The caller workflow passes `config: .{{script_slug}}.json`, so the config
+    /// has to ship with it — without it the six tunable limits are written to a
+    /// file nobody reads and the gate silently runs on the linter's defaults.
     static var fallbackFiles: [AutomationScriptFile] {
         [
+            AutomationScriptFile(
+                id: "config",
+                destinationPath: ".{{script_slug}}.json",
+                isExecutable: false,
+                contents: """
+                    {
+                      "max_file_lines": {{max_file_lines}},
+                      "max_function_lines": {{max_function_lines}},
+                      "max_nesting_depth": {{max_nesting_depth}},
+                      "max_parameters": {{max_parameters}},
+                      "max_comment_lines": {{max_comment_lines}},
+                      "max_types_per_file": {{max_types_per_file}}
+                    }
+
+                    """
+            ),
             AutomationScriptFile(
                 id: "workflow",
                 destinationPath: ".github/workflows/{{script_slug}}.yml",
                 isExecutable: false,
                 contents: fallbackWorkflow
-            )
+            ),
         ]
     }
 
