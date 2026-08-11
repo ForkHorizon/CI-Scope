@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# CI approval probe: harmless code-file comment; no runtime behavior change.
 set -euo pipefail
 
 RUNNER_HOME="${RUNNER_HOME:-$HOME/actions-runners}"
