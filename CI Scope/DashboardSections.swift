@@ -4,6 +4,8 @@ enum WorkspaceTab: String, CaseIterable, Identifiable {
     case projects
     case runners
     case scripts
+    case coverage
+    case settings
 
     var id: String { rawValue }
 
@@ -12,6 +14,8 @@ enum WorkspaceTab: String, CaseIterable, Identifiable {
         case .projects: "Projects"
         case .runners: "Runners"
         case .scripts: "Scripts"
+        case .coverage: "Coverage"
+        case .settings: "Settings"
         }
     }
 
@@ -20,6 +24,8 @@ enum WorkspaceTab: String, CaseIterable, Identifiable {
         case .projects: "square.grid.2x2"
         case .runners: "server.rack"
         case .scripts: "curlybraces.square"
+        case .coverage: "tablecells"
+        case .settings: "gearshape"
         }
     }
 }

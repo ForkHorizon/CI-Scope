@@ -14,8 +14,7 @@ struct AutomationScriptInstaller {
         variableValues: [String: String],
         mode: AutomationScriptInstallMode
     ) async throws -> AutomationScriptInstallResult {
-        _ = try await run("NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
-        try await validateBrokerAccessIfNeeded(mode: mode, project: project)
+        try await prepareBrokerForInstall(script: script, project: project, mode: mode)
         let defaultBranch = try await defaultBranch(for: project)
         let renderer = AutomationScriptRenderer(
             script: script,
@@ -32,7 +31,6 @@ struct AutomationScriptInstaller {
         defer { try? fileManager.removeItem(at: tempRoot) }
 
         let touchedFiles = try await renderAndStageInstall(
-            script: script,
             project: project,
             defaultBranch: defaultBranch,
             renderer: renderer,
@@ -43,7 +41,6 @@ struct AutomationScriptInstaller {
             try await commitAndPush(renderer: renderer, cwd: repoURL)
         }
         guard try await branchDiffersFromDefault(defaultBranch: defaultBranch, cwd: repoURL) else {
-            try await attachBrokerIfNeeded(mode: mode, project: project)
             return alreadyInstalledResult(script, defaultBranch: defaultBranch)
         }
         let pullRequestURL = try await pullRequestURL(
@@ -51,12 +48,25 @@ struct AutomationScriptInstaller {
             renderer: renderer,
             tempRoot: tempRoot
         )
-        try await attachBrokerIfNeeded(mode: mode, project: project)
         return readyResult(script, pullRequestURL: pullRequestURL)
     }
 
-    private func renderAndStageInstall(
+    /// Attach (and create the repo's webhook) before any push or PR: a
+    /// brand-new project's very first PR fires workflow_job:queued the moment
+    /// it opens, and if the webhook doesn't exist yet that event has nowhere
+    /// to go — permanently stuck, unrecoverable (see NexusUnity, 2026-07-04).
+    private func prepareBrokerForInstall(
         script: AutomationScript,
+        project: CIProject,
+        mode: AutomationScriptInstallMode
+    ) async throws {
+        _ = try await run("NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
+        try await validateBrokerAccessIfNeeded(mode: mode, project: project)
+        try validateRunnerLabelsSatisfiable(mode: mode, script: script, project: project)
+        try await attachBrokerIfNeeded(mode: mode, project: project)
+    }
+
+    private func renderAndStageInstall(
         project: CIProject,
         defaultBranch: String,
         renderer: AutomationScriptRenderer,
@@ -66,11 +76,9 @@ struct AutomationScriptInstaller {
         let branchExists = await remoteBranchExists(renderer.branchName, cwd: repoURL)
         try await checkoutBranch(renderer.branchName, exists: branchExists, cwd: repoURL)
         let files = try renderer.renderedFiles()
-        let obsoleteFiles = obsoleteInstalledFiles(for: script, currentFiles: files, cwd: repoURL)
-        try await remove(obsoleteFiles, cwd: repoURL)
         try write(files, to: repoURL)
         try await stage(files, cwd: repoURL)
-        return files + obsoleteFiles
+        return files
     }
 
     func remove(
@@ -98,11 +106,9 @@ struct AutomationScriptInstaller {
         let branchExists = await remoteBranchExists(branchName, cwd: repoURL)
         try await checkoutBranch(branchName, exists: branchExists, cwd: repoURL)
         let files = try renderer.renderedFiles()
-        let obsoleteFiles = obsoleteInstalledFiles(for: script, currentFiles: files, cwd: repoURL)
-        let filesToRemove = files + obsoleteFiles
-        try await remove(filesToRemove, cwd: repoURL)
+        try await remove(files, cwd: repoURL)
 
-        if try await hasStagedChanges(files: filesToRemove, cwd: repoURL) {
+        if try await hasStagedChanges(files: files, cwd: repoURL) {
             try await commitAndPushRemoval(script: script, branchName: branchName, cwd: repoURL)
         }
         guard try await branchDiffersFromDefault(defaultBranch: defaultBranch, cwd: repoURL) else {
@@ -118,7 +124,7 @@ struct AutomationScriptInstaller {
         return removalReadyResult(script, pullRequestURL: pullRequestURL)
     }
 
-    private func defaultBranch(for project: CIProject) async throws -> String {
+    func defaultBranch(for project: CIProject) async throws -> String {
         let output = try await run(
             "gh repo view \(quoted(project.repositorySlug)) --json defaultBranchRef --jq '.defaultBranchRef.name'",
             step: "Read default branch"
@@ -130,7 +136,7 @@ struct AutomationScriptInstaller {
         return branch
     }
 
-    private func clone(project: CIProject, defaultBranch: String, into repoURL: URL) async throws {
+    func clone(project: CIProject, defaultBranch: String, into repoURL: URL) async throws {
         _ = try await run(
             "gh repo clone \(quoted(project.repositorySlug)) \(quoted(repoURL.path)) -- --depth 1 --branch \(quoted(defaultBranch))",
             timeout: 180,
@@ -138,12 +144,12 @@ struct AutomationScriptInstaller {
         )
     }
 
-    private func remoteBranchExists(_ branch: String, cwd: URL) async -> Bool {
+    func remoteBranchExists(_ branch: String, cwd: URL) async -> Bool {
         let result = await shell("git ls-remote --exit-code --heads origin \(quoted(branch))", cwd: cwd)
         return result.exitCode == 0
     }
 
-    private func checkoutBranch(_ branch: String, exists: Bool, cwd: URL) async throws {
+    func checkoutBranch(_ branch: String, exists: Bool, cwd: URL) async throws {
         if exists {
             try await checkoutExistingBranch(branch, cwd: cwd)
         } else {
@@ -165,7 +171,7 @@ struct AutomationScriptInstaller {
         )
     }
 
-    private func write(_ files: [AutomationScriptFile], to repoURL: URL) throws {
+    func write(_ files: [AutomationScriptFile], to repoURL: URL) throws {
         for file in files {
             let destinationURL = try repoURL.safelyAppendingPathComponent(file.destinationPath)
             try fileManager.createDirectory(
@@ -176,11 +182,11 @@ struct AutomationScriptInstaller {
         }
     }
 
-    private func stage(_ files: [AutomationScriptFile], cwd: URL) async throws {
+    func stage(_ files: [AutomationScriptFile], cwd: URL) async throws {
         _ = try await run(stageCommand(for: files), cwd: cwd, step: "Stage automation files")
     }
 
-    private func remove(_ files: [AutomationScriptFile], cwd: URL) async throws {
+    func remove(_ files: [AutomationScriptFile], cwd: URL) async throws {
         guard !files.isEmpty else { return }
         _ = try await run(
             "git rm -f --ignore-unmatch -- \(gitPaths(files))",
@@ -197,49 +203,9 @@ struct AutomationScriptInstaller {
         return "set -euo pipefail\n\(chmod)git add -f -- \(paths)\n\(stageExecutable)"
     }
 
-    private func hasStagedChanges(files: [AutomationScriptFile], cwd: URL) async throws -> Bool {
+    func hasStagedChanges(files: [AutomationScriptFile], cwd: URL) async throws -> Bool {
         guard !files.isEmpty else { return false }
         return try await diffHasChanges("git diff --cached --quiet -- \(gitPaths(files))", cwd: cwd, step: "Check staged changes")
-    }
-
-    private func obsoleteInstalledFiles(
-        for script: AutomationScript,
-        currentFiles: [AutomationScriptFile],
-        cwd: URL
-    ) -> [AutomationScriptFile] {
-        guard script.defaultSeedID == "ai-readability" || script.id == "ai-readability" else { return [] }
-
-        let currentPaths = Set(currentFiles.map { normalizedPath($0.destinationPath) })
-        return
-            legacyReadabilityInstallPaths
-            .filter { path in
-                !currentPaths.contains(normalizedPath(path))
-                    && fileManager.fileExists(atPath: (try? cwd.safelyAppendingPathComponent(path))?.path ?? "")
-            }
-            .map { path in
-                AutomationScriptFile(
-                    id: "obsolete-\(path)",
-                    destinationPath: path,
-                    isExecutable: false,
-                    contents: ""
-                )
-            }
-    }
-
-    private var legacyReadabilityInstallPaths: [String] {
-        [
-            ".ai-readability.json",
-            ".github/workflows/ai-readability.yml",
-            "scripts/ai-readability-check.py",
-        ]
-    }
-
-    private func normalizedPath(_ path: String) -> String {
-        path
-            .trimmed
-            .replacingOccurrences(of: "\\", with: "/")
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            .lowercased()
     }
 
     private func commitAndPush(renderer: AutomationScriptRenderer, cwd: URL) async throws {
@@ -266,7 +232,7 @@ struct AutomationScriptInstaller {
         )
     }
 
-    private func branchDiffersFromDefault(defaultBranch: String, cwd: URL) async throws -> Bool {
+    func branchDiffersFromDefault(defaultBranch: String, cwd: URL) async throws -> Bool {
         try await diffHasChanges(
             "git diff --quiet \(quoted("refs/remotes/origin/\(defaultBranch)")) HEAD --",
             cwd: cwd,

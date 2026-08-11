@@ -5,11 +5,14 @@ struct ProjectCIPanel: View {
     let project: CIProject
     let snapshot: ProjectCISnapshot?
     let isLoading: Bool
+    let liveJobs: [RunnerWorkItem]
     let scripts: [AutomationScript]
     let isBrokerManaged: Bool
     let removalSnapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
     let onAttachToBroker: () -> Void
     let onRemoveScript: (AutomationScript) -> Void
+    @ObservedObject var installViewModel: AutomationScriptInstallViewModel
+    @State var codeLinterStatus: CodeLinterWorkflowStatus = .unavailable
 
     var body: some View {
         PanelShell(title: "GitHub CI", icon: "point.3.connected.trianglepath.dotted") {
@@ -84,8 +87,26 @@ struct ProjectCIPanel: View {
                         brokerAccessRow
                     }
 
+                    HStack {
+                        RecommendedGatesButton(
+                            project: project,
+                            scripts: scripts,
+                            isInstalled: { $0.matchingWorkflow(in: snapshot) != nil },
+                            installViewModel: installViewModel
+                        )
+                        Spacer()
+                    }
+
+                    if let script = codeLinterScript, let workflow = script.matchingWorkflow(in: snapshot) {
+                        codeLinterStatusRow(script: script, workflow: workflow)
+                    }
+
                     if let error = snapshot?.error {
                         ErrorBox(text: error)
+                    }
+
+                    if !liveJobs.isEmpty {
+                        ProjectLiveWorkSection(items: liveJobs)
                     }
 
                     if !installedScripts.isEmpty {
@@ -111,6 +132,7 @@ struct ProjectCIPanel: View {
                 .padding(12)
             }
         }
+        .task(id: codeLinterWorkflowPath) { await refreshCodeLinterStatus() }
     }
 
     private var brokerAccessRow: some View {
@@ -231,6 +253,22 @@ struct ProjectCIPanel: View {
 
     func openGitHubRepository() {
         NSWorkspace.shared.open(githubURL)
+    }
+}
+
+private struct ProjectLiveWorkSection: View {
+    let items: [RunnerWorkItem]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label("Running now", systemImage: "waveform.path.ecg")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+
+            ForEach(items) { item in
+                LiveWorkCard(item: item, compact: true)
+            }
+        }
     }
 }
 

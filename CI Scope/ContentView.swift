@@ -9,6 +9,7 @@ struct ContentView: View {
     @StateObject var scriptStore = AutomationScriptStore()
     @StateObject var scriptInstallViewModel = AutomationScriptInstallViewModel()
     @StateObject var runnerFleetViewModel = RunnerFleetViewModel()
+    @StateObject var settingsStore = CIQueueSettingsStore()
     @StateObject var notificationManager = NotificationManager.shared
     @State var workspaceTab: WorkspaceTab = .projects
     @State var isProjectMenuOpen = true
@@ -74,7 +75,12 @@ struct ContentView: View {
         }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
             guard workspaceTab != .runners else { return }
-            Task { @MainActor in refreshCurrentTab() }
+            Task { @MainActor in
+                // Fallback poll only: skip entirely while GitHub is rate-limited
+                // so we never pile requests onto an exhausted quota.
+                if await GitHubRateLimitGate.shared.isPaused() { return }
+                refreshCurrentTab()
+            }
         }
     }
 }

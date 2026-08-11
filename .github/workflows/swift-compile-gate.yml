@@ -17,17 +17,4 @@ concurrency:
 
 jobs:
   swift-compile-gate:
-    name: Swift Compile Gate
-    runs-on: [self-hosted, macOS, ARM64, ci-scope-broker]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Compile
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 scripts/swift-compile-gate.py --config .swift-compile-gate.json
+    uses: ForkHorizon/ci-gates/.github/workflows/swift-compile.yml@main

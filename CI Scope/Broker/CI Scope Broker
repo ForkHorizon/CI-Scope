@@ -5,6 +5,8 @@ import glob
 import hashlib
 import hmac
 import json
+import logging
+import logging.handlers
 import os
 import shutil
 import signal
@@ -13,12 +15,16 @@ import sys
 import tarfile
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.request import urlopen
 
+SERVICE_LABEL = "com.ci-scope.local-mac-broker"
 ORG_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope"]
 ORG_BROKER_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
 PRIVATE_LABELS = ["self-hosted", "macOS", "ARM64", "ci-scope-broker"]
@@ -51,11 +57,41 @@ DEFAULT_PROFILES = [
         "enabled": True,
     },
 ]
-POLL_SECONDS = max(1, int(os.environ.get("CI_SCOPE_POLL_SECONDS", "4")))
-WEBHOOK_RECONCILE_SECONDS = 75
+POLL_SECONDS = max(60, int(os.environ.get("CI_SCOPE_POLL_SECONDS", "900")))
+WEBHOOK_RECONCILE_SECONDS = max(60, int(os.environ.get("CI_SCOPE_WEBHOOK_RECONCILE_SECONDS", "900")))
 ORG_REPO_CACHE_SECONDS = int(os.environ.get("CI_SCOPE_ORG_REPO_CACHE_SECONDS", "90"))
 POLL_MAX_WORKERS = max(1, int(os.environ.get("CI_SCOPE_POLL_WORKERS", "12")))
 WEBHOOK_FRESH_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_FRESH_SECONDS", "300"))
+WEBHOOK_QUEUE_GRACE_SECONDS = int(os.environ.get("CI_SCOPE_WEBHOOK_QUEUE_GRACE", "120"))
+BACKEND_URL = os.environ.get("CI_SCOPE_BACKEND_URL", "").rstrip("/")
+BACKEND_TOKEN = os.environ.get("CI_SCOPE_BACKEND_TOKEN", "")
+# Cloudflare's Browser Integrity Check 403s the default Python-urllib/x.y UA
+# (error 1010) before the request reaches the Worker, so every backend call
+# advertises a product UA instead. Overridable in case the edge ever needs a
+# different allow-listed value.
+BACKEND_USER_AGENT = os.environ.get("CI_SCOPE_USER_AGENT", "") or "CI-Scope-Broker/1.0"
+SERVER_MODE = os.environ.get("CI_SCOPE_SERVER_MODE", "") == "1"
+MACHINE_ID = os.environ.get("CI_SCOPE_MACHINE_ID", "") or os.uname().nodename
+MACHINE_NAME = os.environ.get("CI_SCOPE_MACHINE_NAME", "") or os.uname().nodename
+MACHINE_LABELS = [
+    label.strip()
+    for label in os.environ.get("CI_SCOPE_MACHINE_LABELS", ",".join(PRIVATE_LABELS)).split(",")
+    if label.strip()
+]
+MACHINE_CAPACITY = max(1, int(os.environ.get("CI_SCOPE_MACHINE_CAPACITY", "1")))
+BACKEND_SNAPSHOT_SECONDS = max(30, int(os.environ.get("CI_SCOPE_BACKEND_SNAPSHOT_SECONDS", "900")))
+BACKEND_FALLBACK_SECONDS = max(60, int(os.environ.get("CI_SCOPE_BACKEND_FALLBACK_SECONDS", "900")))
+BACKEND_FALLBACK_MAX_SECONDS = max(
+    BACKEND_FALLBACK_SECONDS,
+    int(os.environ.get("CI_SCOPE_BACKEND_FALLBACK_MAX_SECONDS", "3600")),
+)
+BACKEND_CONNECT_TIMEOUT = max(1, int(os.environ.get("CI_SCOPE_BACKEND_CONNECT_TIMEOUT", "8")))
+BACKEND_SSE_RETRY_SECONDS = max(1, int(os.environ.get("CI_SCOPE_BACKEND_SSE_RETRY_SECONDS", "5")))
+# The broker only runs while the CI Scope app is open. The app touches this
+# heartbeat file every few seconds; an empty path keeps the legacy always-on
+# behaviour (old plist without the env var).
+APP_HEARTBEAT_PATH = os.environ.get("CI_SCOPE_APP_HEARTBEAT_PATH", "")
+APP_HEARTBEAT_STALE_SECONDS = max(5, int(os.environ.get("CI_SCOPE_APP_HEARTBEAT_STALE", "15")))
 SCHEDULER_SECONDS = 1
 MAX_RETRIES = 3
 RETRY_RESET_SECONDS = int(os.environ.get("CI_SCOPE_RETRY_RESET_SECONDS", "300"))
@@ -68,18 +104,139 @@ MAX_WEBHOOK_BODY_BYTES = 2_000_000
 ROOT = Path.home() / "Library/Application Support/CI Scope/Broker"
 REGISTRY_PATH = ROOT / "managed-repos.json"
 STATE_PATH = ROOT / "broker-state.json"
+RUNS_PATH = ROOT / "workflow-runs.json"
 JOBS_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/jobs"
 RUNNER_TEMPLATE_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/runner-template"
+TOOL_CACHE_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/toolcache"
 LOG_DIR = Path.home() / "Library/Logs/CI Scope/Broker"
 WEBHOOK_PORT = int(os.environ.get("CI_SCOPE_WEBHOOK_PORT", "8765"))
 WEBHOOK_PATH = os.environ.get("CI_SCOPE_WEBHOOK_PATH", "/github/workflow-job")
 WEBHOOK_SECRET_PATH = Path(os.environ.get("CI_SCOPE_WEBHOOK_SECRET_PATH", ROOT / "webhook-secret"))
+# Written by the app right before it boots the LaunchAgent out on a real quit,
+# deleted here once consumed. Its presence is what tells shutdown() this
+# SIGTERM is a quit (kill active runners) rather than a routine restart
+# (Settings button, app launch, kickstart -k all send the same signal).
+QUIT_MARKER_PATH = ROOT / "quit-requested"
+# PID of the CI Scope.app process that (re)installed this LaunchAgent, if any.
+# Lets the broker notice its owner force-quit or crashed even when no SIGTERM
+# ever arrives (that only happens on a clean quit), so it can tear itself
+# down instead of running on as an orphan nobody asked for.
+OWNER_PID = int(os.environ.get("CI_SCOPE_APP_PID", "0") or 0)
+LOG_RETENTION_SECONDS = max(1, int(os.environ.get("CI_SCOPE_LOG_RETENTION_DAYS", "14"))) * 86400
+IDLE_SWEEP_SECONDS = 30
 
 STATE_LOCK = threading.RLock()
+# Guards workflow-runs.json (the dashboard snapshot), kept separate from
+# STATE_LOCK so dashboard recording can never block job dispatch.
+RUNS_LOCK = threading.Lock()
+MAX_DASHBOARD_RUNS = int(os.environ.get("CI_SCOPE_MAX_DASHBOARD_RUNS", "80"))
 ACTIVE_PROCESSES: dict[int, subprocess.Popen] = {}
-RETRY_RESET_AT = time.monotonic()
+# job id -> time.monotonic() when its retry counter was last bumped, so
+# reset_stale_retries can age each job out individually. Loop-owned (touched
+# only from tick), like the retries dict itself.
+RETRY_BUMPED_AT: dict[str, float] = {}
 ORG_REPO_CACHE: dict[str, tuple[float, list[str]]] = {}
+# Persistent worker pool reused across polls (collect_queue runs one repo
+# query per worker); avoids spinning up/tearing down threads every poll.
+POLL_EXECUTOR = ThreadPoolExecutor(max_workers=POLL_MAX_WORKERS, thread_name_prefix="ci-scope-poll")
+# job id -> time.monotonic() when a webhook queued it. Touched only under
+# STATE_LOCK (webhook handler + tick publish). Lets the publish keep a webhook
+# arrival that landed after the poll snapshot, until the next poll confirms it.
+WEBHOOK_QUEUED_AT: dict[str, float] = {}
+BACKEND_STREAM_THREAD: threading.Thread | None = None
+BACKEND_LAST_EVENT_ID = 0
+BACKEND_SYNC_LOCK = threading.Lock()
 UNSET = object()
+
+
+def effective_runner_capacity() -> int:
+    """The maximum number of JIT runners this broker may have alive at once."""
+    return min(MACHINE_CAPACITY, MAX_CONCURRENT_JOBS)
+
+# Structured event log: every dispatch/terminate/backend-call/webhook/crash
+# lands here as one JSON object per line, so a stress test that produces
+# thousands of lines stays greppable/jq-able instead of a wall of prose. Sized
+# to stay bounded (unlike the launchd-redirected stdout/stderr files, which
+# just append forever) — rotates at CI_SCOPE_LOG_MAX_BYTES, keeps
+# CI_SCOPE_LOG_BACKUPS old copies. broker-errors.jsonl mirrors WARNING+ only,
+# so "what went wrong" is a small file to skim instead of the full firehose.
+EVENT_LOG_PATH = LOG_DIR / "broker.jsonl"
+ERROR_LOG_PATH = LOG_DIR / "broker-errors.jsonl"
+LOG_MAX_BYTES = int(os.environ.get("CI_SCOPE_LOG_MAX_BYTES", str(20 * 1024 * 1024)))
+LOG_BACKUP_COUNT = int(os.environ.get("CI_SCOPE_LOG_BACKUPS", "5"))
+
+
+class JsonLogFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "component": "broker",
+            "event": getattr(record, "event", record.funcName),
+            "msg": record.getMessage(),
+        }
+        context = getattr(record, "context", None)
+        if context:
+            payload["context"] = context
+        if record.exc_info:
+            payload["exc"] = self.formatException(record.exc_info)
+        return json.dumps(payload, default=str)
+
+
+def setup_logging() -> logging.Logger:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger("ci-scope-broker")
+    logger.setLevel(os.environ.get("CI_SCOPE_LOG_LEVEL", "INFO"))
+    logger.propagate = False
+    if logger.handlers:
+        return logger
+
+    formatter = JsonLogFormatter()
+    main_handler = logging.handlers.RotatingFileHandler(
+        EVENT_LOG_PATH, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
+    )
+    main_handler.setFormatter(formatter)
+    logger.addHandler(main_handler)
+
+    error_handler = logging.handlers.RotatingFileHandler(
+        ERROR_LOG_PATH, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
+    )
+    error_handler.setLevel(logging.WARNING)
+    error_handler.setFormatter(formatter)
+    logger.addHandler(error_handler)
+    return logger
+
+
+LOGGER = setup_logging()
+
+
+def log_event(level: int, event: str, message: str, **context) -> None:
+    LOGGER.log(level, message, extra={"event": event, "context": context or None})
+
+
+def _log_uncaught_exception(exc_type, exc_value, exc_tb) -> None:
+    # Last-chance net: whatever escapes main() entirely still leaves a record
+    # of exactly when and why the broker died, instead of just vanishing.
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+        return
+    LOGGER.critical(
+        "Unhandled exception, broker process is exiting",
+        exc_info=(exc_type, exc_value, exc_tb),
+        extra={"event": "process.crash", "context": None},
+    )
+
+
+def _log_thread_exception(args) -> None:
+    LOGGER.error(
+        f"Unhandled exception in thread {args.thread.name if args.thread else '?'}",
+        exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+        extra={"event": "thread.crash", "context": None},
+    )
+
+
+sys.excepthook = _log_uncaught_exception
+threading.excepthook = _log_thread_exception
 
 
 def main() -> int:
@@ -99,30 +256,100 @@ def main() -> int:
         ]
     )
     ensure_dirs()
-    start_webhook_server()
+    LOGGER.info(
+        "Broker starting",
+        extra={
+            "event": "broker.start",
+            "context": {
+                "serverMode": SERVER_MODE,
+                "machineId": MACHINE_ID,
+                "machineName": MACHINE_NAME,
+                "labels": MACHINE_LABELS,
+                "capacity": MACHINE_CAPACITY,
+                "backendEnabled": backend_enabled(),
+                "maxConcurrentJobs": MAX_CONCURRENT_JOBS,
+                "webhookPort": WEBHOOK_PORT,
+                "pid": os.getpid(),
+            },
+        },
+    )
+    if not backend_enabled() or not SERVER_MODE:
+        start_webhook_server()
+    if backend_enabled() and not SERVER_MODE:
+        start_backend_stream_thread()
 
     last_poll = 0.0
+    last_backend_snapshot = -BACKEND_SNAPSHOT_SECONDS
+    last_server_claim = -5
+    last_server_heartbeat = -30
+    last_idle_sweep = -IDLE_SWEEP_SECONDS
+    last_log_prune = -86400.0
+    backend_failures = 0
     while True:
+        if not owner_app_alive():
+            shutdown_for_owner_exit()
         try:
-            with STATE_LOCK:
-                should_poll = time.monotonic() - last_poll >= poll_interval(read_state())
-            # Poll GitHub WITHOUT holding STATE_LOCK: collect_queue makes one
-            # request per managed repo (several seconds), and the webhook handler
-            # needs the lock to reply before GitHub's delivery timeout. Holding
-            # it across the poll starved webhooks (EOF) and stalled the loop.
+            registry = read_registry()
+            profiles = enabled_profiles(registry)
             polled = None
-            if should_poll:
-                try:
-                    registry = read_registry()
-                    profiles = enabled_profiles(registry)
-                    polled = collect_queue(registry, profiles)
-                except Exception:
-                    polled = None
-                last_poll = time.monotonic()
-            with STATE_LOCK:
-                state = read_state()
-                tick(state, polled)
+            monotonic_now = time.monotonic()
+            if not app_is_active():
+                # App closed: take no new work, keep monitoring so in-flight
+                # jobs finish, then exit once nothing is running. launchd won't
+                # relaunch us (KeepAlive is off); the app kickstarts us again.
+                tick(None, profiles, dispatch_new=False)
+                if not (read_state().get("actives") or []):
+                    return 0
+                time.sleep(SCHEDULER_SECONDS)
+                continue
+            if monotonic_now - last_log_prune >= 86400:
+                prune_old_logs()
+                last_log_prune = monotonic_now
+            idle_sweep_due = monotonic_now - last_idle_sweep >= IDLE_SWEEP_SECONDS
+            if idle_sweep_due:
+                last_idle_sweep = monotonic_now
+            if SERVER_MODE and backend_enabled():
+                if monotonic_now - last_server_heartbeat >= 30:
+                    server_heartbeat()
+                    last_server_heartbeat = monotonic_now
+                if server_has_capacity() and monotonic_now - last_server_claim >= 5:
+                    polled = server_claim_queue(registry, profiles)
+                    last_server_claim = monotonic_now
+            elif backend_enabled():
+                if monotonic_now - last_backend_snapshot >= BACKEND_SNAPSHOT_SECONDS:
+                    if sync_backend_snapshot("scheduled"):
+                        backend_failures = 0
+                    else:
+                        backend_failures += 1
+                    last_backend_snapshot = monotonic_now
+
+                fallback_interval = backend_fallback_interval(backend_failures)
+                if backend_failures > 0 and monotonic_now - last_poll >= fallback_interval:
+                    try:
+                        polled = collect_queue(registry, profiles)
+                    except Exception:
+                        polled = None
+                    last_poll = monotonic_now
+            else:
+                with STATE_LOCK:
+                    should_poll = monotonic_now - last_poll >= poll_interval(read_state())
+                # Poll GitHub WITHOUT holding STATE_LOCK: collect_queue makes one
+                # request per managed repo (several seconds), and the webhook handler
+                # needs the lock to reply before GitHub's delivery timeout. Holding
+                # it across the poll starved webhooks (EOF) and stalled the loop.
+                if should_poll:
+                    try:
+                        polled = collect_queue(registry, profiles)
+                    except Exception:
+                        polled = None
+                    last_poll = monotonic_now
+            # tick() does its own short-lived locking: it snapshots state under
+            # the lock, runs all gh-api work lock-free, then re-acquires only to
+            # publish. Calling it here without the lock keeps the webhook handler
+            # responsive while a runner is being dispatched.
+            tick(polled, profiles, idle_sweep_due)
         except Exception as exc:
+            LOGGER.exception("Scheduler tick failed", extra={"event": "tick.error", "context": None})
             with STATE_LOCK:
                 state = read_state()
                 state["lastError"] = str(exc)
@@ -131,19 +358,457 @@ def main() -> int:
                 write_state(state)
         time.sleep(SCHEDULER_SECONDS)
 
+def backend_enabled() -> bool:
+    return bool(BACKEND_URL)
 
-def tick(state: dict, polled: tuple | None) -> dict:
-    registry = read_registry()
-    profiles = enabled_profiles(registry)
-    retries = reset_stale_retries(state.get("retries") or {})
-    webhook = webhook_status(state.get("webhook"))
-    actives = list(state.get("actives") or [])
-    queue = list(state.get("queue") or [])
-    statuses = list(state.get("repos") or [])
+
+def backend_fallback_interval(failures: int) -> int:
+    if failures <= 0:
+        return BACKEND_FALLBACK_SECONDS
+    multiplier = 2 ** min(failures - 1, 3)
+    return min(BACKEND_FALLBACK_MAX_SECONDS, BACKEND_FALLBACK_SECONDS * multiplier)
+
+
+def start_backend_stream_thread() -> None:
+    global BACKEND_STREAM_THREAD
+    if not backend_enabled() or BACKEND_STREAM_THREAD is not None:
+        return
+    BACKEND_STREAM_THREAD = threading.Thread(
+        target=backend_stream_loop,
+        name="ci-scope-backend-sse",
+        daemon=True,
+    )
+    BACKEND_STREAM_THREAD.start()
+
+
+def backend_stream_loop() -> None:
+    global BACKEND_LAST_EVENT_ID
+    while True:
+        try:
+            record_backend_status(connected=False, last_error=None)
+            request = backend_request("/v1/events/stream", last_event_id=BACKEND_LAST_EVENT_ID)
+            with urllib.request.urlopen(request, timeout=90) as response:
+                record_backend_status(connected=True, last_error=None)
+                event_id = None
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+                    if line.startswith("id:"):
+                        event_id = line[3:].strip()
+                    elif line == "":
+                        if event_id and event_id.isdigit():
+                            BACKEND_LAST_EVENT_ID = int(event_id)
+                            sync_backend_snapshot("sse")
+                        event_id = None
+        except Exception as exc:
+            record_backend_status(connected=False, last_error=str(exc))
+            time.sleep(BACKEND_SSE_RETRY_SECONDS)
+
+
+def sync_backend_snapshot(reason: str) -> bool:
+    if not backend_enabled():
+        return False
+    if not BACKEND_SYNC_LOCK.acquire(blocking=False):
+        return True
+    try:
+        payload = backend_get_json("/v1/snapshot")
+        registry = read_registry()
+        profiles = enabled_profiles(registry)
+        queue, statuses = backend_snapshot_to_polled(payload, registry, profiles)
+        record_dashboard_snapshot(payload)
+        publish_backend_snapshot(queue, statuses, profiles, payload, reason)
+        return True
+    except Exception as exc:
+        record_backend_status(connected=False, last_error=str(exc))
+        return False
+    finally:
+        BACKEND_SYNC_LOCK.release()
+
+
+def backend_get_json(path: str) -> dict:
+    start = time.monotonic()
+    request = backend_request(path)
+    try:
+        with urllib.request.urlopen(request, timeout=BACKEND_CONNECT_TIMEOUT) as response:
+            status = response.status
+            body = json.loads(response.read().decode("utf-8") or "{}")
+    except Exception as exc:
+        log_event(logging.WARNING, "backend.request_error", f"GET {path} failed: {exc}",
+                   method="GET", path=path, durationMs=round((time.monotonic() - start) * 1000))
+        raise
+    log_event(logging.INFO, "backend.request", f"GET {path} -> {status}",
+              method="GET", path=path, status=status, durationMs=round((time.monotonic() - start) * 1000))
+    return body
+
+
+def backend_request(path: str, last_event_id: int | None = None) -> urllib.request.Request:
+    url = f"{BACKEND_URL}{path}"
+    headers = {"Accept": "application/json", "User-Agent": BACKEND_USER_AGENT}
+    if path.endswith("/stream"):
+        headers["Accept"] = "text/event-stream"
+    if BACKEND_TOKEN:
+        headers["Authorization"] = f"Bearer {BACKEND_TOKEN}"
+    if last_event_id:
+        headers["Last-Event-ID"] = str(last_event_id)
+    return urllib.request.Request(url, headers=headers)
+
+
+def server_has_capacity() -> bool:
+    with STATE_LOCK:
+        active_count = len(read_state().get("actives") or [])
+    return active_count < effective_runner_capacity()
+
+
+def server_heartbeat() -> None:
+    with STATE_LOCK:
+        state = read_state()
+        active = state.get("actives") or []
+    active_ids = [item.get("id") for item in active if item.get("id")]
+    payload = {
+        "machineId": MACHINE_ID,
+        "name": MACHINE_NAME,
+        "status": "busy" if len(active) >= effective_runner_capacity() else "online",
+        "labels": MACHINE_LABELS,
+        "capacity": effective_runner_capacity(),
+        "activeJobId": active_ids[0] if active_ids else None,
+        "activeJobIds": active_ids,
+    }
+    try:
+        response = server_post_json("/api/ci/local/heartbeat", payload)
+        record_backend_status(connected=True, last_error=None)
+        process_pending_reruns(response.get("pendingReruns") or [])
+        ping_id = response.get("pendingPingId")
+        if ping_id:
+            ack_ping(ping_id)
+    except Exception as exc:
+        record_backend_status(connected=False, last_error=str(exc))
+
+
+def process_pending_reruns(reruns: list) -> None:
+    """Re-run runs the server flagged as infra failures (machine died mid-job,
+    not a real test failure). We ack whether or not gh succeeds: the server
+    already caps how many times a run is offered, so acking on attempt keeps a
+    permanently un-rerunnable run from looping every heartbeat."""
+    attempted = []
+    for item in reruns:
+        slug = item.get("repositorySlug")
+        run_id = item.get("runId")
+        if slug and run_id:
+            rerun_github_run(slug, run_id)
+            attempted.append({"repositorySlug": slug, "runId": run_id})
+    if attempted:
+        try:
+            server_post_json("/api/ci/local/reruns/ack", {"machineId": MACHINE_ID, "reruns": attempted})
+        except Exception as exc:
+            log_event(logging.WARNING, "job.rerun_ack_failed", f"rerun ack failed: {exc}")
+
+
+def rerun_github_run(slug: str, run_id: object) -> bool:
+    command = ["gh", "run", "rerun", str(run_id), "--repo", str(slug), "--failed"]
+    completed = subprocess.run(command, text=True, capture_output=True, timeout=60)
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip()[:300]
+        log_event(logging.WARNING, "job.rerun_failed", f"rerun {slug} #{run_id} failed: {detail}", repo=slug, runId=run_id)
+        return False
+    log_event(logging.INFO, "job.rerun", f"re-ran {slug} #{run_id} after infra failure", repo=slug, runId=run_id)
+    return True
+
+
+def ack_ping(ping_id: str) -> None:
+    # Answers the admin dashboard's "Test task" button: proof the broker is
+    # alive and this heartbeat round-trip actually reaches the server.
+    try:
+        server_post_json(f"/api/ci/local/ping/{urllib.parse.quote(ping_id, safe='')}/ack", {"machineId": MACHINE_ID})
+    except Exception:
+        pass
+
+
+def server_claim_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
+    payload = {
+        "machineId": MACHINE_ID,
+        "name": MACHINE_NAME,
+        "labels": MACHINE_LABELS,
+        "capacity": effective_runner_capacity(),
+    }
+    try:
+        response = server_post_json("/api/ci/local/claim", payload)
+        record_backend_status(connected=True, last_sync_at=now(), last_error=None)
+    except Exception as exc:
+        record_backend_status(connected=False, last_error=str(exc))
+        return [], []
+
+    action = response.get("action")
+    if not isinstance(action, dict):
+        return [], []
+
+    job = server_job_payload(action, registry, profiles)
+    if not job:
+        server_post_status(
+            action,
+            "released",
+            f"Claimed server action did not match enabled local profiles: {action.get('repositorySlug') or 'unknown'}",
+        )
+        return [], []
+
+    statuses = backend_repo_statuses(
+        {"repositories": [{"slug": job["repositorySlug"]}]},
+        registry,
+        profiles,
+        [job],
+    )
+    return [job], statuses
+
+
+def server_job_payload(action: dict, registry: dict, profiles: list[dict]) -> dict | None:
+    slug = action.get("repositorySlug") or ""
+    labels = action.get("labels") or MACHINE_LABELS
+    # The backend only leases a machine jobs whose labels it satisfies, so trust
+    # that and accept any leased job for a repo this broker manages — the JIT
+    # runner is built from the job's own labels (generate_jit_config), not the
+    # repo's configured labels. Requiring the job to match a hand-maintained
+    # per-repo/org label list is redundant here and silently strands jobs whose
+    # runs-on differs from that config (e.g. moodling build-and-test vs
+    # local-smoke, or any org-owned repo). Keep a cheap capability guard in case
+    # the backend ever hands over something this machine can't run.
+    if not has_labels(MACHINE_LABELS, labels):
+        return None
+    match = matching_profile(slug, labels, registry, profiles, require_label_match=False)
+    if match is None:
+        return None
+    profile, required_labels = match
+    return {
+        "id": action.get("id") or f"{slug}:{action.get('runId')}:{action.get('jobId')}",
+        "repositorySlug": slug,
+        "workflowName": action.get("workflowName") or "Workflow",
+        "title": action.get("title") or action.get("workflowName") or "Workflow run",
+        "jobName": action.get("jobName") or "Queued job",
+        "headBranch": action.get("headBranch") or "-",
+        "status": "queued",
+        "url": action.get("url") or "",
+        "createdAt": action.get("queuedAt") or action.get("createdAt") or now(),
+        "labels": labels or required_labels,
+        "runId": action.get("runId"),
+        "jobId": action.get("jobId"),
+        "profileId": profile["id"],
+        "profileTitle": profile["title"],
+        "profileScope": profile["scope"],
+    }
+
+
+def server_post_status(job: dict, status: str, error: str | None = None) -> None:
+    if not SERVER_MODE or not backend_enabled() or not job.get("id"):
+        return
+    payload = {
+        "machineId": MACHINE_ID,
+        "status": status,
+        "error": error,
+    }
+    try:
+        server_post_json(f"/api/ci/local/actions/{urllib.parse.quote(str(job['id']), safe='')}/status", payload)
+    except Exception:
+        pass
+
+
+def server_post_json(path: str, payload: dict) -> dict:
+    start = time.monotonic()
+    data = json.dumps(payload).encode("utf-8")
+    request = backend_request(path)
+    request.add_header("Content-Type", "application/json")
+    request.data = data
+    request.method = "POST"
+    try:
+        with urllib.request.urlopen(request, timeout=BACKEND_CONNECT_TIMEOUT) as response:
+            status = response.status
+            body = json.loads(response.read().decode("utf-8") or "{}")
+    except Exception as exc:
+        log_event(logging.WARNING, "backend.request_error", f"POST {path} failed: {exc}",
+                   method="POST", path=path, durationMs=round((time.monotonic() - start) * 1000))
+        raise
+    log_event(logging.INFO, "backend.request", f"POST {path} -> {status}",
+              method="POST", path=path, status=status, durationMs=round((time.monotonic() - start) * 1000))
+    return body
+
+
+def backend_snapshot_to_polled(payload: dict, registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
+    jobs = []
+    for item in payload.get("jobs") or []:
+        if item.get("status") != "queued":
+            continue
+        slug = item.get("repositorySlug") or ""
+        labels = item.get("labels") or []
+        match = matching_profile(slug, labels, registry, profiles)
+        if match is None:
+            continue
+        profile, required_labels = match
+        jobs.append(backend_job_payload(item, profile, required_labels))
+
+    statuses = backend_repo_statuses(payload, registry, profiles, jobs)
+    return merge_jobs(jobs, []), statuses
+
+
+def backend_job_payload(item: dict, profile: dict, labels: list[str]) -> dict:
+    slug = item.get("repositorySlug") or ""
+    run_id = item.get("runId")
+    job_id = item.get("id")
+    return {
+        "id": f"{slug}:{run_id}:{job_id}",
+        "repositorySlug": slug,
+        "workflowName": item.get("workflowName") or "Workflow",
+        "title": item.get("title") or item.get("workflowName") or "Workflow run",
+        "jobName": item.get("jobName") or "Queued job",
+        "headBranch": item.get("headBranch") or "-",
+        "status": item.get("status") or "queued",
+        "url": item.get("url") or "",
+        "createdAt": item.get("createdAt") or now(),
+        "labels": item.get("labels") or labels,
+        "runId": run_id,
+        "jobId": job_id,
+        "profileId": profile["id"],
+        "profileTitle": profile["title"],
+        "profileScope": profile["scope"],
+    }
+
+
+def backend_repo_statuses(payload: dict, registry: dict, profiles: list[dict], jobs: list[dict]) -> list[dict]:
+    slugs = {
+        repo.get("slug")
+        for repo in payload.get("repositories") or []
+        if repo.get("slug") and not repo.get("deleted")
+    }
+    slugs.update(job.get("repositorySlug") for job in jobs if job.get("repositorySlug"))
+    for repo in registry.get("repos", []):
+        if repo.get("enabled", True):
+            slugs.add(repo.get("slug"))
+
+    statuses = []
+    for profile in profiles:
+        for slug in sorted(slug for slug in slugs if slug):
+            labels = labels_for_repository(slug, profile, registry)
+            if labels is None:
+                continue
+            count = sum(
+                1
+                for job in jobs
+                if job.get("repositorySlug", "").lower() == slug.lower()
+                and job.get("profileId") == profile["id"]
+            )
+            statuses.append(repo_status(slug, "ok", count, None, profile, labels))
+    return statuses
+
+
+def publish_backend_snapshot(
+    queue: list[dict],
+    statuses: list[dict],
+    profiles: list[dict],
+    payload: dict,
+    reason: str,
+) -> None:
+    with STATE_LOCK:
+        state = read_state()
+        backend = backend_status(
+            state.get("backend"),
+            enabled=True,
+            connected=True,
+            last_sync_at=now(),
+            last_event_id=payload.get("eventId"),
+            last_reason=reason,
+            last_error=None,
+        )
+        save_state(
+            state.get("actives") or [],
+            queue,
+            statuses,
+            state.get("lastError"),
+            state.get("retries") or {},
+            profiles,
+            webhook_status(state.get("webhook")),
+            backend,
+        )
+
+
+def record_backend_status(
+    connected: bool,
+    last_error: str | None = None,
+    last_sync_at: str | None = None,
+) -> None:
+    if not backend_enabled():
+        return
+    with STATE_LOCK:
+        state = read_state()
+        existing_backend = state.get("backend") or {}
+        state["backend"] = backend_status(
+            existing_backend,
+            enabled=True,
+            connected=connected,
+            last_sync_at=last_sync_at,
+            last_event_id=BACKEND_LAST_EVENT_ID or existing_backend.get("lastEventId"),
+            last_error=last_error,
+        )
+        state["updatedAt"] = now()
+        write_state(state)
+
+
+def backend_status(
+    existing: dict | None,
+    enabled: bool | None = None,
+    connected: bool | None = None,
+    last_sync_at: str | None = None,
+    last_event_id: int | None = None,
+    last_reason: str | None = None,
+    last_error=UNSET,
+) -> dict:
+    status = dict(existing or {})
+    status["enabled"] = bool(status.get("enabled", False) if enabled is None else enabled)
+    status["url"] = BACKEND_URL
+    if connected is not None:
+        status["connected"] = connected
+    if last_sync_at is not None:
+        status["lastSyncAt"] = last_sync_at
+    if last_event_id is not None:
+        status["lastEventId"] = last_event_id
+    if last_reason is not None:
+        status["lastReason"] = last_reason
+    if last_error is not UNSET:
+        status["lastError"] = last_error
+    return status
+
+
+def app_is_active() -> bool:
+    """Whether the CI Scope app is currently open. The app touches its heartbeat
+    file every few seconds; when it quits, crashes, or the Mac sleeps the file
+    goes stale (or is deleted on a clean quit) and the broker drains and exits.
+    An empty heartbeat path means the feature is off — keep running as before."""
+    if not APP_HEARTBEAT_PATH:
+        return True
+    try:
+        return (time.time() - os.path.getmtime(APP_HEARTBEAT_PATH)) <= APP_HEARTBEAT_STALE_SECONDS
+    except OSError:
+        return False
+
+
+def tick(
+    polled: tuple | None,
+    profiles: list[dict],
+    dispatch_new: bool = True,
+    idle_sweep_due: bool = True,
+) -> dict:
+    # Snapshot the bits we need under the lock, then release it for every
+    # gh-api call below. tick used to run entirely inside STATE_LOCK, but its
+    # subprocess calls (runner-registration cleanup, JIT config generation,
+    # remote job status, runner deletion) each block up to 60s — holding the
+    # lock across them starved the webhook handler exactly like the in-loop
+    # poll once did. Mirror collect_queue: do the I/O lock-free and re-acquire
+    # the lock only to mutate in-memory state and write it.
+    with STATE_LOCK:
+        state = read_state()
+        retries = reset_stale_retries(state.get("retries") or {})
+        actives_snapshot = list(state.get("actives") or [])
+        queue_snapshot = list(state.get("queue") or [])
+
     last_error = None
-
+    removed_ids: set = set()
     surviving = []
-    for active in actives:
+    progress_by_id: dict = {}
+    for active in actives_snapshot:
         if active.get("pid") and active_is_running(active):
             # Ephemeral JIT runners pick up whichever queued job matches their
             # labels, so the process the broker started for one job may be
@@ -151,25 +816,51 @@ def tick(state: dict, polled: tuple | None) -> dict:
             # status — only the watchdog may stop a genuinely stuck one. A slot
             # frees when the runner process exits on its own (the else branch).
             if active_timed_out(active):
-                terminate_active_process(active)
+                terminate_active_process(active, reason=f"timed_out:{MAX_ACTIVE_SECONDS}s")
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+                remove_runner_dir(active.get("id"))
                 retries = update_retry(active, retries)
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
+                removed_ids.add(active.get("id"))
                 last_error = f"Stopped {active.get('id')}: runner ran past {MAX_ACTIVE_SECONDS // 60} min without completing."
-            elif polled is not None and active_idle_too_long(active) and runner_is_idle(active):
+                # "released", not "failed": the backend no longer accepts a
+                # broker-reported terminal status (see finish_active) — GitHub's
+                # own workflow_job webhook is the sole source of truth for a job
+                # actually finishing. Releasing lets it be retried through the
+                # normal retry-limited claim flow.
+                server_post_status(active, "released", last_error)
+            elif (
+                (polled is not None or idle_sweep_due)
+                and active_idle_too_long(active)
+                and runner_is_idle(active)
+            ):
                 # The runner connected but GitHub never handed it a job (its job
                 # was already serviced by another runner). Reap it now instead of
-                # squatting a slot until the watchdog fires — no retry, since the
-                # job is done; if it weren't, the next poll re-queues it.
-                terminate_active_process(active)
+                # squatting a slot until the watchdog fires. idle_sweep_due keeps
+                # this check alive even when `polled` stays None every tick (e.g.
+                # server mode with no free capacity) — otherwise a stuck runner
+                # would occupy the only slot for the full MAX_ACTIVE_SECONDS
+                # instead of IDLE_RUNNER_SECONDS. Bump the retry so a job that
+                # keeps producing idle runners (nothing ever picks it up) is
+                # eventually backed off instead of churning dispatch->idle->reap
+                # forever; for an already-done job the id never returns and
+                # prune_retries drops the counter.
+                terminate_active_process(active, reason=f"idle_too_long:{IDLE_RUNNER_SECONDS}s")
                 cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+                remove_runner_dir(active.get("id"))
+                retries = update_retry(active, retries)
                 ACTIVE_PROCESSES.pop(active.get("pid"), None)
+                removed_ids.add(active.get("id"))
+                server_post_status(active, "released", f"Runner stayed idle for {IDLE_RUNNER_SECONDS}s.")
             else:
+                marker = read_last_progress_marker(active.get("id"))
+                if marker:
+                    progress_by_id[active.get("id")] = marker
                 surviving.append(active)
         else:
             retries, error = finish_active(active, retries)
+            removed_ids.add(active.get("id"))
             last_error = error or last_error
-    actives = surviving
 
     if polled is not None:
         # collect_queue ran outside STATE_LOCK (network I/O); apply its result.
@@ -177,19 +868,27 @@ def tick(state: dict, polled: tuple | None) -> dict:
         # it is authoritative: replace the queue rather than unioning it, or jobs
         # that left GitHub's queue (completed/cancelled) without the broker
         # dispatching them would linger forever and inflate the shared count.
-        polled_queue, statuses = polled
-        queue = polled_queue
-        retries = prune_retries(retries, queue, actives)
+        polled_queue, polled_statuses = polled
+        work_queue = polled_queue
+        retries = prune_retries(retries, work_queue, surviving)
+    else:
+        polled_queue = None
+        polled_statuses = None
+        work_queue = queue_snapshot
 
-    queue = merge_jobs(queue, [])
-    active_ids = {active.get("id") for active in actives}
-    queue = [job for job in queue if job.get("id") not in active_ids]
+    # work_queue is already deduped+sorted (polled comes from collect_queue's
+    # merge_jobs; queue_snapshot from a prior save_state) — no need to re-merge.
+    surviving_ids = {active.get("id") for active in surviving}
+    work_queue = [job for job in work_queue if job.get("id") not in surviving_ids]
 
-    heavy_running = sum(1 for active in actives if job_is_heavy(active))
-    dispatchable = [job for job in queue if retries.get(job["id"], 0) < MAX_RETRIES]
+    heavy_running = sum(1 for active in surviving if job_is_heavy(active))
+    # While draining (app closed) we finish in-flight jobs but start no new ones.
+    dispatchable = [job for job in work_queue if retries.get(job["id"], 0) < MAX_RETRIES] if dispatch_new else []
+    working_actives = list(surviving)
+    dispatched_actives = []
     dispatched = False
     for job in dispatchable:
-        if len(actives) >= MAX_CONCURRENT_JOBS:
+        if len(working_actives) >= effective_runner_capacity():
             break
         heavy = job_is_heavy(job)
         if heavy and heavy_running >= MAX_CONCURRENT_HEAVY:
@@ -199,28 +898,75 @@ def tick(state: dict, polled: tuple | None) -> dict:
         except Exception as exc:
             retries = update_retry(job, retries)
             last_error = f"Could not start {job.get('id', 'queued job')}: {exc}"
+            server_post_status(job, "released", last_error)
             continue
 
         active = dict(job)
         active["pid"] = process.pid
         active["status"] = "in_progress"
         active["dispatchedAt"] = time.time()
+        server_post_status(active, "in_progress")
         ACTIVE_PROCESSES[process.pid] = process
-        actives.append(active)
-        active_ids.add(job["id"])
-        queue = remove_job(queue, job["id"])
+        working_actives.append(active)
+        dispatched_actives.append(active)
         if heavy:
             heavy_running += 1
         dispatched = True
 
     if dispatched:
         last_error = None
-    elif not last_error and not actives and queue:
-        exhausted = [job for job in queue if retries.get(job["id"], 0) >= MAX_RETRIES]
+    elif not last_error and not working_actives and work_queue:
+        exhausted = [job for job in work_queue if retries.get(job["id"], 0) >= MAX_RETRIES]
         if exhausted:
             last_error = f"Retry limit reached for {len(exhausted)} queued job(s)."
+            if SERVER_MODE and polled is not None:
+                for job in exhausted:
+                    server_post_status(job, "released", last_error)
 
-    return save_state(actives, queue, statuses, last_error, retries, profiles, webhook)
+    # Re-acquire the lock only to publish. Re-read so queue/status/webhook
+    # mutations the handler made while we were doing I/O are preserved; actives
+    # membership, retries, and ACTIVE_PROCESSES are owned solely by this loop,
+    # so our computed values win there. fresh_actives minus the ids we finished
+    # or reaped equals the survivors (the handler only relabels actives, never
+    # adds or removes them), so we rebuild from fresh to keep its status labels.
+    # save_state strips any dispatched job from the queue (it is now active).
+    with STATE_LOCK:
+        fresh = read_state()
+        final_actives = []
+        for active in fresh.get("actives") or []:
+            if active.get("id") in removed_ids:
+                continue
+            marker = progress_by_id.get(active.get("id"))
+            if marker:
+                active = {**active, "progress": marker}
+            final_actives.append(active)
+        final_actives.extend(dispatched_actives)
+
+        if polled is not None:
+            # polled is authoritative, but the poll snapshot predates any webhook
+            # that arrived while we did I/O lock-free. Union those still-fresh
+            # webhook arrivals so an instant 'queued' isn't dropped until the next
+            # poll. The grace window expires them, so completed/stale jobs don't
+            # pile back up — the poll stays authoritative otherwise.
+            prune_webhook_queued()
+            final_ids = {active.get("id") for active in final_actives}
+            polled_ids = {job.get("id") for job in polled_queue}
+            preserved = [
+                job
+                for job in (fresh.get("queue") or [])
+                if job.get("id") in WEBHOOK_QUEUED_AT
+                and job.get("id") not in polled_ids
+                and job.get("id") not in final_ids
+            ]
+            queue = merge_jobs(polled_queue, preserved)
+            statuses = polled_statuses
+        else:
+            queue = list(fresh.get("queue") or [])
+            statuses = list(fresh.get("repos") or [])
+
+        webhook = webhook_status(fresh.get("webhook"))
+        backend = backend_status(fresh.get("backend")) if backend_enabled() else fresh.get("backend")
+        return save_state(final_actives, queue, statuses, last_error, retries, profiles, webhook, backend)
 
 
 def poll_interval(state: dict) -> int:
@@ -254,7 +1000,24 @@ def active_is_running(active: dict) -> bool:
     return process_alive(pid)
 
 
-def terminate_active_process(active: dict) -> None:
+def terminate_active_process(active: dict, reason: str = "unspecified") -> None:
+    LOGGER.info(
+        f"Terminating runner for {active.get('id')} ({reason})",
+        extra={
+            "event": "job.terminate",
+            "context": {"jobId": active.get("id"), "repo": active.get("repositorySlug"), "pid": active.get("pid"), "reason": reason},
+        },
+    )
+    # active_is_running (checked by every caller, moments earlier in the same
+    # tick) already confirmed a live process owns this pid — via ACTIVE_PROCESSES
+    # if we started it, or via process_alive(pid) if it's a runner restored from
+    # state after a broker restart. Either way it's safe to signal by pid: we
+    # always start runners with start_new_session=True, so pid == its own
+    # process group leader, and the alive-check just ran. Restored actives used
+    # to be left untouched here, which meant a genuinely stuck runner could
+    # never actually be stopped once the broker restarted — it just silently
+    # dropped off the dashboard while continuing to run and hold its job
+    # directory open.
     pid = active.get("pid")
     if not pid:
         return
@@ -276,6 +1039,10 @@ def terminate_active_process(active: dict) -> None:
             return
         except subprocess.TimeoutExpired:
             pass
+    else:
+        time.sleep(5)
+        if not process_alive(pid):
+            return
 
     time.sleep(1)
     if not process_alive(pid):
@@ -287,6 +1054,11 @@ def terminate_active_process(active: dict) -> None:
             os.kill(pid, signal.SIGKILL)
         except OSError:
             return
+    if process is not None:
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            pass
 
 
 def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
@@ -297,12 +1069,38 @@ def finish_active(active: dict, retries: dict) -> tuple[dict, str | None]:
         active["exitCode"] = exit_code
     active["status"] = "completed" if exit_code in (0, None) else "failed"
 
+    # A clean runner exit does NOT mean the job we leased is the one that ran:
+    # GitHub hands a connecting runner ANY queued job whose labels match, so
+    # two same-run jobs sharing runs-on labels can swap which one actually
+    # executes (NexusUnity PR #145, 2026-07-04). Always check GitHub's own
+    # record for the leased job rather than trusting the local exit code — if
+    # it's still "queued" there, our runner ran a different job, so release
+    # the lease immediately instead of falsely reporting it done. Whichever
+    # job DID run closes out on its own via GitHub's workflow_job webhook,
+    # which is now the only accepted source of a terminal status.
     refreshed = job_remote_status(active)
-    cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
     if refreshed.get("status") == "queued":
+        server_post_status(
+            active, "released", "Runner exited without running this job (GitHub assigned it a different queued job)."
+        )
         retries = update_retry(active, retries)
     else:
         retries = clear_retry(active.get("id"), retries)
+    cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+    remove_runner_dir(active.get("id"))
+    LOGGER.info(
+        f"Runner for {active.get('id')} exited ({active.get('status')}, exit={active.get('exitCode')})",
+        extra={
+            "event": "job.finish",
+            "context": {
+                "jobId": active.get("id"),
+                "repo": active.get("repositorySlug"),
+                "status": active.get("status"),
+                "exitCode": active.get("exitCode"),
+                "remoteStatus": refreshed.get("status"),
+            },
+        },
+    )
     return retries, refreshed.get("lastError")
 
 
@@ -326,15 +1124,14 @@ def collect_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], lis
     # sequential so the cached org-repo list is never touched from threads.
     jobs = []
     if tasks:
-        with ThreadPoolExecutor(max_workers=min(len(tasks), POLL_MAX_WORKERS)) as pool:
-            pending = {pool.submit(queued_jobs, slug, labels, profile): (slug, labels, profile) for slug, labels, profile in tasks}
-            for future, (slug, labels, profile) in pending.items():
-                try:
-                    repo_jobs = future.result()
-                    jobs.extend(repo_jobs)
-                    statuses.append(repo_status(slug, "ok", len(repo_jobs), None, profile, labels))
-                except Exception as exc:
-                    statuses.append(repo_status(slug, "warning", 0, str(exc), profile, labels))
+        pending = {POLL_EXECUTOR.submit(queued_jobs, slug, labels, profile): (slug, labels, profile) for slug, labels, profile in tasks}
+        for future, (slug, labels, profile) in pending.items():
+            try:
+                repo_jobs = future.result()
+                jobs.extend(repo_jobs)
+                statuses.append(repo_status(slug, "ok", len(repo_jobs), None, profile, labels))
+            except Exception as exc:
+                statuses.append(repo_status(slug, "warning", 0, str(exc), profile, labels))
     return merge_jobs(jobs, []), statuses
 
 
@@ -409,13 +1206,30 @@ def start_runner(job: dict) -> subprocess.Popen:
     log_handle = open(log_file, "a", encoding="utf-8")
     log_handle.write(f"[{now()}] starting JIT runner for {job['id']}\n")
     log_handle.flush()
-    return subprocess.Popen(
+    runner_environment = os.environ.copy()
+    runner_environment["RUNNER_TOOL_CACHE"] = str(TOOL_CACHE_DIR)
+    process = subprocess.Popen(
         ["./run.sh", "--jitconfig", encoded],
         cwd=runner_dir,
         stdout=log_handle,
         stderr=subprocess.STDOUT,
         start_new_session=True,
+        env=runner_environment,
     )
+    LOGGER.info(
+        f"Dispatched runner for {job['id']} (pid {process.pid})",
+        extra={
+            "event": "job.dispatch",
+            "context": {
+                "jobId": job.get("id"),
+                "repo": job.get("repositorySlug"),
+                "pid": process.pid,
+                "labels": job.get("labels"),
+                "profile": job.get("profileId"),
+            },
+        },
+    )
+    return process
 
 
 def generate_jit_config(job: dict) -> str:
@@ -447,18 +1261,22 @@ def runner_name_for(job: dict) -> str:
     return f"ci-scope-{job_id}-{int(time.time()) % 100000:05d}"
 
 
+def list_repo_runners(slug: str) -> list[dict]:
+    try:
+        return gh_json(f"repos/{slug}/actions/runners?per_page=100").get("runners") or []
+    except Exception:
+        return []
+
+
 def cleanup_stale_runners(job: dict) -> None:
     prefix = f"ci-scope-{job.get('jobId') or job.get('runId') or 'run'}-"
-    try:
-        runners = gh_json(f"repos/{job['repositorySlug']}/actions/runners?per_page=100").get("runners") or []
-    except Exception:
-        return
-
-    for runner in runners:
+    for runner in list_repo_runners(job["repositorySlug"]):
         name = str(runner.get("name") or "")
-        if not name.startswith(prefix):
-            continue
-        if runner.get("busy"):
+        # An online idle JIT runner can be assigned a matching job immediately
+        # after this list call. Removing it races GitHub's dispatcher and kills
+        # that unrelated job mid-step. Only clean up runners GitHub has already
+        # marked offline; live runners are reaped by their owning process.
+        if not name.startswith(prefix) or runner.get("busy") or runner.get("status") != "offline":
             continue
         try:
             gh_json(f"repos/{job['repositorySlug']}/actions/runners/{runner['id']}", method="DELETE")
@@ -474,11 +1292,7 @@ def runner_is_idle(active: dict) -> bool:
     name = active.get("runnerName")
     if not slug or not name:
         return False
-    try:
-        runners = gh_json(f"repos/{slug}/actions/runners?per_page=100").get("runners") or []
-    except Exception:
-        return False
-    for runner in runners:
+    for runner in list_repo_runners(slug):
         if runner.get("name") == name:
             return not runner.get("busy", False)
     return False
@@ -487,12 +1301,7 @@ def runner_is_idle(active: dict) -> bool:
 def cleanup_runner_by_name(repository_slug: str | None, runner_name: str | None) -> None:
     if not repository_slug or not runner_name:
         return
-    try:
-        runners = gh_json(f"repos/{repository_slug}/actions/runners?per_page=100").get("runners") or []
-    except Exception:
-        return
-
-    for runner in runners:
+    for runner in list_repo_runners(repository_slug):
         if runner.get("name") != runner_name or runner.get("busy"):
             continue
         try:
@@ -539,6 +1348,17 @@ def prepare_runner_dir(job: dict) -> Path:
         with tarfile.open(find_runner_archive()) as tar:
             tar.extractall(runner_dir)
     return runner_dir
+
+
+def remove_runner_dir(job_id: str | None) -> None:
+    """Delete a finished job's runner working directory. Each job clones a
+    ~430MB runner template into JOBS_DIR; without this cleanup those dirs
+    accumulate (273 dirs = 118GB observed) and eventually fill the disk."""
+    if not job_id:
+        return
+    runner_dir = JOBS_DIR / safe_name(job_id)
+    if runner_dir.exists():
+        shutil.rmtree(runner_dir, ignore_errors=True)
 
 
 def find_runner_archive() -> Path:
@@ -589,7 +1409,7 @@ def job_remote_status(active: dict) -> dict:
     if job_id and slug:
         try:
             job = gh_json(f"repos/{slug}/actions/jobs/{job_id}")
-            return {"status": job.get("status"), "conclusion": job.get("conclusion"), "lastError": None}
+            return {"status": job.get("status"), "lastError": None}
         except Exception:
             pass
     return refresh_run(active)
@@ -616,7 +1436,7 @@ def active_older_than(active: dict, seconds: int) -> bool:
 def refresh_run(job: dict) -> dict:
     try:
         run = gh_json(f"repos/{job['repositorySlug']}/actions/runs/{job['runId']}")
-        return {"status": run.get("status"), "conclusion": run.get("conclusion"), "lastError": None}
+        return {"status": run.get("status"), "lastError": None}
     except Exception as exc:
         return {"status": "unknown", "lastError": str(exc)}
 
@@ -685,7 +1505,6 @@ def webhook_job_payload(payload: dict, registry: dict, profiles: list[dict]) -> 
         "jobName": workflow_job.get("name") or "Workflow job",
         "headBranch": workflow_job.get("head_branch") or workflow_run.get("head_branch") or "-",
         "status": workflow_job.get("status") or payload.get("action") or "queued",
-        "conclusion": workflow_job.get("conclusion"),
         "url": workflow_job.get("html_url") or workflow_run.get("html_url") or "",
         "createdAt": workflow_job.get("created_at") or workflow_run.get("created_at") or now(),
         "labels": job_labels or labels,
@@ -714,6 +1533,7 @@ class GitHubWebhookHandler(BaseHTTPRequestHandler):
     server_version = "CI Scope Broker"
 
     def do_POST(self) -> None:
+        self._start = time.monotonic()
         if self.path != WEBHOOK_PATH:
             self.respond(404, "not found")
             return
@@ -730,7 +1550,7 @@ class GitHubWebhookHandler(BaseHTTPRequestHandler):
 
         body = self.rfile.read(length)
         event = self.headers.get("X-GitHub-Event") or ""
-        if event != "workflow_job":
+        if event not in ("workflow_job", "workflow_run"):
             self.respond(202, "ignored")
             return
         if not verify_signature(body, self.headers.get("X-Hub-Signature-256") or "", self.server.secret):
@@ -745,7 +1565,18 @@ class GitHubWebhookHandler(BaseHTTPRequestHandler):
             return
 
         delivery_id = self.headers.get("X-GitHub-Delivery") or ""
-        apply_workflow_job_event(payload, delivery_id)
+        if event == "workflow_job":
+            apply_workflow_job_event(payload, delivery_id)
+            log_event(
+                logging.INFO, "webhook.workflow_job", f"Processed workflow_job delivery {delivery_id}",
+                deliveryId=delivery_id, action=payload.get("action"),
+            )
+        # Dashboard recording is best-effort: it must never affect job dispatch,
+        # so a failure here is swallowed rather than rejecting the delivery.
+        try:
+            record_dashboard_event(event, payload)
+        except Exception:
+            pass
         self.respond(202, "accepted")
 
     def respond(self, status: int, text: str) -> None:
@@ -755,8 +1586,16 @@ class GitHubWebhookHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+        duration_ms = round((time.monotonic() - getattr(self, "_start", time.monotonic())) * 1000)
+        log_event(
+            logging.INFO if status < 400 else logging.WARNING,
+            "webhook.request", f"POST {self.path} -> {status} ({text})",
+            path=self.path, status=status, durationMs=duration_ms,
+        )
 
     def log_message(self, format: str, *args) -> None:
+        # BaseHTTPRequestHandler's default writes plain text to stderr; we log
+        # structured access lines from respond() instead, so silence this.
         return
 
 
@@ -766,6 +1605,12 @@ def verify_signature(body: bytes, signature: str, secret: str) -> bool:
     digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
     expected = f"sha256={digest}"
     return hmac.compare_digest(expected, signature)
+
+
+def prune_webhook_queued() -> None:
+    cutoff = time.monotonic() - WEBHOOK_QUEUE_GRACE_SECONDS
+    for job_id in [jid for jid, at in WEBHOOK_QUEUED_AT.items() if at < cutoff]:
+        WEBHOOK_QUEUED_AT.pop(job_id, None)
 
 
 def apply_workflow_job_event(payload: dict, delivery_id: str) -> None:
@@ -793,19 +1638,22 @@ def apply_workflow_job_event(payload: dict, delivery_id: str) -> None:
 
         if job and action == "queued":
             queue = merge_jobs(queue, [job])
+            WEBHOOK_QUEUED_AT[job["id"]] = time.monotonic()
         elif job and action == "in_progress":
             queue = remove_job(queue, job["id"])
             actives = [{**a, "status": action} if a.get("id") == job["id"] else a for a in actives]
+            WEBHOOK_QUEUED_AT.pop(job["id"], None)
         elif job and action == "completed":
             # Just drop the finished job from the queue. Do NOT kill or remove a
             # runner by job id — ephemeral runners can be running a different
             # (swapped) job. tick() reaps each runner when its process exits.
             queue = remove_job(queue, job["id"])
+            WEBHOOK_QUEUED_AT.pop(job["id"], None)
 
         if job and profile is not None:
             statuses = upsert_repo_status(statuses, queue, job["repositorySlug"], profile, labels)
 
-        save_state(actives, queue, statuses, last_error, retries, profiles, webhook)
+        save_state(actives, queue, statuses, last_error, retries, profiles, webhook, state.get("backend"))
 
 
 def record_webhook_status(enabled: bool, last_error: str | None) -> None:
@@ -868,12 +1716,23 @@ def upsert_repo_status(statuses: list[dict], queue: list[dict], slug: str, profi
     return result
 
 
-def matching_profile(slug: str, job_labels: list[str], registry: dict, profiles: list[dict]) -> tuple[dict, list[str]] | None:
+def matching_profile(
+    slug: str,
+    job_labels: list[str],
+    registry: dict,
+    profiles: list[dict],
+    require_label_match: bool = True,
+) -> tuple[dict, list[str]] | None:
     for profile in profiles:
         labels = labels_for_repository(slug, profile, registry)
         if labels is None:
             continue
-        if has_labels(job_labels, labels):
+        # require_label_match=False (server mode): the backend already leased this
+        # machine the job, so a repo being managed by an enabled profile is enough;
+        # don't also require the job to carry the profile's configured labels. That
+        # configured-label subset check is the right filter only in poll mode, where
+        # the broker itself decides what to run. See server_job_payload.
+        if not require_label_match or has_labels(job_labels, labels):
             return profile, labels
     return None
 
@@ -895,7 +1754,7 @@ def labels_for_repository(slug: str, profile: dict, registry: dict) -> list[str]
     return None
 
 
-def save_state(actives, queue, statuses, error, retries, profiles, webhook) -> dict:
+def save_state(actives, queue, statuses, error, retries, profiles, webhook, backend=None) -> dict:
     queue = merge_jobs(queue, [])
     actives = list(actives or [])
     active_ids = {active.get("id") for active in actives}
@@ -913,6 +1772,8 @@ def save_state(actives, queue, statuses, error, retries, profiles, webhook) -> d
         "lastError": error,
         "retries": retries,
     }
+    if backend is not None:
+        state["backend"] = backend_status(backend)
     write_state(state)
     return state
 
@@ -930,11 +1791,27 @@ def read_registry() -> dict:
 
 def read_state() -> dict:
     if not STATE_PATH.exists():
-        return {"version": 1, "actives": [], "queue": [], "repos": [], "retries": {}, "webhook": webhook_status(None)}
+        return {
+            "version": 1,
+            "actives": [],
+            "queue": [],
+            "repos": [],
+            "retries": {},
+            "webhook": webhook_status(None),
+            "backend": backend_status(None) if backend_enabled() else None,
+        }
     try:
         state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return {"version": 1, "actives": [], "queue": [], "repos": [], "retries": {}, "webhook": webhook_status(None)}
+        return {
+            "version": 1,
+            "actives": [],
+            "queue": [],
+            "repos": [],
+            "retries": {},
+            "webhook": webhook_status(None),
+            "backend": backend_status(None) if backend_enabled() else None,
+        }
     state.setdefault("version", 1)
     state.setdefault("queue", [])
     state.setdefault("repos", [])
@@ -943,6 +1820,8 @@ def read_state() -> dict:
         legacy = state.get("active")
         state["actives"] = [legacy] if legacy else []
     state["webhook"] = webhook_status(state.get("webhook"))
+    if backend_enabled():
+        state["backend"] = backend_status(state.get("backend"))
     return state
 
 
@@ -952,25 +1831,186 @@ def write_state(state: dict) -> None:
     tmp.replace(STATE_PATH)
 
 
+def record_dashboard_event(event: str, payload: dict) -> None:
+    """Update workflow-runs.json from a webhook delivery so the app can render
+    recent runs/jobs without polling the GitHub API. Best-effort and isolated
+    from the dispatch state machine via its own file and lock."""
+    repository = payload.get("repository") or {}
+    slug = repository.get("full_name") or ""
+    if not slug:
+        return
+    with RUNS_LOCK:
+        index = {run["id"]: run for run in read_runs() if run.get("id") is not None}
+        if event == "workflow_run":
+            apply_dashboard_run(index, slug, payload)
+        elif event == "workflow_job":
+            apply_dashboard_job(index, slug, payload)
+        write_runs(prune_runs(list(index.values())))
+
+
+def record_dashboard_snapshot(payload: dict) -> None:
+    """Mirror the backend's recent workflow runs into workflow-runs.json.
+    This keeps the Swift dashboard on the existing local-file contract while
+    the backend owns the expensive GitHub-facing event ingestion."""
+    runs = payload.get("runs") or []
+    if not isinstance(runs, list):
+        return
+    with RUNS_LOCK:
+        index = {run["id"]: run for run in read_runs() if run.get("id") is not None}
+        jobs_by_run: dict[int, list[dict]] = {}
+        for job in payload.get("jobs") or []:
+            run_id = job.get("runId")
+            if run_id is None:
+                continue
+            jobs_by_run.setdefault(run_id, []).append({
+                "id": job.get("id"),
+                "name": job.get("jobName") or "Workflow job",
+                "status": job.get("status") or "queued",
+                "conclusion": job.get("conclusion"),
+                "runnerName": job.get("runnerName"),
+                "htmlURL": job.get("url"),
+                "startedAt": job.get("startedAt"),
+                "completedAt": job.get("completedAt"),
+                "labels": job.get("labels") or [],
+            })
+
+        for run in runs:
+            run_id = run.get("id")
+            if run_id is None:
+                continue
+            entry = dict(index.get(run_id) or {})
+            entry.update({
+                "id": run_id,
+                "repositorySlug": run.get("repositorySlug") or entry.get("repositorySlug") or "",
+                "workflowName": run.get("workflowName") or entry.get("workflowName") or "Workflow",
+                "displayTitle": run.get("displayTitle") or entry.get("displayTitle") or "Workflow run",
+                "headBranch": run.get("headBranch") or entry.get("headBranch") or "-",
+                "status": run.get("status") or entry.get("status") or "queued",
+                "conclusion": run.get("conclusion"),
+                "url": run.get("url") or entry.get("url") or "",
+                "event": run.get("event") or entry.get("event") or "",
+                "createdAt": run.get("createdAt") or entry.get("createdAt") or now(),
+                "updatedAt": run.get("updatedAt") or entry.get("updatedAt") or now(),
+            })
+            if run_id in jobs_by_run:
+                entry["jobs"] = sorted(jobs_by_run[run_id], key=lambda item: item.get("id") or 0)
+            index[run_id] = entry
+
+        write_runs(prune_runs(list(index.values())))
+
+
+def apply_dashboard_run(index: dict, slug: str, payload: dict) -> None:
+    run = payload.get("workflow_run") or {}
+    run_id = run.get("id")
+    if run_id is None:
+        return
+    entry = index.get(run_id) or {"id": run_id, "jobs": []}
+    entry.update({
+        "repositorySlug": slug,
+        "workflowName": run.get("name") or entry.get("workflowName") or "Workflow",
+        "displayTitle": run.get("display_title") or run.get("name") or entry.get("displayTitle") or "Workflow run",
+        "headBranch": run.get("head_branch") or entry.get("headBranch") or "-",
+        "status": run.get("status") or entry.get("status") or "queued",
+        "conclusion": run.get("conclusion"),
+        "url": run.get("html_url") or entry.get("url") or "",
+        "event": run.get("event") or entry.get("event") or "",
+        "createdAt": run.get("created_at") or entry.get("createdAt") or now(),
+        "updatedAt": now(),
+    })
+    index[run_id] = entry
+
+
+def apply_dashboard_job(index: dict, slug: str, payload: dict) -> None:
+    job = payload.get("workflow_job") or {}
+    run = payload.get("workflow_run") or {}
+    run_id = job.get("run_id") or run.get("id")
+    job_id = job.get("id")
+    if run_id is None or job_id is None:
+        return
+    entry = index.get(run_id) or {
+        "id": run_id,
+        "repositorySlug": slug,
+        "workflowName": job.get("workflow_name") or "Workflow",
+        "displayTitle": run.get("display_title") or job.get("name") or "Workflow run",
+        "headBranch": job.get("head_branch") or "-",
+        "status": "in_progress",
+        "conclusion": None,
+        "url": run.get("html_url") or job.get("run_url") or "",
+        "event": "",
+        "createdAt": job.get("created_at") or now(),
+        "jobs": [],
+    }
+    entry["updatedAt"] = now()
+    jobs = [item for item in entry.get("jobs", []) if item.get("id") != job_id]
+    jobs.append({
+        "id": job_id,
+        "name": job.get("name") or "Workflow job",
+        "status": job.get("status") or "queued",
+        "conclusion": job.get("conclusion"),
+        "runnerName": job.get("runner_name"),
+        "htmlURL": job.get("html_url"),
+        "startedAt": job.get("started_at"),
+        "completedAt": job.get("completed_at"),
+        "labels": job.get("labels") or [],
+    })
+    entry["jobs"] = sorted(jobs, key=lambda item: item.get("id") or 0)
+    index[run_id] = entry
+
+
+def prune_runs(runs: list[dict]) -> list[dict]:
+    ordered = sorted(runs, key=lambda item: item.get("createdAt") or "", reverse=True)
+    return ordered[:MAX_DASHBOARD_RUNS]
+
+
+def read_runs() -> list[dict]:
+    if not RUNS_PATH.exists():
+        return []
+    try:
+        data = json.loads(RUNS_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    runs = data.get("runs") if isinstance(data, dict) else data
+    return runs if isinstance(runs, list) else []
+
+
+def write_runs(runs: list[dict]) -> None:
+    payload = {"version": 1, "updatedAt": now(), "runs": runs}
+    tmp = RUNS_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(RUNS_PATH)
+
+
 def update_retry(job: dict, retries: dict) -> dict:
     result = dict(retries)
     result[job["id"]] = result.get(job["id"], 0) + 1
+    RETRY_BUMPED_AT[job["id"]] = time.monotonic()
     return result
 
 
 def reset_stale_retries(retries: dict) -> dict:
-    # Periodically forget retry counters so a job abandoned during a transient
-    # outage (e.g. a DNS blip that broke runner startup) gets another chance
-    # once conditions recover, instead of staying wedged at MAX_RETRIES forever.
-    global RETRY_RESET_AT
-    if time.monotonic() - RETRY_RESET_AT >= RETRY_RESET_SECONDS:
-        RETRY_RESET_AT = time.monotonic()
-        if retries:
-            return {}
-    return retries
+    # Forget a job's retry counter once it has gone RETRY_RESET_SECONDS without
+    # a new failure, so a job abandoned during a transient outage (e.g. a DNS
+    # blip that broke runner startup) gets another chance once conditions
+    # recover — without also resetting jobs that are still actively failing.
+    now = time.monotonic()
+    cutoff = now - RETRY_RESET_SECONDS
+    result = {}
+    for job_id, count in retries.items():
+        bumped = RETRY_BUMPED_AT.get(job_id)
+        if bumped is None:
+            # First time seen (e.g. restored from state after a restart) — start
+            # its clock now rather than dropping the count immediately.
+            RETRY_BUMPED_AT[job_id] = now
+            result[job_id] = count
+        elif bumped >= cutoff:
+            result[job_id] = count
+        else:
+            RETRY_BUMPED_AT.pop(job_id, None)
+    return result
 
 
 def clear_retry(job_id: str | None, retries: dict) -> dict:
+    RETRY_BUMPED_AT.pop(job_id, None)
     if not job_id or job_id not in retries:
         return retries
     result = dict(retries)
@@ -983,6 +2023,8 @@ def prune_retries(retries: dict, queue: list[dict], actives: list[dict] | None =
     for active in actives or []:
         if active.get("id"):
             keep.add(active["id"])
+    for job_id in [jid for jid in RETRY_BUMPED_AT if jid not in keep]:
+        RETRY_BUMPED_AT.pop(job_id, None)
     return {job_id: count for job_id, count in retries.items() if job_id in keep}
 
 
@@ -1027,6 +2069,53 @@ def safe_name(value: str) -> str:
     return "".join(char if char.isalnum() or char in "-_." else "-" for char in value)
 
 
+PROGRESS_MARKER_PREFIX = "::ci-scope-progress:: "
+PROGRESS_TAIL_BYTES = 4096
+
+
+def read_last_progress_marker(job_id: str) -> dict | None:
+    # Gate scripts print a `::ci-scope-progress:: {json}` line as they work;
+    # the runner's stdout is already redirected into this log by start_runner.
+    # Only the last ~4KB is read since the marker we want is always the most
+    # recent line and this runs once per active job every tick.
+    path = LOG_DIR / f"{safe_name(job_id)}.log"
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            handle.seek(max(0, size - PROGRESS_TAIL_BYTES))
+            tail = handle.read().decode("utf-8", errors="ignore")
+    except OSError:
+        return None
+    for line in reversed(tail.splitlines()):
+        if line.startswith(PROGRESS_MARKER_PREFIX):
+            try:
+                marker = json.loads(line[len(PROGRESS_MARKER_PREFIX):])
+            except json.JSONDecodeError:
+                continue
+            if valid_progress_marker(marker):
+                return marker
+    return None
+
+
+def valid_progress_marker(marker: object) -> bool:
+    if not isinstance(marker, dict):
+        return False
+    step = marker.get("step")
+    if not isinstance(step, str) or not step.strip() or len(step) > 80:
+        return False
+    detail = marker.get("detail")
+    if detail is not None and not isinstance(detail, str):
+        return False
+    for key in ("current", "total"):
+        value = marker.get(key)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+            return False
+    current = marker.get("current")
+    total = marker.get("total")
+    return not (current is not None and total is not None and total > 0 and current > total)
+
+
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -1034,7 +2123,41 @@ def now() -> str:
 def ensure_dirs() -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
     JOBS_DIR.mkdir(parents=True, exist_ok=True)
+    TOOL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+    prune_orphan_job_dirs()
+    prune_old_logs()
+
+
+def prune_old_logs() -> None:
+    # Every dispatched job writes its own {job-id}.log to LOG_DIR and nothing
+    # ever removed them (490+ files/1.9MB observed going back to May). Bounded
+    # by age rather than count since a single verbose job can dwarf a hundred
+    # quiet ones.
+    cutoff = time.time() - LOG_RETENTION_SECONDS
+    for path in LOG_DIR.glob("*.log"):
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+        except OSError:
+            continue
+
+
+def prune_orphan_job_dirs() -> None:
+    # Each dispatched job clones a ~430MB runner template into JOBS_DIR
+    # (prepare_runner_dir) and is normally removed by remove_runner_dir when it
+    # finishes, times out, or is idle-reaped. A crash between cloning the dir
+    # and persisting the active to state — or a bug in one of those cleanup
+    # paths — can still strand one. Run only at startup: mid-run, a dir with no
+    # matching active could belong to a runner this same process just dispatched
+    # a moment ago, before tick() got a chance to publish it.
+    if not JOBS_DIR.exists():
+        return
+    with STATE_LOCK:
+        keep = {safe_name(active["id"]) for active in (read_state().get("actives") or []) if active.get("id")}
+    for entry in JOBS_DIR.iterdir():
+        if entry.is_dir() and entry.name not in keep:
+            shutil.rmtree(entry, ignore_errors=True)
 
 
 def ensure_webhook_secret() -> str:
@@ -1045,7 +2168,70 @@ def ensure_webhook_secret() -> str:
     return WEBHOOK_SECRET_PATH.read_text(encoding="utf-8").strip()
 
 
+def kill_active_runners_for_app_gone(reason: str) -> None:
+    """Kills every runner this broker has in flight because the app that owns
+    it is gone (quit or crashed/force-quit) and nothing should keep running
+    without it. Reports each as "released" so the queue can retry it on
+    whichever machine picks it up next, same as a timeout or idle-reap."""
+    with STATE_LOCK:
+        actives = list(read_state().get("actives") or [])
+    for active in actives:
+        if active.get("pid") and active_is_running(active):
+            terminate_active_process(active, reason=reason)
+            cleanup_runner_by_name(active.get("repositorySlug"), active.get("runnerName"))
+            remove_runner_dir(active.get("id"))
+            server_post_status(active, "released", f"Stopped: {reason}.")
+    with STATE_LOCK:
+        state = read_state()
+        state["actives"] = []
+        write_state(state)
+
+
+def owner_app_alive() -> bool:
+    if not OWNER_PID:
+        return True
+    return process_alive(OWNER_PID)
+
+
+def shutdown_for_owner_exit() -> None:
+    # CI_SCOPE_APP_PID died without ever sending us a SIGTERM (force-quit or a
+    # crash skip applicationShouldTerminate entirely), so nothing else will
+    # trigger cleanup. Kill every runner this broker owns, then bootout
+    # ourselves so KeepAlive doesn't just relaunch a broker with no app left
+    # to answer to.
+    LOGGER.info(
+        f"Owner app (pid {OWNER_PID}) is gone; killing active runners and shutting down",
+        extra={"event": "broker.owner_exit", "context": {"ownerPid": OWNER_PID}},
+    )
+    kill_active_runners_for_app_gone("app_gone")
+    subprocess.run(
+        ["launchctl", "bootout", f"gui/{os.getuid()}/{SERVICE_LABEL}"],
+        capture_output=True,
+    )
+    sys.exit(0)
+
+
 def shutdown(*_) -> None:
+    # Runs on SIGTERM. Routine restarts (Settings button, app launch,
+    # kickstart -k) send the exact same signal as a real app quit, so by
+    # default this deliberately does NOT touch active runners — each runs in
+    # its own process group (start_new_session=True) and keeps talking to
+    # GitHub Actions directly, independent of this process; the next broker
+    # instance reconciles them straight out of persisted state.
+    # QUIT_MARKER_PATH is the one case that should kill jobs: the app writes
+    # it immediately before booting the LaunchAgent out on a genuine quit.
+    if QUIT_MARKER_PATH.exists():
+        LOGGER.info(
+            "Received SIGTERM for app quit; killing active runners",
+            extra={"event": "broker.sigterm.quit", "context": None},
+        )
+        kill_active_runners_for_app_gone("app_quit")
+        try:
+            QUIT_MARKER_PATH.unlink()
+        except OSError:
+            pass
+    else:
+        LOGGER.info("Received SIGTERM; exiting without touching active runners", extra={"event": "broker.sigterm", "context": None})
     sys.exit(0)
 
 

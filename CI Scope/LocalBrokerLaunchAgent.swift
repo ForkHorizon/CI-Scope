@@ -22,7 +22,7 @@ extension LocalBrokerService {
         let isLoaded = await launchAgentIsLoaded()
         if changed || !isLoaded {
             let result = await ShellClient.run(
-                "launchctl bootstrap gui/$(id -u) \(quoted(launchAgentURL.path))",
+                "launchctl bootstrap gui/\(geteuid()) \(quoted(launchAgentURL.path))",
                 timeout: 10,
                 config: config
             )
@@ -36,12 +36,28 @@ extension LocalBrokerService {
         return executableURL.path
     }
 
+    /// Tears the broker down at app quit: writes the quit marker so the
+    /// broker's own SIGTERM handler kills any in-flight runner, then unloads
+    /// the LaunchAgent. Routine restarts (Settings button, app launch) go
+    /// through installOrUpdateLaunchAgent's kickstart instead, which never
+    /// writes this marker, so they leave an active runner alone. Best-effort
+    /// with a short timeout — quitting shouldn't hang on it.
+    func uninstallLaunchAgent() async {
+        try? "1".write(to: quitMarkerURL, atomically: true, encoding: .utf8)
+        _ = await ShellClient.run(bootoutCommand, timeout: 8, config: config)
+    }
+
+    private var quitMarkerURL: URL {
+        try! brokerDirectory.safelyAppendingPathComponent("quit-requested")
+    }
+
     private func stopStandaloneRunnerLaunchAgents() async {
+        let uid = geteuid()
         for runnerConfig in config.actionsRunners {
             guard let serviceLabel = standaloneServiceLabel(for: runnerConfig) else { continue }
             guard serviceLabel != LocalBrokerConstants.serviceLabel else { continue }
             _ = await ShellClient.run(
-                "launchctl bootout gui/$(id -u)/\(quoted(serviceLabel)) >/dev/null 2>&1 || true",
+                "launchctl bootout gui/\(uid)/\(quoted(serviceLabel)) >/dev/null 2>&1 || true",
                 timeout: 5,
                 config: config
             )
@@ -114,7 +130,7 @@ extension LocalBrokerService {
 
     private func launchAgentIsLoaded() async -> Bool {
         let result = await ShellClient.run(
-            "launchctl print gui/$(id -u)/\(LocalBrokerConstants.serviceLabel)",
+            "launchctl print gui/\(geteuid())/\(LocalBrokerConstants.serviceLabel)",
             timeout: 4,
             config: config
         )
@@ -122,11 +138,11 @@ extension LocalBrokerService {
     }
 
     private var bootoutCommand: String {
-        "launchctl bootout gui/$(id -u)/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
+        "launchctl bootout gui/\(geteuid())/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
     }
 
     private var kickstartCommand: String {
-        "launchctl kickstart -k gui/$(id -u)/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
+        "launchctl kickstart -k gui/\(geteuid())/\(LocalBrokerConstants.serviceLabel) >/dev/null 2>&1 || true"
     }
 
     private func launchAgentPlist(executableURL: URL, secretURL: URL) -> String {
@@ -142,9 +158,12 @@ extension LocalBrokerService {
             <string>\(executableURL.path)</string>
           </array>
           <key>RunAtLoad</key>
-          <true/>
+          <false/>
           <key>KeepAlive</key>
-          <true/>
+          <dict>
+            <key>SuccessfulExit</key>
+            <false/>
+          </dict>
           <key>EnvironmentVariables</key>
           <dict>
             <key>PATH</key>
@@ -155,6 +174,9 @@ extension LocalBrokerService {
             <string>\(secretURL.path)</string>
             <key>CI_SCOPE_WEBHOOK_PATH</key>
             <string>\(LocalBrokerConstants.webhookPath)</string>
+            <key>CI_SCOPE_APP_PID</key>
+            <string>\(ProcessInfo.processInfo.processIdentifier)</string>
+            \(backendEnvironmentPlistEntries())
           </dict>
           <key>StandardOutPath</key>
           <string>\(try! logsDirectory.safelyAppendingPathComponent("broker.out.log").path)</string>
@@ -163,6 +185,40 @@ extension LocalBrokerService {
         </dict>
         </plist>
         """
+    }
+
+    private func backendEnvironmentPlistEntries() -> String {
+        let settings = CIQueueSettingsStore.snapshot()
+        var values: [String: String] = [:]
+        if settings.serverModeEnabled, !settings.normalizedServerURL.isEmpty, !settings.localToken.isEmpty {
+            values["CI_SCOPE_SERVER_MODE"] = "1"
+            values["CI_SCOPE_BACKEND_URL"] = settings.normalizedServerURL
+            values["CI_SCOPE_BACKEND_TOKEN"] = settings.localToken
+            values["CI_SCOPE_MACHINE_ID"] = settings.machineID
+            values["CI_SCOPE_MACHINE_NAME"] = settings.machineName
+            values["CI_SCOPE_MACHINE_LABELS"] = settings.labels.joined(separator: ",")
+            values["CI_SCOPE_MACHINE_CAPACITY"] = String(settings.capacity)
+        }
+        if !settings.deepSeekAPIKey.isEmpty {
+            values["DEEPSEEK_API_KEY"] = settings.deepSeekAPIKey
+        }
+
+        return values.keys.sorted().compactMap { key in
+            guard let value = values[key], !value.isEmpty else { return nil }
+            return """
+                <key>\(key)</key>
+                <string>\(xmlEscaped(value))</string>
+                """
+        }.joined(separator: "\n")
+    }
+
+    private func xmlEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 }
 

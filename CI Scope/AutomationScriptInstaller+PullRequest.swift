@@ -1,5 +1,13 @@
 import Foundation
 
+/// The branch/base/title/body of a pull request the installer is about to open.
+struct PullRequestDraft {
+    let base: String
+    let branch: String
+    let title: String
+    let body: String
+}
+
 extension AutomationScriptInstaller {
     func pullRequestURL(
         project: CIProject,
@@ -9,14 +17,13 @@ extension AutomationScriptInstaller {
         if let existingURL = try await existingPullRequestURL(project: project, branch: renderer.branchName) {
             return existingURL
         }
-        return try await createPullRequest(
-            project: project,
+        let draft = PullRequestDraft(
             base: renderer.defaultBranch,
             branch: renderer.branchName,
             title: renderer.pullRequestTitle,
-            body: renderer.pullRequestBody,
-            tempRoot: tempRoot
+            body: renderer.pullRequestBody
         )
+        return try await createPullRequest(project: project, draft: draft, tempRoot: tempRoot)
     }
 
     func removalPullRequestURL(
@@ -29,14 +36,13 @@ extension AutomationScriptInstaller {
         if let existingURL = try await existingPullRequestURL(project: project, branch: branchName) {
             return existingURL
         }
-        return try await createPullRequest(
-            project: project,
+        let draft = PullRequestDraft(
             base: defaultBranch,
             branch: branchName,
             title: "Remove \(script.title) automation",
-            body: removalPullRequestBody(for: script),
-            tempRoot: tempRoot
+            body: removalPullRequestBody(for: script)
         )
+        return try await createPullRequest(project: project, draft: draft, tempRoot: tempRoot)
     }
 
     func existingPullRequestURL(project: CIProject, branch: String) async throws -> URL? {
@@ -58,27 +64,39 @@ extension AutomationScriptInstaller {
 
     func createPullRequest(
         project: CIProject,
-        base: String,
-        branch: String,
-        title: String,
-        body: String,
+        draft: PullRequestDraft,
         tempRoot: URL
     ) async throws -> URL? {
         let bodyURL = try tempRoot.safelyAppendingPathComponent("pull-request-body.md")
-        try body.write(to: bodyURL, atomically: true, encoding: .utf8)
+        try draft.body.write(to: bodyURL, atomically: true, encoding: .utf8)
         let output = try await run(
             """
             gh pr create \
               --repo \(quoted(project.repositorySlug)) \
-              --base \(quoted(base)) \
-              --head \(quoted(branch)) \
-              --title \(quoted(title)) \
+              --base \(quoted(draft.base)) \
+              --head \(quoted(draft.branch)) \
+              --title \(quoted(draft.title)) \
               --body-file \(quoted(bodyURL.path))
             """,
             timeout: 60,
             step: "Create automation script pull request"
         )
-        return URL(string: output.trimmed)
+        let pullRequestURL = URL(string: output.trimmed)
+        await enableAutoMergeIfConfigured(project: project, pullRequestURL: pullRequestURL)
+        return pullRequestURL
+    }
+
+    /// Best effort: turns on GitHub auto-merge when the user opted in. Never
+    /// throws — a repo that doesn't allow auto-merge just leaves the PR open.
+    private func enableAutoMergeIfConfigured(project: CIProject, pullRequestURL: URL?) async {
+        guard
+            UserDefaults.standard.bool(forKey: CIQueueSettingsStore.autoMergeDefaultsKey),
+            let pullRequestURL
+        else { return }
+        _ = await shell(
+            "gh pr merge --auto --squash --repo \(quoted(project.repositorySlug)) \(quoted(pullRequestURL.absoluteString))",
+            timeout: 30
+        )
     }
 
     func alreadyInstalledResult(_ script: AutomationScript, defaultBranch: String) -> AutomationScriptInstallResult {

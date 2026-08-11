@@ -27,10 +27,31 @@ extension ContentView {
                 selectedProject: selectedProject,
                 onInstallSuccess: { project in
                     Task {
-                        await projectCIViewModel.load(project)
+                        await projectCIViewModel.load(project, forceRefresh: true)
                     }
                 }
             )
+        case .coverage:
+            GateMatrixView(
+                projects: projectStore.projects,
+                gateScripts: gateScripts,
+                installViewModel: scriptInstallViewModel,
+                onInstalled: { project in
+                    Task {
+                        await projectCIViewModel.load(project, forceRefresh: true)
+                    }
+                }
+            )
+            .padding(14)
+        case .settings:
+            SettingsView(store: settingsStore)
+        }
+    }
+
+    /// The managed gates in canonical order, for the coverage matrix columns.
+    var gateScripts: [AutomationScript] {
+        AutomationScriptSeedProvider.defaultSeedIDs.compactMap { id in
+            scriptStore.scripts.first { $0.defaultSeedID == id }
         }
     }
 
@@ -42,6 +63,7 @@ extension ContentView {
                     project: selectedProject,
                     snapshot: projectCIViewModel.snapshot(for: selectedProject.id),
                     isLoading: projectCIViewModel.loadingProjectID == selectedProject.id,
+                    liveJobs: liveJobs(for: selectedProject),
                     scripts: scriptStore.scripts,
                     isBrokerManaged: isBrokerManaged(selectedProject),
                     removalSnapshot: { script in
@@ -54,7 +76,8 @@ extension ContentView {
                         scriptInstallViewModel.remove(script: script, project: selectedProject) {
                             refreshSelectedProject()
                         }
-                    }
+                    },
+                    installViewModel: scriptInstallViewModel
                 )
                 .frame(minHeight: 260, maxHeight: .infinity)
             }
@@ -65,6 +88,12 @@ extension ContentView {
             }
             .padding(14)
         }
+    }
+
+    func liveJobs(for project: CIProject) -> [RunnerWorkItem] {
+        runnerFleetViewModel.snapshot.runners
+            .flatMap(\.activeJobs)
+            .filter { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
     }
 
     var header: some View {

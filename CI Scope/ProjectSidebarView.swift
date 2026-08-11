@@ -44,6 +44,24 @@ struct ProjectMenuPanel: View {
                 ) {
                     workspaceTab = .scripts
                 }
+
+                WorkspaceMenuRow(
+                    tab: .coverage,
+                    state: .unknown,
+                    count: 0,
+                    isActive: workspaceTab == .coverage
+                ) {
+                    workspaceTab = .coverage
+                }
+
+                WorkspaceMenuRow(
+                    tab: .settings,
+                    state: .unknown,
+                    count: 0,
+                    isActive: workspaceTab == .settings
+                ) {
+                    workspaceTab = .settings
+                }
             }
             .padding(10)
 
@@ -133,6 +151,10 @@ struct ProjectMenuPanel: View {
             runnerState
         case .scripts:
             scriptState
+        case .coverage:
+            .unknown
+        case .settings:
+            .unknown
         }
     }
 
@@ -144,6 +166,10 @@ struct ProjectMenuPanel: View {
             runnerCount == 0 ? "Runners not loaded" : "\(runnerCount) runners · \(runnerState.rawValue)"
         case .scripts:
             scriptCount == 0 ? "No scripts" : "\(scriptCount) scripts · \(scriptState.rawValue)"
+        case .coverage:
+            "Gate coverage"
+        case .settings:
+            "Server settings"
         }
     }
 }
@@ -205,6 +231,10 @@ struct WorkspaceMenuRow: View {
             count == 0 ? "Load runner status" : "\(count) configured"
         case .scripts:
             count == 1 ? "1 script" : "\(count) scripts"
+        case .coverage:
+            "Gate coverage"
+        case .settings:
+            "Server queue"
         }
     }
 

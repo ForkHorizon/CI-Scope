@@ -15,27 +15,23 @@ extension LocalBrokerService {
         }
         let activeJobs = state.activeJobs.map(\.workItem)
         let queuedJobs = state.queue.map(\.workItem)
-        let visibleRepositoryCount = subRunners.reduce(0) { $0 + $1.visibleRepositoryCount }
 
         var snapshot = RunnerMonitorSnapshot(
             id: "local-mac-broker",
             title: "MacBook Runner",
-            scope: "ForkHorizon organization + Daliys private repositories",
-            root: brokerDirectory.path
+            scope: "ForkHorizon organization + Daliys private repositories"
         )
         snapshot.localState = launch.state
         snapshot.githubState = dispatcherState(launch: launch, state: state)
         snapshot.launchctlState = launch.launchctlState
         snapshot.pid = launch.pid
         snapshot.uptime = launch.uptime
-        snapshot.serviceLabel = LocalBrokerConstants.serviceLabel
         snapshot.remoteName = "MacBook Controller"
         snapshot.remoteStatus = "parallel dispatcher"
         snapshot.registeredTo = "\(subRunners.count) sub-runners"
         snapshot.labels = uniqueLabels(profiles.flatMap(\.labels))
         snapshot.activeJobs = activeJobs
         snapshot.queuedJobs = queuedJobs
-        snapshot.visibleRepositoryCount = visibleRepositoryCount
         snapshot.subRunners = subRunners
         snapshot.webhook = state.webhook
         snapshot.error = [state.lastError, staleWarning].compactMap { $0 }.joined(separator: "\n").nilIfEmpty
@@ -128,7 +124,7 @@ extension LocalBrokerService {
 
     private func launchStatus() async -> RunnerLaunchStatus {
         let result = await ShellClient.run(
-            "launchctl print gui/$(id -u)/\(LocalBrokerConstants.serviceLabel)",
+            "launchctl print gui/\(geteuid())/\(LocalBrokerConstants.serviceLabel)",
             timeout: 5,
             config: config
         )
@@ -137,8 +133,7 @@ extension LocalBrokerService {
                 state: .offline,
                 launchctlState: "not running",
                 pid: nil,
-                uptime: "-",
-                error: result.output.trimmed
+                uptime: "-"
             )
         }
 
@@ -148,8 +143,7 @@ extension LocalBrokerService {
             state: launchState == "running" ? .online : .warning,
             launchctlState: launchState,
             pid: pid,
-            uptime: await processUptime(pid: pid),
-            error: nil
+            uptime: await processUptime(pid: pid)
         )
     }
 

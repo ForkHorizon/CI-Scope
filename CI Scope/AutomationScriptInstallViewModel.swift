@@ -11,10 +11,6 @@ final class AutomationScriptInstallViewModel: ObservableObject {
         self.installer = AutomationScriptInstaller(config: DashboardConfig())
     }
 
-    init(config: DashboardConfig) {
-        self.installer = AutomationScriptInstaller(config: config)
-    }
-
     func snapshot(for script: AutomationScript?) -> AutomationScriptInstallSnapshot {
         guard let script else { return .idle }
         return snapshots[installKey(script)] ?? .idle
@@ -47,12 +43,44 @@ final class AutomationScriptInstallViewModel: ObservableObject {
                     variableValues: variableValues,
                     mode: mode
                 )
+                ProjectCIService.invalidateWorkflowsCache(forRepositorySlug: project.repositorySlug)
                 snapshots[snapshotKey] = .succeeded(result)
                 onSuccess()
             } catch {
                 snapshots[snapshotKey] = .failed(error.localizedDescription)
             }
         }
+    }
+
+    func installBundle(
+        scripts: [AutomationScript],
+        project: CIProject?,
+        mode: AutomationScriptInstallMode,
+        onSuccess: @escaping () -> Void = {}
+    ) {
+        guard !snapshots.values.contains(where: \.isInstalling) else { return }
+        let snapshotKey = bundleKey(project)
+        guard let project else {
+            snapshots[snapshotKey] = .failed(AutomationScriptError.missingProject.localizedDescription)
+            return
+        }
+        guard !scripts.isEmpty else { return }
+
+        snapshots[snapshotKey] = .installingBundle(count: scripts.count)
+        Task {
+            do {
+                let result = try await installer.installBundle(scripts: scripts, project: project, mode: mode)
+                ProjectCIService.invalidateWorkflowsCache(forRepositorySlug: project.repositorySlug)
+                snapshots[snapshotKey] = .succeeded(result)
+                onSuccess()
+            } catch {
+                snapshots[snapshotKey] = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func bundleSnapshot(for project: CIProject) -> AutomationScriptInstallSnapshot {
+        snapshots[bundleKey(project)] ?? .idle
     }
 
     func remove(
@@ -71,6 +99,7 @@ final class AutomationScriptInstallViewModel: ObservableObject {
                     project: project,
                     variableValues: defaultValues(for: script)
                 )
+                ProjectCIService.invalidateWorkflowsCache(forRepositorySlug: project.repositorySlug)
                 snapshots[snapshotKey] = .succeeded(result)
                 onSuccess()
             } catch {
@@ -92,6 +121,10 @@ final class AutomationScriptInstallViewModel: ObservableObject {
 
     private func installKey(_ script: AutomationScript) -> String {
         "install:\(script.id)"
+    }
+
+    private func bundleKey(_ project: CIProject?) -> String {
+        "bundle:\(project?.id ?? "-")"
     }
 
     private func removeKey(_ script: AutomationScript, project: CIProject) -> String {

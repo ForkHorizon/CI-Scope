@@ -15,7 +15,8 @@ extension ProjectCIService {
 
     func workflowName(from path: String) -> String {
         let filename = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
-        return filename
+        return
+            filename
             .replacingOccurrences(of: "-", with: " ")
             .replacingOccurrences(of: "_", with: " ")
             .capitalized
@@ -41,7 +42,8 @@ extension ProjectCIService {
 
         let suffix = output[range.upperBound...]
         let terminators = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "("))
-        return suffix
+        return
+            suffix
             .prefix { character in
                 String(character).rangeOfCharacter(from: terminators) == nil
             }
@@ -77,7 +79,8 @@ extension ProjectCIService {
             value = String(value.dropFirst("http://github.com/".count))
         }
 
-        value = value
+        value =
+            value
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
         if value.hasSuffix(".git") {

@@ -1,5 +1,21 @@
 import Foundation
 
+enum CodeLinterWorkflowStatus {
+    case latest
+    case pinned
+    case custom
+    case unavailable
+
+    var title: String {
+        switch self {
+        case .latest: "Latest · updates automatically"
+        case .pinned: "Pinned version"
+        case .custom: "Custom workflow"
+        case .unavailable: "Version unavailable"
+        }
+    }
+}
+
 struct InstalledAutomationScript: Identifiable {
     let script: AutomationScript
     let workflow: GitHubWorkflow
@@ -28,8 +44,25 @@ struct InstalledAutomationScript: Identifiable {
 }
 
 extension AutomationScript {
+    var isCodeLinter: Bool {
+        defaultSeedID == "code-linter" || id == "code-linter"
+    }
+
+    var workflowOnly: AutomationScript {
+        var copy = self
+        copy.files = files.filter { $0.destinationPath.hasPrefix(".github/workflows/") }
+        return copy
+    }
+
+    func codeLinterStatus(workflowSource: String?) -> CodeLinterWorkflowStatus {
+        guard isCodeLinter, let workflowSource else { return .unavailable }
+        let reusableWorkflow = "ForkHorizon/ci-gates/.github/workflows/code-linter.yml@"
+        guard workflowSource.contains(reusableWorkflow) else { return .custom }
+        return workflowSource.contains("\(reusableWorkflow)main") ? .latest : .pinned
+    }
+
     var workflowDestinationPaths: Set<String> {
-        var paths = Set(
+        Set(
             files
                 .map { renderedDetectionPath($0.destinationPath).normalizedRepositoryPath }
                 .filter { path in
@@ -38,16 +71,6 @@ extension AutomationScript {
                         && !path.contains("{{")
                 }
         )
-
-        if managesLegacyReadabilityInstall {
-            paths.insert(".github/workflows/ai-readability.yml")
-        }
-
-        return paths
-    }
-
-    func isDetected(in snapshot: ProjectCISnapshot?) -> Bool {
-        matchingWorkflow(in: snapshot) != nil
     }
 
     func matchingWorkflow(in snapshot: ProjectCISnapshot?) -> GitHubWorkflow? {
@@ -66,10 +89,6 @@ extension AutomationScript {
             .replacingOccurrences(of: "{{script_id}}", with: id)
             .replacingOccurrences(of: "{{script_slug}}", with: scriptSlug)
             .replacingOccurrences(of: "{{script_title}}", with: title)
-    }
-
-    private var managesLegacyReadabilityInstall: Bool {
-        defaultSeedID == "ai-readability" || id == "ai-readability"
     }
 }
 

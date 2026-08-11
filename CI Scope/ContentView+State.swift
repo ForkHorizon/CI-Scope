@@ -14,7 +14,9 @@ extension ContentView {
             return projectCIViewModel.loadingProjectID == selectedProject.id
         case .runners:
             return runnerFleetViewModel.isLoading
-        case .scripts:
+        case .scripts, .coverage:
+            return false
+        case .settings:
             return false
         }
     }
@@ -26,7 +28,9 @@ extension ContentView {
             return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt
         case .runners:
             return runnerFleetViewModel.snapshot.refreshedAt
-        case .scripts:
+        case .scripts, .coverage:
+            return nil
+        case .settings:
             return nil
         }
     }
@@ -37,7 +41,9 @@ extension ContentView {
             selectedProject != nil
         case .runners:
             true
-        case .scripts:
+        case .scripts, .coverage:
+            false
+        case .settings:
             false
         }
     }
@@ -50,6 +56,10 @@ extension ContentView {
             "Runner · MacBook"
         case .scripts:
             "\(scriptStore.scripts.count) installable scripts"
+        case .coverage:
+            "\(projectStore.projects.count) repositories"
+        case .settings:
+            settingsStore.serverModeEnabled ? "Server queue enabled" : "Server queue off"
         }
     }
 
@@ -61,6 +71,10 @@ extension ContentView {
             "Runners"
         case .scripts:
             "Scripts"
+        case .coverage:
+            "Coverage"
+        case .settings:
+            "Settings"
         }
     }
 
@@ -72,6 +86,10 @@ extension ContentView {
             "server.rack"
         case .scripts:
             "curlybraces.square"
+        case .coverage:
+            "tablecells"
+        case .settings:
+            "gearshape"
         }
     }
 
@@ -84,6 +102,10 @@ extension ContentView {
             return runnerFleetViewModel.snapshot.state
         case .scripts:
             return scriptStore.scripts.isEmpty ? .unknown : .online
+        case .coverage:
+            return .unknown
+        case .settings:
+            return settingsStore.serverModeEnabled ? .online : .unknown
         }
     }
 
@@ -110,7 +132,7 @@ extension ContentView {
         }
 
         Task {
-            await projectCIViewModel.load(selectedProject)
+            await projectCIViewModel.load(selectedProject, forceRefresh: true)
         }
     }
 
@@ -126,7 +148,7 @@ extension ContentView {
     func attachToBroker(_ project: CIProject) {
         Task {
             try? await LocalBrokerService(config: DashboardConfig()).attach(project: project)
-            await projectCIViewModel.load(project)
+            await projectCIViewModel.load(project, forceRefresh: true)
             await runnerFleetViewModel.load()
         }
     }
@@ -139,7 +161,9 @@ extension ContentView {
             Task {
                 await runnerFleetViewModel.load()
             }
-        case .scripts:
+        case .scripts, .coverage:
+            break
+        case .settings:
             break
         }
     }

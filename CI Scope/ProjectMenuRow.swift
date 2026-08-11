@@ -54,7 +54,7 @@ struct ProjectMenuRow: View {
             .buttonStyle(.plain)
 
             Menu {
-                ProjectContextMenu(project: project, onRemove: onRemove)
+                ProjectContextMenu(onRemove: onRemove)
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 13, weight: .semibold))
@@ -76,7 +76,7 @@ struct ProjectMenuRow: View {
         )
         .contentShape(RoundedRectangle(cornerRadius: 8))
         .contextMenu {
-            ProjectContextMenu(project: project, onRemove: onRemove)
+            ProjectContextMenu(onRemove: onRemove)
         }
         .onHover { isHovering = $0 }
     }
@@ -97,7 +97,6 @@ struct ProjectMenuRow: View {
 }
 
 struct ProjectContextMenu: View {
-    let project: CIProject
     let onRemove: () -> Void
 
     var body: some View {

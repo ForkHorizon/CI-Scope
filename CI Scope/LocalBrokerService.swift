@@ -22,6 +22,7 @@ struct LocalBrokerService {
         }) {
             try writeRegistry(registry)
             _ = try? await installOrUpdateLaunchAgent()
+            try await ensureGitHubWebhook(project: project)
             return
         }
 
@@ -41,6 +42,51 @@ struct LocalBrokerService {
         }
         try writeRegistry(registry)
         _ = try? await installOrUpdateLaunchAgent()
+        try await ensureGitHubWebhook(project: project)
+    }
+
+    /// Every managed repo needs its own GitHub webhook to `.../api/ci/github/webhook` —
+    /// there's no org-wide hook feeding the server queue, so a repo attached without
+    /// one just queues jobs forever with no error anywhere (see NexusUnity 2026-07-04).
+    /// Creates it here, at the single place a repo becomes managed, so every future
+    /// project gets wired up automatically instead of needing a manual `gh api` fix.
+    func ensureGitHubWebhook(project: CIProject) async throws {
+        let settings = CIQueueSettingsStore.snapshot()
+        guard settings.serverModeEnabled, !settings.webhookURL.isEmpty, !settings.webhookSecret.isEmpty else {
+            return
+        }
+
+        let hooksPath = "repos/\(project.repositorySlug)/hooks"
+        let list = await ShellClient.run("gh api \(quoted(hooksPath))", config: config)
+        guard list.exitCode == 0 else {
+            throw LocalBrokerError.invalidRepository(
+                "Could not list webhooks for \(project.repositorySlug): \(list.output)")
+        }
+        let existingHooks = (try? decoder.decode([GitHubWebhookSummary].self, from: Data(list.output.utf8))) ?? []
+        guard !existingHooks.contains(where: { $0.config.url == settings.webhookURL }) else { return }
+
+        let payload: [String: Any] = [
+            "name": "web",
+            "active": true,
+            "events": ["workflow_job"],
+            "config": [
+                "url": settings.webhookURL,
+                "content_type": "json",
+                "secret": settings.webhookSecret,
+            ],
+        ]
+        let payloadURL = fileManager.temporaryDirectory.appendingPathComponent("ci-scope-webhook-\(UUID().uuidString).json")
+        try JSONSerialization.data(withJSONObject: payload).write(to: payloadURL)
+        defer { try? fileManager.removeItem(at: payloadURL) }
+
+        let create = await ShellClient.run(
+            "gh api \(quoted(hooksPath)) -X POST --input \(quoted(payloadURL.path))",
+            config: config
+        )
+        guard create.exitCode == 0 else {
+            throw LocalBrokerError.invalidRepository(
+                "Could not create webhook for \(project.repositorySlug): \(create.output)")
+        }
     }
 
     func isManaged(project: CIProject) -> Bool {
@@ -100,6 +146,10 @@ struct LocalBrokerService {
 
     var stateURL: URL {
         try! brokerDirectory.safelyAppendingPathComponent("broker-state.json")
+    }
+
+    var workflowRunsURL: URL {
+        try! brokerDirectory.safelyAppendingPathComponent("workflow-runs.json")
     }
 
     var logsDirectory: URL {

@@ -53,6 +53,7 @@ final class NotificationManager: ObservableObject {
     }
 
     func checkWorkUpdates(snapshot: RunnerFleetSnapshot) {
+        let isInitialFetch = !fetchedWorkSnapshot
         let activeJobs = uniqueWorkItems(snapshot.runners.flatMap(\.activeJobs))
         let activeIDs = Set(activeJobs.map(\.id))
         let queuedJobs = uniqueWorkItems(snapshot.runners.flatMap(\.queuedJobs))
@@ -66,11 +67,14 @@ final class NotificationManager: ObservableObject {
             fetchedWorkSnapshot = true
         }
 
-        guard !newJobs.isEmpty else { return }
+        // On the first snapshot every running/queued job looks "new"; don't fire
+        // notifications for work already in flight before the app started
+        // (mirrors checkRunUpdates / checkRunnerUpdates).
+        guard !newJobs.isEmpty, !isInitialFetch else { return }
 
         let notification = JobArrivalNotification(
             newJobs: newJobs,
-            runningJob: activeJobs.first,
+            runningJobs: activeJobs,
             queuedJobs: queuedJobs
         )
         activeJobNotification = notification
@@ -88,7 +92,7 @@ final class NotificationManager: ObservableObject {
 
             if fetchedRunnerSnapshots {
                 if previousState == .online && runner.state == .offline {
-                    sendRunnerNotification(runnerName: runner.title, state: runner.state)
+                    sendRunnerNotification(runnerName: runner.title)
                 }
             }
 
@@ -140,12 +144,12 @@ final class NotificationManager: ObservableObject {
         }
         content.sound = UNNotificationSound.default
 
-        let identifier = "job-\(notification.createdAt.timeIntervalSince1970)"
+        let identifier = "job-\(notification.id)"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
 
-    private func sendRunnerNotification(runnerName: String, state: ServiceState) {
+    private func sendRunnerNotification(runnerName: String) {
         let content = UNMutableNotificationContent()
 
         content.title = "⚠️ Runner Offline"

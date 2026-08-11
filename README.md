@@ -106,7 +106,7 @@ Both runners should run on this Mac and include these labels:
 self-hosted, macOS, ARM64, ci-scope
 ```
 
-The portable AI readability workflow targets those labels:
+The portable Code Linter workflow targets those labels:
 
 ```yaml
 runs-on: [self-hosted, macOS, ARM64, ci-scope]
@@ -158,15 +158,45 @@ Repository -> Settings -> Actions -> Runners
 
 CI Scope shows job arrivals through an in-app Liquid Glass notification banner and also sends a native macOS notification when notification permission is available. The banner self-dismisses after five seconds and can be dismissed manually.
 
-The broker also supports **Server mode**: point it at a backend implementing
-its `/api/ci/local/*` protocol (heartbeat, queue/run snapshot sync) and it
-reads state from the backend instead of polling GitHub directly, using SSE
-only as a wakeup signal. In production that backend is
-`https://ci.forkhorizon.com`, served by the separate `ForkHorizon/WebSite`
-repo — not part of this repository. See `develop`'s README for the current
-Server mode setup details; that work hasn't been backported to `main` yet.
+The MacBook Runner broker is designed to avoid GitHub polling in normal use,
+through **Server mode**: point it at a backend that speaks its
+`/api/ci/local/*` protocol (heartbeat, queue/run snapshot sync, pending
+infra-rerun acks — see `CIQueueSettingsStore.swift` /
+`LocalBrokerLaunchAgent.swift`).
 
-Without Server mode configured, the MacBook Runner broker supports a free webhook-first path for faster queue updates:
+```text
+GitHub App webhook -> CI Scope backend -> outbound SSE -> local broker (Server mode) -> Swift UI
+```
+
+**In production, that backend is `https://ci.forkhorizon.com`** — served by
+the separate `ForkHorizon/WebSite` repo
+(`src/products/ci-scope/backend.ts`), not by this repository. It already
+implements failure classification (infra vs. test, by runner heartbeat
+freshness) and auto-retry of infra-classified failures. Configure Server
+mode with:
+
+```text
+CI_SCOPE_BACKEND_URL=https://ci.forkhorizon.com
+CI_SCOPE_BACKEND_TOKEN=<shared client token>
+```
+
+When the backend is healthy, CI Scope reads queue/run state from the backend on
+startup, then uses SSE only as a wakeup signal to sync a fresh snapshot. If the
+backend is down, the broker falls back to slow GitHub reconciliation polling
+instead of the old tight loop.
+
+> **`backend/` in this repo is a separate, earlier prototype and is not
+> deployed.** It's a standalone Python/FastAPI GitHub-App-webhook receiver
+> (`/github/webhook`, its own SQLite store) built before the `ci.forkhorizon.com`
+> backend above existed, and its wire protocol doesn't match what the broker's
+> Server mode actually calls (`/api/ci/local/heartbeat` etc.) — its own
+> `backend/README.md` still points at the placeholder domain
+> `your-backend.example.com`, and there's no nginx route to it anywhere on the
+> production VPS. Treat it as historical/experimental, not a second production
+> path, until it's either wired up for real or removed.
+
+Without Server mode configured, the broker still supports a localhost-only
+webhook path for ad-hoc setups:
 
 ```text
 POST http://127.0.0.1:8765/github/workflow-job
@@ -178,7 +208,7 @@ GitHub cannot call a private localhost URL directly, so expose that local endpoi
 - Content type: `application/json`
 - Secret: the contents of `~/Library/Application Support/CI Scope/Broker/webhook-secret`
 
-The webhook secret is generated automatically when CI Scope installs or updates the broker launch agent. If no webhook deliveries arrive, the broker keeps using its existing GitHub CLI polling fallback; once webhooks are active, polling slows down and acts as reconciliation for missed deliveries.
+The webhook secret is generated automatically when CI Scope installs or updates the broker launch agent. If no webhook deliveries arrive, the broker uses a slow GitHub CLI reconciliation fallback; once webhooks are active, that fallback remains slow and only repairs missed deliveries.
 
 ## Build
 

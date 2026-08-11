@@ -1,0 +1,42 @@
+{
+  "branchName": "ci-scope/install-{{script_id}}",
+  "commitMessage": "Add {{script_title}}",
+  "defaultSeedID": "unity-quality-gate",
+  "detail": "Installs a thin GitHub Actions workflow that calls the shared Unity gate in ForkHorizon/ci-gates: compiles Assembly-CSharp with Microsoft.Unity.Analyzers and fails on analyzer or compiler warnings in first-party code, plus jscpd copy-paste detection for C#. Uses a persistent per-repo workspace cache on the runner, so the first run clones and imports the project once and later runs take seconds.",
+  "files": [
+    {
+      "contents": "{\n  \"project\": \"Assembly-CSharp.csproj\",\n  \"unity_path\": \"\",\n  \"include_paths\": [\n    \"Assets/\"\n  ],\n  \"exclude_paths\": [\n    \"Assets/Plugins/\",\n    \"Assets/Libs/\",\n    \"Assets/TextMesh Pro/\",\n    \"Assets/ThirdParty/\"\n  ],\n  \"warning_exclude_codes\": []\n}\n",
+      "destinationPath": ".{{script_slug}}.json",
+      "id": "config",
+      "isExecutable": false
+    },
+    {
+      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: unity-quality-gate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  unity-quality-gate:\n    uses: ForkHorizon/ci-gates/.github/workflows/unity-quality.yml@main\n    with:\n      runs-on: '{{runner_labels_json}}'\n      duplication-threshold: \"{{duplication_threshold}}\"\n",
+      "destinationPath": ".github/workflows/{{script_slug}}.yml",
+      "id": "workflow",
+      "isExecutable": false
+    }
+  ],
+  "id": "unity-quality-gate",
+  "pullRequestBody": "Adds {{script_title}} managed by CI Scope.\n\nThis PR adds:\n- `.github/workflows/{{script_slug}}.yml`\n- `.{{script_slug}}.json`\n\nThe workflow calls the shared gate in `ForkHorizon/ci-gates`. It compiles the Unity project with Microsoft.Unity.Analyzers and blocks analyzer/compiler warnings in first-party code (Assets/ minus Plugins, Libs, TextMesh Pro), plus copy-paste detection. The first CI run primes a persistent workspace cache on the runner and can take several minutes; later runs are incremental.",
+  "pullRequestTitle": "Add {{script_title}}",
+  "runnerLabels": [
+    "self-hosted",
+    "macOS",
+    "ARM64",
+    "ci-scope"
+  ],
+  "summary": "Compiles Unity C# with analyzers and blocks warnings and copy-paste in first-party code.",
+  "title": "Unity Quality Gate",
+  "variables": [
+    {
+      "defaultValue": "2",
+      "help": "Max allowed duplicated-code percentage before the gate fails.",
+      "id": "duplication_threshold",
+      "isRequired": true,
+      "kind": "number",
+      "options": [],
+      "title": "Duplication threshold %"
+    }
+  ]
+}
