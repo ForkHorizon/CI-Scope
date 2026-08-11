@@ -43,6 +43,17 @@ def test_start_runner_uses_writable_scope_tool_cache(tmp_path, monkeypatch):
     assert captured["env"]["RUNNER_TOOL_CACHE"] == str(tmp_path / "toolcache")
 
 
+def test_jit_runner_environment_file_uses_scope_tool_cache(tmp_path, monkeypatch):
+    tool_cache = tmp_path / "toolcache"
+    monkeypatch.setattr(broker, "TOOL_CACHE_DIR", tool_cache)
+
+    broker.write_runner_environment(tmp_path)
+
+    assert (tmp_path / ".env").read_text() == (
+        f"AGENT_TOOLSDIRECTORY={tool_cache}\\nRUNNER_TOOL_CACHE={tool_cache}\\n"
+    )
+
+
 def test_prune_webhook_queued():
     broker.WEBHOOK_QUEUED_AT.clear()
     now = time.monotonic()

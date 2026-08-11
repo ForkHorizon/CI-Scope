@@ -1348,7 +1348,16 @@ def prepare_runner_dir(job: dict) -> Path:
         runner_dir.mkdir(parents=True)
         with tarfile.open(find_runner_archive()) as tar:
             tar.extractall(runner_dir)
+    write_runner_environment(runner_dir)
     return runner_dir
+
+
+def write_runner_environment(runner_dir: Path) -> None:
+    tool_cache = str(TOOL_CACHE_DIR)
+    (runner_dir / ".env").write_text(
+        f"AGENT_TOOLSDIRECTORY={tool_cache}\\nRUNNER_TOOL_CACHE={tool_cache}\\n",
+        encoding="utf-8",
+    )
 
 
 def remove_runner_dir(job_id: str | None) -> None:
