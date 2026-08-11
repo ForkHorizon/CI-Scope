@@ -1207,6 +1207,7 @@ def start_runner(job: dict) -> subprocess.Popen:
     log_handle.write(f"[{now()}] starting JIT runner for {job['id']}\n")
     log_handle.flush()
     runner_environment = os.environ.copy()
+    runner_environment["AGENT_TOOLSDIRECTORY"] = str(TOOL_CACHE_DIR)
     runner_environment["RUNNER_TOOL_CACHE"] = str(TOOL_CACHE_DIR)
     process = subprocess.Popen(
         ["./run.sh", "--jitconfig", encoded],

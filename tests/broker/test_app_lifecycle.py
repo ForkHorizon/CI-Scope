@@ -7,7 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from backend_broker_testkit import BACKEND_QUEUE_JOB, MockProcess, load_broker
+from backend_broker_fakes import MockProcess
+from backend_broker_testkit import BACKEND_QUEUE_JOB, load_broker
 
 
 class AppHeartbeatTests(unittest.TestCase):

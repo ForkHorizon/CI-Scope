@@ -39,6 +39,7 @@ def test_start_runner_uses_writable_scope_tool_cache(tmp_path, monkeypatch):
 
     broker.start_runner({"id": "job_1", "repositorySlug": "test/repo"})
 
+    assert captured["env"]["AGENT_TOOLSDIRECTORY"] == str(tmp_path / "toolcache")
     assert captured["env"]["RUNNER_TOOL_CACHE"] == str(tmp_path / "toolcache")
 
 
