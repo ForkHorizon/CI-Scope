@@ -1,10 +1,3 @@
-//
-//  CI_ScopeApp.swift
-//  CI Scope
-//
-//  Created by Kiryl Shcherba on 27/05/2026.
-//
-
 import AppKit
 import SwiftUI
 

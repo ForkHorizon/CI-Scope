@@ -1,5 +1,21 @@
 import Foundation
 
+enum CodeLinterWorkflowStatus {
+    case latest
+    case pinned
+    case custom
+    case unavailable
+
+    var title: String {
+        switch self {
+        case .latest: "Latest · updates automatically"
+        case .pinned: "Pinned version"
+        case .custom: "Custom workflow"
+        case .unavailable: "Version unavailable"
+        }
+    }
+}
+
 struct InstalledAutomationScript: Identifiable {
     let script: AutomationScript
     let workflow: GitHubWorkflow
@@ -28,6 +44,23 @@ struct InstalledAutomationScript: Identifiable {
 }
 
 extension AutomationScript {
+    var isCodeLinter: Bool {
+        defaultSeedID == "code-linter" || id == "code-linter"
+    }
+
+    var workflowOnly: AutomationScript {
+        var copy = self
+        copy.files = files.filter { $0.destinationPath.hasPrefix(".github/workflows/") }
+        return copy
+    }
+
+    func codeLinterStatus(workflowSource: String?) -> CodeLinterWorkflowStatus {
+        guard isCodeLinter, let workflowSource else { return .unavailable }
+        let reusableWorkflow = "ForkHorizon/ci-gates/.github/workflows/code-linter.yml@"
+        guard workflowSource.contains(reusableWorkflow) else { return .custom }
+        return workflowSource.contains("\(reusableWorkflow)main") ? .latest : .pinned
+    }
+
     var workflowDestinationPaths: Set<String> {
         Set(
             files

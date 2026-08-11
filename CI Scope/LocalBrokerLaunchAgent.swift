@@ -160,7 +160,10 @@ extension LocalBrokerService {
           <key>RunAtLoad</key>
           <false/>
           <key>KeepAlive</key>
-          <true/>
+          <dict>
+            <key>SuccessfulExit</key>
+            <false/>
+          </dict>
           <key>EnvironmentVariables</key>
           <dict>
             <key>PATH</key>
