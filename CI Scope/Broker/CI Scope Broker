@@ -1207,7 +1207,6 @@ def start_runner(job: dict) -> subprocess.Popen:
     log_handle.write(f"[{now()}] starting JIT runner for {job['id']}\n")
     log_handle.flush()
     runner_environment = os.environ.copy()
-    runner_environment["AGENT_TOOLSDIRECTORY"] = str(TOOL_CACHE_DIR)
     runner_environment["RUNNER_TOOL_CACHE"] = str(TOOL_CACHE_DIR)
     process = subprocess.Popen(
         ["./run.sh", "--jitconfig", encoded],
@@ -1348,16 +1347,7 @@ def prepare_runner_dir(job: dict) -> Path:
         runner_dir.mkdir(parents=True)
         with tarfile.open(find_runner_archive()) as tar:
             tar.extractall(runner_dir)
-    write_runner_environment(runner_dir)
     return runner_dir
-
-
-def write_runner_environment(runner_dir: Path) -> None:
-    tool_cache = str(TOOL_CACHE_DIR)
-    (runner_dir / ".env").write_text(
-        f"AGENT_TOOLSDIRECTORY={tool_cache}\\nRUNNER_TOOL_CACHE={tool_cache}\\n",
-        encoding="utf-8",
-    )
 
 
 def remove_runner_dir(job_id: str | None) -> None:
