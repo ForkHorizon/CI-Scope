@@ -167,10 +167,14 @@ class BrokerServerModeTests(unittest.TestCase):
                 lambda path, payload: calls.append((path, payload)) or {"ok": True},
             ),
         ):
-            self.broker.server_post_status({"id": "ForkHorizon/Widget:1001:2002"}, "in_progress")
+            self.broker.server_post_status(
+                {"id": "ForkHorizon/Widget:1001:2002", "runnerName": "ci-scope-2002-12345"},
+                "in_progress",
+            )
 
         self.assertEqual(calls[0][0], "/api/ci/local/actions/ForkHorizon%2FWidget%3A1001%3A2002/status")
         self.assertEqual(calls[0][1]["status"], "in_progress")
+        self.assertEqual(calls[0][1]["runnerName"], "ci-scope-2002-12345")
 
 
 if __name__ == "__main__":
