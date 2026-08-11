@@ -12,6 +12,7 @@ struct ProjectCIPanel: View {
     let onAttachToBroker: () -> Void
     let onRemoveScript: (AutomationScript) -> Void
     @ObservedObject var installViewModel: AutomationScriptInstallViewModel
+    @State var codeLinterStatus: CodeLinterWorkflowStatus = .unavailable
 
     var body: some View {
         PanelShell(title: "GitHub CI", icon: "point.3.connected.trianglepath.dotted") {
@@ -96,6 +97,10 @@ struct ProjectCIPanel: View {
                         Spacer()
                     }
 
+                    if let script = codeLinterScript, let workflow = script.matchingWorkflow(in: snapshot) {
+                        codeLinterStatusRow(script: script, workflow: workflow)
+                    }
+
                     if let error = snapshot?.error {
                         ErrorBox(text: error)
                     }
@@ -127,6 +132,7 @@ struct ProjectCIPanel: View {
                 .padding(12)
             }
         }
+        .task(id: codeLinterWorkflowPath) { await refreshCodeLinterStatus() }
     }
 
     private var brokerAccessRow: some View {

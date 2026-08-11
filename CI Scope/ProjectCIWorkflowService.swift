@@ -180,6 +180,12 @@ extension ProjectCIService {
         return LoadResponse(value: workflows)
     }
 
+    func workflowSource(for project: CIProject, path: String) async -> String? {
+        let command = "set -o pipefail; gh api \(quoted("repos/\(project.repositorySlug)/contents/\(path)")) --jq .content | base64 -D"
+        let result = await ShellClient.run(command, timeout: 15, config: config)
+        return result.exitCode == 0 ? result.output : nil
+    }
+
     func loadRuns(for project: CIProject) async -> LoadResponse<[GitHubRun]> {
         // Prefer the broker's webhook-sourced feed: when it has fresh runs for
         // this repo, render them with zero GitHub API calls. gh is only a
