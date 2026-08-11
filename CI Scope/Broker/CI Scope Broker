@@ -475,12 +475,21 @@ def server_heartbeat() -> None:
     try:
         response = server_post_json("/api/ci/local/heartbeat", payload)
         record_backend_status(connected=True, last_error=None)
-        process_pending_reruns(response.get("pendingReruns") or [])
         ping_id = response.get("pendingPingId")
         if ping_id:
             ack_ping(ping_id)
+        process_pending_reruns(response.get("pendingReruns") or [])
     except Exception as exc:
         record_backend_status(connected=False, last_error=str(exc))
+
+
+def ack_ping(ping_id: str) -> None:
+    # Answers the admin dashboard's "Test task" button: proof the broker is
+    # alive and this heartbeat round-trip actually reaches the server.
+    try:
+        server_post_json(f"/api/ci/local/ping/{urllib.parse.quote(ping_id, safe='')}/ack", {"machineId": MACHINE_ID})
+    except Exception:
+        pass
 
 
 def process_pending_reruns(reruns: list) -> None:
@@ -511,15 +520,6 @@ def rerun_github_run(slug: str, run_id: object) -> bool:
         return False
     log_event(logging.INFO, "job.rerun", f"re-ran {slug} #{run_id} after infra failure", repo=slug, runId=run_id)
     return True
-
-
-def ack_ping(ping_id: str) -> None:
-    # Answers the admin dashboard's "Test task" button: proof the broker is
-    # alive and this heartbeat round-trip actually reaches the server.
-    try:
-        server_post_json(f"/api/ci/local/ping/{urllib.parse.quote(ping_id, safe='')}/ack", {"machineId": MACHINE_ID})
-    except Exception:
-        pass
 
 
 def server_claim_queue(registry: dict, profiles: list[dict]) -> tuple[list[dict], list[dict]]:
