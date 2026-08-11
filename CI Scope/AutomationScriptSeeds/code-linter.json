@@ -11,7 +11,7 @@
       "isExecutable": false
     },
     {
-      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n    inputs:\n      mode:\n        description: Files to scan\n        required: false\n        default: all\n        type: choice\n        options:\n          - all\n          - changed\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: ci-scope-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  code-linter:\n    uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@main\n    with:\n      mode: ${{ inputs.mode || 'auto' }}\n      config: .{{script_slug}}.json\n      runs-on: '{{runner_labels_json}}'\n",
+      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n    inputs:\n      mode:\n        description: Files to scan\n        required: false\n        default: all\n        type: choice\n        options:\n          - all\n          - changed\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: ci-scope-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  code-linter:\n    uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@main\n    with:\n      mode: ${{ inputs.mode || 'auto' }}\n      config: .{{script_slug}}.json\n      gates-ref: main\n      runs-on: '{{runner_labels_json}}'\n",
       "destinationPath": ".github/workflows/{{script_slug}}.yml",
       "id": "workflow",
       "isExecutable": false

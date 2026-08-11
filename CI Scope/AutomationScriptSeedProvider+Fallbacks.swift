@@ -159,7 +159,7 @@ extension AutomationScriptSeedProvider {
           \(jobID):
             uses: ForkHorizon/ci-gates/.github/workflows/\(gate)@main
             with:
-        \(withConfig ? "      config: .{{script_slug}}.json\n" : "")      runs-on: '{{runner_labels_json}}'
+        \(withConfig ? "      config: .{{script_slug}}.json\n" : "")\(jobID == "code-linter" ? "      gates-ref: main\n" : "")      runs-on: '{{runner_labels_json}}'
 
         """
     }
