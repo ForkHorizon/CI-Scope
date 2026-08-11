@@ -107,6 +107,7 @@ STATE_PATH = ROOT / "broker-state.json"
 RUNS_PATH = ROOT / "workflow-runs.json"
 JOBS_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/jobs"
 RUNNER_TEMPLATE_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/runner-template"
+TOOL_CACHE_DIR = Path.home() / "Library/Caches/CI-Scope-Broker/toolcache"
 LOG_DIR = Path.home() / "Library/Logs/CI Scope/Broker"
 WEBHOOK_PORT = int(os.environ.get("CI_SCOPE_WEBHOOK_PORT", "8765"))
 WEBHOOK_PATH = os.environ.get("CI_SCOPE_WEBHOOK_PATH", "/github/workflow-job")
@@ -1205,12 +1206,15 @@ def start_runner(job: dict) -> subprocess.Popen:
     log_handle = open(log_file, "a", encoding="utf-8")
     log_handle.write(f"[{now()}] starting JIT runner for {job['id']}\n")
     log_handle.flush()
+    runner_environment = os.environ.copy()
+    runner_environment["RUNNER_TOOL_CACHE"] = str(TOOL_CACHE_DIR)
     process = subprocess.Popen(
         ["./run.sh", "--jitconfig", encoded],
         cwd=runner_dir,
         stdout=log_handle,
         stderr=subprocess.STDOUT,
         start_new_session=True,
+        env=runner_environment,
     )
     LOGGER.info(
         f"Dispatched runner for {job['id']} (pid {process.pid})",
@@ -2119,6 +2123,7 @@ def now() -> str:
 def ensure_dirs() -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
     JOBS_DIR.mkdir(parents=True, exist_ok=True)
+    TOOL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     prune_orphan_job_dirs()
     prune_old_logs()
