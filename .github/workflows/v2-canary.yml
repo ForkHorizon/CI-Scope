@@ -1,0 +1,36 @@
+name: CI Scope v2 Canary
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-scope-v2-canary
+  cancel-in-progress: false
+
+jobs:
+  same-label-a:
+    name: Same-label canary A
+    uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@be604eeba94deb321f760125c0afa431186adac0
+    with:
+      runner-group: ci-scope-v2-canary
+      runner-labels: '["self-hosted", "macOS", "ARM64", "ci-scope-v2"]'
+      routing-generation: v2
+      workflow-contract-version: v2
+      trust-fixture-mode: canary-only
+      gates-ref: be604eeba94deb321f760125c0afa431186adac0
+      mode: all
+
+  same-label-b:
+    name: Same-label canary B
+    uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@be604eeba94deb321f760125c0afa431186adac0
+    with:
+      runner-group: ci-scope-v2-canary
+      runner-labels: '["self-hosted", "macOS", "ARM64", "ci-scope-v2"]'
+      routing-generation: v2
+      workflow-contract-version: v2
+      trust-fixture-mode: canary-only
+      gates-ref: be604eeba94deb321f760125c0afa431186adac0
+      mode: all
