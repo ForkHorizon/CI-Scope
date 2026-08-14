@@ -602,6 +602,8 @@ def server_post_status(job: dict, status: str, error: str | None = None) -> None
         "status": status,
         "error": error,
     }
+    if job.get("runnerName"):
+        payload["runnerName"] = job["runnerName"]
     try:
         server_post_json(f"/api/ci/local/actions/{urllib.parse.quote(str(job['id']), safe='')}/status", payload)
     except Exception:
@@ -1508,6 +1510,7 @@ def webhook_job_payload(payload: dict, registry: dict, profiles: list[dict]) -> 
         "url": workflow_job.get("html_url") or workflow_run.get("html_url") or "",
         "createdAt": workflow_job.get("created_at") or workflow_run.get("created_at") or now(),
         "labels": job_labels or labels,
+        "runnerName": workflow_job.get("runner_name"),
         "runId": run_id,
         "jobId": job_id,
         "profileId": profile["id"],
@@ -1640,8 +1643,27 @@ def apply_workflow_job_event(payload: dict, delivery_id: str) -> None:
             queue = merge_jobs(queue, [job])
             WEBHOOK_QUEUED_AT[job["id"]] = time.monotonic()
         elif job and action == "in_progress":
+            matched_runner = next(
+                (
+                    active
+                    for active in actives
+                    if job.get("runnerName")
+                    and active.get("runnerName") == job.get("runnerName")
+                    and active.get("id") != job["id"]
+                ),
+                None,
+            )
+            if matched_runner:
+                # GitHub assigns a JIT runner to any queued job with matching
+                # labels. Rebind the local process to the job GitHub actually
+                # started so heartbeats and completion checks follow reality.
+                replacement = {**matched_runner, **job, "pid": matched_runner.get("pid")}
+                replacement["runnerName"] = matched_runner.get("runnerName")
+                actives = [replacement if a.get("id") == matched_runner.get("id") else a for a in actives]
+                queue = remove_job(queue, matched_runner["id"])
+            else:
+                actives = [{**a, "status": action} if a.get("id") == job["id"] else a for a in actives]
             queue = remove_job(queue, job["id"])
-            actives = [{**a, "status": action} if a.get("id") == job["id"] else a for a in actives]
             WEBHOOK_QUEUED_AT.pop(job["id"], None)
         elif job and action == "completed":
             # Just drop the finished job from the queue. Do NOT kill or remove a
