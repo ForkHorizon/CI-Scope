@@ -11,6 +11,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  label-only-probe:
+    name: Label-only runner selector probe
+    runs-on: [self-hosted, macOS, ARM64, ci-scope-v2]
+    timeout-minutes: 5
+    steps:
+      - name: Verify label-only selector
+        run: echo "v2 label-only runner selector matched"
+
   selector-probe:
     name: Literal runner selector probe
     runs-on:
