@@ -17,7 +17,7 @@ jobs:
     with:
       runner-group: ci-scope-v2-canary
       runner-labels: '["self-hosted", "macOS", "ARM64", "ci-scope-v2"]'
-      runner-label: ci-scope-v2
+      runner-label: self-hosted
       routing-generation: v2
       workflow-contract-version: v2
       trust-fixture-mode: canary-only
@@ -30,7 +30,7 @@ jobs:
     with:
       runner-group: ci-scope-v2-canary
       runner-labels: '["self-hosted", "macOS", "ARM64", "ci-scope-v2"]'
-      runner-label: ci-scope-v2
+      runner-label: self-hosted
       routing-generation: v2
       workflow-contract-version: v2
       trust-fixture-mode: canary-only
