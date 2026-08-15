@@ -11,24 +11,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  label-only-probe:
-    name: Label-only runner selector probe
-    runs-on: [self-hosted, macOS, ARM64, ci-scope-v2]
-    timeout-minutes: 5
-    steps:
-      - name: Verify label-only selector
-        run: echo "v2 label-only runner selector matched"
-
-  selector-probe:
-    name: Literal runner selector probe
-    runs-on:
-      group: ci-scope-v2-canary
-      labels: [self-hosted, macOS, ARM64, ci-scope-v2]
-    timeout-minutes: 5
-    steps:
-      - name: Verify disposable runner
-        run: echo "v2 disposable runner selector matched"
-
   same-label-a:
     name: Same-label canary A
     uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@a94e73b2f0935bd11f47f269f1c18bc9469daaa4
