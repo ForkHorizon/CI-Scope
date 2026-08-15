@@ -13,24 +13,26 @@ concurrency:
 jobs:
   same-label-a:
     name: Same-label canary A
-    uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@be604eeba94deb321f760125c0afa431186adac0
+    uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@7cc83ee02daa0114d8536fa510ab09925e81a208
     with:
       runner-group: ci-scope-v2-canary
       runner-labels: '["self-hosted", "macOS", "ARM64", "ci-scope-v2"]'
+      runner-label: ci-scope-v2
       routing-generation: v2
       workflow-contract-version: v2
       trust-fixture-mode: canary-only
-      gates-ref: be604eeba94deb321f760125c0afa431186adac0
+      gates-ref: 7cc83ee02daa0114d8536fa510ab09925e81a208
       mode: all
 
   same-label-b:
     name: Same-label canary B
-    uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@be604eeba94deb321f760125c0afa431186adac0
+    uses: ForkHorizon/ci-gates/.github/workflows/code-linter.yml@7cc83ee02daa0114d8536fa510ab09925e81a208
     with:
       runner-group: ci-scope-v2-canary
       runner-labels: '["self-hosted", "macOS", "ARM64", "ci-scope-v2"]'
+      runner-label: ci-scope-v2
       routing-generation: v2
       workflow-contract-version: v2
       trust-fixture-mode: canary-only
-      gates-ref: be604eeba94deb321f760125c0afa431186adac0
+      gates-ref: 7cc83ee02daa0114d8536fa510ab09925e81a208
       mode: all
