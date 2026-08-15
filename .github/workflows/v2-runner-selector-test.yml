@@ -1,0 +1,17 @@
+name: CI Scope v2 Runner Selector Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selector:
+    runs-on:
+      group: ci-scope-v2-canary
+      labels: [self-hosted, macOS, ARM64, ci-scope-v2]
+    timeout-minutes: 5
+    steps:
+      - name: Verify disposable runner
+        run: echo "v2 disposable runner selector matched"
