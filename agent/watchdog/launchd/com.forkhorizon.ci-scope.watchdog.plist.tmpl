@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.forkhorizon.ci-scope.watchdog</string>
+  <key>ProgramArguments</key><array><string>{{WATCHDOG_PATH}}</string><string>run</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>StandardOutPath</key><string>{{LOG_DIR}}/watchdog.out.log</string>
+  <key>StandardErrorPath</key><string>{{LOG_DIR}}/watchdog.err.log</string>
+</dict></plist>

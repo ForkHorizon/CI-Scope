@@ -44,7 +44,7 @@ extension ContentView {
             )
             .padding(14)
         case .settings:
-            SettingsView(store: settingsStore)
+            SettingsView(store: settingsStore, v2Control: settingsStore.v2Control)
         }
     }
 
@@ -66,6 +66,7 @@ extension ContentView {
                     liveJobs: liveJobs(for: selectedProject),
                     scripts: scriptStore.scripts,
                     isBrokerManaged: isBrokerManaged(selectedProject),
+                    v2Control: settingsStore.v2Control,
                     removalSnapshot: { script in
                         scriptInstallViewModel.removalSnapshot(for: script, project: selectedProject)
                     },

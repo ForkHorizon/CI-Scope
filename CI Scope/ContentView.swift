@@ -61,12 +61,14 @@ struct ContentView: View {
             }
         }
         .task {
+            settingsStore.startV2Lifecycle()
             runnerFleetViewModel.startLiveUpdates {
                 await refreshSelectedProjectRunnerStatusFromBroker()
             }
         }
         .onDisappear {
             runnerFleetViewModel.stopLiveUpdates()
+            settingsStore.stopV2Lifecycle()
         }
         .sheet(isPresented: $isAddingProject) {
             AddProjectSheet { input in

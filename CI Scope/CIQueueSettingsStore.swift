@@ -32,6 +32,8 @@ struct CIQueueSettingsSnapshot {
 @MainActor
 final class CIQueueSettingsStore: ObservableObject {
     @Published var serverModeEnabled = false { didSet { persist() } }
+    @Published var v2StatusAdapterEnabled = false { didSet { persist() } }
+    @Published private(set) var v2AuthorityEnabled = false
     @Published var serverURL = "" { didSet { persist() } }
     @Published var localToken = "" { didSet { persistSecrets() } }
     @Published var webhookSecret = "" { didSet { persistSecrets() } }
@@ -52,11 +54,16 @@ final class CIQueueSettingsStore: ObservableObject {
     static let autoMergeDefaultsKey = "ciScope.queue.autoMergeGatePRs"
 
     private let defaults: UserDefaults
+    let v2Control: V2ClientControlSession
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        self.v2Control = V2ClientControlSession(defaults: defaults)
         let snapshot = Self.snapshot(defaults: defaults)
         serverModeEnabled = snapshot.serverModeEnabled
+        v2StatusAdapterEnabled = defaults.bool(forKey: V2ClientFeature.statusAdapterKey)
+        v2AuthorityEnabled = defaults.bool(forKey: V2ClientFeature.explicitAuthorityEnabledKey)
+        if v2AuthorityEnabled { v2StatusAdapterEnabled = true }
         serverURL = snapshot.serverURL
         localToken = snapshot.localToken
         webhookSecret = snapshot.webhookSecret
@@ -66,6 +73,7 @@ final class CIQueueSettingsStore: ObservableObject {
         labelsText = snapshot.labelsText
         capacity = snapshot.capacity
         autoMergeGatePRs = defaults.bool(forKey: Self.autoMergeDefaultsKey)
+        v2Control.setExplicitAuthorityEnabled(v2AuthorityEnabled)
         persist()
     }
 
@@ -103,6 +111,45 @@ final class CIQueueSettingsStore: ObservableObject {
         )
     }
 
+    var v2AuthorityState: V2ClientAuthorityState {
+        v2Control.authorityState
+    }
+
+    func startV2Lifecycle() {
+        v2Control.startLifecycle()
+    }
+
+    func stopV2Lifecycle() {
+        v2Control.stopLifecycle()
+    }
+
+    func setV2AuthorityEnabled(_ enabled: Bool) {
+        if enabled { v2StatusAdapterEnabled = true }
+        v2AuthorityEnabled = enabled
+        defaults.set(enabled, forKey: V2ClientFeature.explicitAuthorityEnabledKey)
+        v2Control.setExplicitAuthorityEnabled(enabled)
+    }
+
+    func acquireV2Lease() async {
+        await v2Control.acquire()
+    }
+
+    func renewV2Lease() async {
+        await v2Control.renew()
+    }
+
+    func resumeV2() async {
+        await v2Control.resume()
+    }
+
+    func drainV2() async {
+        await v2Control.drain()
+    }
+
+    func emergencyStopV2() async {
+        await v2Control.emergencyStop()
+    }
+
     func testConnection() async throws -> String {
         let settings = snapshot
         guard settings.serverModeEnabled else { return "Server mode is off." }
@@ -129,6 +176,7 @@ final class CIQueueSettingsStore: ObservableObject {
 
     private func persist() {
         defaults.set(serverModeEnabled, forKey: "ciScope.queue.serverModeEnabled")
+        defaults.set(v2StatusAdapterEnabled, forKey: V2ClientFeature.statusAdapterKey)
         defaults.set(serverURL, forKey: "ciScope.queue.serverURL")
         defaults.set(machineID, forKey: "ciScope.queue.machineID")
         defaults.set(machineName, forKey: "ciScope.queue.machineName")
