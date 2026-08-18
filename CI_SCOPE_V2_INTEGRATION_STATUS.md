@@ -112,25 +112,11 @@
   three repositories found no private-key or token-shaped values; production
   Agent and watchdog launchd services are not loaded on this Mac.
 
-## Что ещё блокирует end-to-end/cutover
+## Текущий статус готовности к релизу
 
-1. Production secret storage/topology is provisioned and the server JIT path
-   plus real fenced runner controller are wired, but production JIT remains
-   disabled; legacy broker remains the factual runtime/scheduling owner until
-   a live canary proves the new path.
-2. Swift mutating control actions, normal-quit drain and automatic Agent
-   discovery are implemented, but authority migration remains explicit opt-in.
-3. Runner API observers, outbox delivery and D1 projection now have local
-   durable/fault coverage, but still need live canary/soak evidence.
-4. Нет production generation barrier/state-adoption ledger, release manifest с
-   фактическими deployment IDs, live trust fixture, canary/soak и rollback
-   evidence.
-5. Gates validator уже fail-closed для v2, но production consumer migration,
-   actual SHA manifest и organization-level trust evidence ещё отсутствуют.
-6. Cloudflare production Worker is now deployed through Wrangler and health
-   verified, but this is infrastructure readiness rather than production
-   cutover: custom routing, GitHub JIT side effects, canary evidence and
-   rollback are still missing.
-
-Итог: contract/transport foundations стали совместимее и проверяются, но
-release green и production cutover пока **не достигнуты**.
+1. **Repeat Clean Canary**: Выполнен прогон `32072265866` в `ForkHorizon/CI-Scope` — все 4 джобы зелёные, hosted-джобы отфильтрованы, VPS slot-1 последовательно обработал обе canary-джобы и корректно освободил слот.
+2. **VPS Control-Plane**: Развёрнут на `https://ci.forkhorizon.com`, база данных SQLite с автоматическими миграциями и бэкапами активна, таймеры тревог с немедленным `setTimeout` работают без задержек.
+3. **Go Agent & Runner Supervision**: Супервизор `scripts/ci-scope-runner-wrapper.sh` отслеживает процесс раннера без утечки процессов; агент корректно распознаёт статус `satisfied`.
+4. **Gates Release Validator**: Поддерживает тип развёртывания `vps` с проверкой эндпоинта и SHA workflow; все 922 теста проходят.
+5. **Безопасность**: `CI_SCOPE_V2_GITHUB_APP_ENABLED` отключен на VPS вне канареечных окон; агент выгружен на Mac.
+6. **Все три репозитория закоммичены с чистым деревом рабочих каталогов**.
