@@ -50,7 +50,14 @@ class DrainTests(unittest.TestCase):
         queue = [dict(BACKEND_QUEUE_JOB)]
 
         def mock_read_state():
-            return {"version": 1, "actives": [], "queue": queue, "repos": [], "retries": {}, "webhook": {}}
+            return {
+                "version": 1,
+                "actives": [],
+                "queue": queue,
+                "repos": [],
+                "retries": {},
+                "webhook": {},
+            }
 
         original_write_state = self.broker.write_state
         original_read_state = self.broker.read_state
@@ -60,7 +67,9 @@ class DrainTests(unittest.TestCase):
             self.broker.write_state = lambda *_a, **_k: None
             self.broker.read_state = mock_read_state
             self.broker.start_runner = lambda job: started.append(job) or MockProcess()
-            self.broker.tick(polled=None, profiles=self.broker.DEFAULT_PROFILES, dispatch_new=False)
+            self.broker.tick(
+                polled=None, profiles=self.broker.DEFAULT_PROFILES, dispatch_new=False
+            )
         finally:
             self.broker.write_state = original_write_state
             self.broker.read_state = original_read_state

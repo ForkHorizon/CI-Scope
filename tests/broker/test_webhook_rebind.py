@@ -22,7 +22,11 @@ def test_webhook_rebinds_active_runner_to_actual_github_job(monkeypatch):
     monkeypatch.setattr(broker, "read_registry", lambda: {})
     monkeypatch.setattr(broker, "enabled_profiles", lambda _registry: [])
     monkeypatch.setattr(broker, "read_state", lambda: state)
-    monkeypatch.setattr(broker, "webhook_job_payload", lambda *_args: (actual, {"id": "profile"}, [], None))
+    monkeypatch.setattr(
+        broker,
+        "webhook_job_payload",
+        lambda *_args: (actual, {"id": "profile"}, [], None),
+    )
     monkeypatch.setattr(broker, "upsert_repo_status", lambda statuses, *_args: statuses)
     monkeypatch.setattr(broker, "save_state", lambda *args: saved.append(args))
 

@@ -10,12 +10,12 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from ci_scope_backend.core import normalize_webhook, verify_signature
-from ci_scope_backend.store import SQLiteStore
+from ci_scope_backend.core import normalize_webhook, verify_signature  # noqa: E402
+from ci_scope_backend.store import SQLiteStore  # noqa: E402
 
 try:
-    from ci_scope_backend.app import require_client
-    from fastapi import HTTPException
+    from ci_scope_backend.app import require_client  # noqa: E402
+    from fastapi import HTTPException  # noqa: E402
 except ModuleNotFoundError:
     require_client = None
     HTTPException = None
@@ -80,18 +80,27 @@ class BackendCoreTests(unittest.TestCase):
         self.assertFalse(verify_signature(body, f"sha256={digest}", "wrong"))
 
     def test_normalizes_workflow_job(self):
-        normalized = normalize_webhook("workflow_job", "delivery-1", workflow_job_payload())
+        normalized = normalize_webhook(
+            "workflow_job", "delivery-1", workflow_job_payload()
+        )
         self.assertEqual(normalized["installationId"], 42)
         self.assertEqual(normalized["repositorySlug"], "ForkHorizon/Widget")
         self.assertEqual(normalized["run"]["id"], 1001)
         self.assertEqual(normalized["job"]["id"], 2002)
-        self.assertEqual(normalized["job"]["labels"], ["self-hosted", "macOS", "ARM64", "ci-scope-broker"])
+        self.assertEqual(
+            normalized["job"]["labels"],
+            ["self-hosted", "macOS", "ARM64", "ci-scope-broker"],
+        )
 
     def test_store_deduplicates_deliveries_and_tracks_queue_transitions(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SQLiteStore(Path(directory) / "state.sqlite3")
-            first = store.record_webhook("workflow_job", "delivery-1", workflow_job_payload())
-            duplicate = store.record_webhook("workflow_job", "delivery-1", workflow_job_payload())
+            first = store.record_webhook(
+                "workflow_job", "delivery-1", workflow_job_payload()
+            )
+            duplicate = store.record_webhook(
+                "workflow_job", "delivery-1", workflow_job_payload()
+            )
             snapshot = store.snapshot()
 
             self.assertFalse(first["duplicate"])
@@ -130,16 +139,22 @@ class BackendCoreTests(unittest.TestCase):
     def test_admin_status_counts_events_runs_jobs_and_sse_clients(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SQLiteStore(Path(directory) / "state.sqlite3")
-            store.record_webhook("workflow_job", "delivery-1", workflow_job_payload_for(2002, 1001))
+            store.record_webhook(
+                "workflow_job", "delivery-1", workflow_job_payload_for(2002, 1001)
+            )
             store.record_webhook(
                 "workflow_job",
                 "delivery-2",
-                workflow_job_payload_for(2003, 1002, action="in_progress", status="in_progress"),
+                workflow_job_payload_for(
+                    2003, 1002, action="in_progress", status="in_progress"
+                ),
             )
             store.record_webhook(
                 "workflow_job",
                 "delivery-3",
-                workflow_job_payload_for(2004, 1003, action="completed", status="completed"),
+                workflow_job_payload_for(
+                    2004, 1003, action="completed", status="completed"
+                ),
             )
 
             status = store.admin_status(active_sse_clients=2)
@@ -148,11 +163,16 @@ class BackendCoreTests(unittest.TestCase):
             self.assertEqual(status["events"]["total"], 3)
             self.assertEqual(status["events"]["latest"]["deliveryId"], "delivery-3")
             self.assertEqual(status["repositories"]["total"], 1)
-            self.assertEqual(status["jobs"]["byStatus"], {"completed": 1, "in_progress": 1, "queued": 1})
+            self.assertEqual(
+                status["jobs"]["byStatus"],
+                {"completed": 1, "in_progress": 1, "queued": 1},
+            )
             self.assertEqual(len(status["jobs"]["queued"]), 1)
             self.assertEqual(len(status["jobs"]["inProgress"]), 1)
 
-    @unittest.skipIf(require_client is None or HTTPException is None, "FastAPI is not installed")
+    @unittest.skipIf(
+        require_client is None or HTTPException is None, "FastAPI is not installed"
+    )
     def test_admin_status_auth_guard_uses_bearer_token(self):
         require_client("Bearer secret", "secret")
         with self.assertRaises(HTTPException):

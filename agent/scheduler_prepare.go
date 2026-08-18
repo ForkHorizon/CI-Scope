@@ -79,60 +79,58 @@ func (s *HeadlessScheduler) reconcilePrepare(ctx context.Context, record *schedu
 	}
 	switch strings.ToLower(strings.TrimSpace(result.State)) {
 	case "preparing":
-		// Only retry register when this process still owns the prepared runner.
-		// After restart there is no local proof that the ephemeral JIT config was
-		// consumed, so ask the server to observe/recover instead of registering a
-		// runner that was never started.
-		if strings.TrimSpace(result.JITConfig) != "" {
-			response, prepareErr := s.config.Runtime.schedulerPrepareFromJIT(record.PrepareRequestID, command, result.JITConfig, result.JITStatus)
-			if prepareErr == nil && response.Outcome == "succeeded" {
-				if registerErr := s.config.Server.Register(ctx, "register."+record.Reservation.Correlation.RunnerInstanceID, record.Reservation); registerErr == nil {
-					record.Phase = schedulerPhasePrepared
-					return s.persist(record)
-				} else {
-					record.Phase = schedulerPhaseReconcilePrepare
-					_ = s.persist(record)
-					return registerErr
-				}
-			}
-		}
-		if s.config.Runtime.OwnsRunnerInstance(record.Reservation.Correlation.RunnerInstanceID) {
-			if registerErr := s.config.Server.Register(ctx, "register."+record.Reservation.Correlation.RunnerInstanceID, record.Reservation); registerErr == nil {
-				record.Phase = schedulerPhasePrepared
-				return s.persist(record)
-			} else {
-				record.Phase = schedulerPhaseReconcilePrepare
-				_ = s.persist(record)
-				log.Printf("scheduler registration retry pending: %v", registerErr)
-				return registerErr
-			}
-		}
-		return s.recoverPrepare(ctx, record)
+		return s.handlePreparingState(ctx, record, command, result)
 	case "reserved", "claimed", "unprepared", "not_prepared":
 		record.Phase = schedulerPhasePreparing
 		return s.persist(record)
 	case "prepared", "config_ready":
-		// The Web side may return the still-unconsumed JIT exactly once. If it
-		// cannot, remain blocked and let the server-side observer decide whether
-		// the reservation can be safely cancelled.
-		if strings.TrimSpace(result.JITConfig) == "" {
-			if s.config.Runtime.OwnsRunnerInstance(record.Reservation.Correlation.RunnerInstanceID) {
-				record.Phase = schedulerPhasePrepared
-				return s.persist(record)
-			}
-			return s.recoverPrepare(ctx, record)
-		}
-		response, prepareErr := s.config.Runtime.schedulerPrepareFromJIT(record.PrepareRequestID, command, result.JITConfig, result.JITStatus)
-		if prepareErr != nil || response.Outcome != "succeeded" {
-			record.Phase = schedulerPhaseReconcilePrepare
-			_ = s.persist(record)
-			return prepareErr
-		}
-		record.Phase = schedulerPhasePrepared
-		return s.persist(record)
+		return s.handlePreparedState(ctx, record, command, result)
 	default:
 		return s.recoverPrepare(ctx, record)
 	}
+}
+
+func (s *HeadlessScheduler) handlePreparingState(ctx context.Context, record *schedulerRecord, command socketCommand, result SchedulerReconcileResponse) error {
+	if strings.TrimSpace(result.JITConfig) != "" {
+		response, prepareErr := s.config.Runtime.schedulerPrepareFromJIT(record.PrepareRequestID, command, result.JITConfig, result.JITStatus)
+		if prepareErr == nil && response.Outcome == "succeeded" {
+			return s.registerPreparedRunner(ctx, record)
+		}
+	}
+	if s.config.Runtime.OwnsRunnerInstance(record.Reservation.Correlation.RunnerInstanceID) {
+		return s.registerPreparedRunner(ctx, record)
+	}
+	return s.recoverPrepare(ctx, record)
+}
+
+func (s *HeadlessScheduler) registerPreparedRunner(ctx context.Context, record *schedulerRecord) error {
+	if registerErr := s.config.Server.Register(ctx, "register."+record.Reservation.Correlation.RunnerInstanceID, record.Reservation); registerErr == nil {
+		record.Phase = schedulerPhasePrepared
+		return s.persist(record)
+	} else {
+		record.Phase = schedulerPhaseReconcilePrepare
+		_ = s.persist(record)
+		log.Printf("scheduler registration retry pending: %v", registerErr)
+		return registerErr
+	}
+}
+
+func (s *HeadlessScheduler) handlePreparedState(ctx context.Context, record *schedulerRecord, command socketCommand, result SchedulerReconcileResponse) error {
+	if strings.TrimSpace(result.JITConfig) == "" {
+		if s.config.Runtime.OwnsRunnerInstance(record.Reservation.Correlation.RunnerInstanceID) {
+			record.Phase = schedulerPhasePrepared
+			return s.persist(record)
+		}
+		return s.recoverPrepare(ctx, record)
+	}
+	response, prepareErr := s.config.Runtime.schedulerPrepareFromJIT(record.PrepareRequestID, command, result.JITConfig, result.JITStatus)
+	if prepareErr != nil || response.Outcome != "succeeded" {
+		record.Phase = schedulerPhaseReconcilePrepare
+		_ = s.persist(record)
+		return prepareErr
+	}
+	record.Phase = schedulerPhasePrepared
+	return s.persist(record)
 }
 
 func (s *HeadlessScheduler) recoverPrepare(ctx context.Context, record *schedulerRecord) error {

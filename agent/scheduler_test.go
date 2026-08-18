@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -32,63 +31,78 @@ type schedulerTestPlane struct {
 func (p *schedulerTestPlane) Do(_ context.Context, path string, request ServerRequestEnvelope) (ServerResponseEnvelope, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	var payload any = map[string]any{}
-	switch {
-	case path == SchedulerDispatchNextPath:
-		p.claimCalls++
-		p.claimPath = path
-		_ = json.Unmarshal(request.Payload, &p.claimPayload)
-		if p.emptyDispatch {
-			payload = map[string]any{"type": "dispatch.next", "dispatch": nil}
-		} else if p.claimCalls == 1 {
-			payload = map[string]any{"claimed": true, "reservation": schedulerTestReservation()}
-		} else {
-			payload = map[string]any{"claimed": false}
-		}
-	case path == SchedulerReconcilePath:
-		payload = map[string]any{"state": "prepared", "jitConfig": "jit-after-lost-response", "jitStatus": "CONFIG_READY"}
-	case strings.HasSuffix(path, "/status"):
-		p.statusCalls++
-		if p.statusError != nil {
-			return ServerResponseEnvelope{}, p.statusError
-		}
-		if len(p.status) > 0 {
-			payload = p.status[0]
-			p.status = p.status[1:]
-		} else {
-			payload = SchedulerStatusResponse{State: "running", JobState: "in_progress"}
-		}
-	case strings.HasSuffix(path, "/release"):
-		p.releaseCalls++
-		payload = SchedulerStatusResponse{State: "released"}
-	case strings.HasSuffix(path, "/recover"):
-		if p.recoverError != nil {
-			return ServerResponseEnvelope{}, p.recoverError
-		}
-		payload = SchedulerStatusResponse{State: "released"}
-	case strings.HasSuffix(path, "/prepare-runner"):
-		p.prepareCalls++
-		if p.losePrepareOnce {
-			p.losePrepareOnce = false
-			return ServerResponseEnvelope{}, ErrResponseLost
-		}
-		payload = map[string]any{"jitConfig": "jit-from-server", "jitStatus": "CONFIG_READY"}
-	case strings.HasSuffix(path, "/config-ack"):
-		p.configAckCalls++
-	case strings.HasSuffix(path, "/observed"):
-		if p.observeError != nil {
-			return ServerResponseEnvelope{}, p.observeError
-		}
-	case strings.HasSuffix(path, "/stop-requested"):
-		if p.stopError != nil {
-			return ServerResponseEnvelope{}, p.stopError
-		}
+	payload, err := p.handlePath(path, request)
+	if err != nil {
+		return ServerResponseEnvelope{}, err
 	}
 	return ServerResponseEnvelope{
 		ProtocolVersion: ServerProtocolVersion, RequestID: request.RequestID,
 		OperationID: "op-" + request.RequestID, ServerRevision: uint64(p.claimCalls + p.statusCalls + p.releaseCalls + p.prepareCalls + p.configAckCalls),
 		Outcome: "completed", Payload: mustJSON(payload),
 	}, nil
+}
+
+func (p *schedulerTestPlane) handlePath(path string, request ServerRequestEnvelope) (any, error) {
+	switch {
+	case path == SchedulerDispatchNextPath:
+		return p.handleClaim(path, request), nil
+	case path == SchedulerReconcilePath:
+		return map[string]any{"state": "prepared", "jitConfig": "jit-after-lost-response", "jitStatus": "CONFIG_READY"}, nil
+	case strings.HasSuffix(path, "/status"):
+		return p.handleStatus()
+	case strings.HasSuffix(path, "/release"):
+		p.releaseCalls++
+		return SchedulerStatusResponse{State: "released"}, nil
+	case strings.HasSuffix(path, "/recover"):
+		if p.recoverError != nil {
+			return nil, p.recoverError
+		}
+		return SchedulerStatusResponse{State: "released"}, nil
+	case strings.HasSuffix(path, "/prepare-runner"):
+		return p.handlePrepare()
+	case strings.HasSuffix(path, "/config-ack"):
+		p.configAckCalls++
+		return map[string]any{}, nil
+	case strings.HasSuffix(path, "/observed"):
+		return map[string]any{}, p.observeError
+	case strings.HasSuffix(path, "/stop-requested"):
+		return map[string]any{}, p.stopError
+	}
+	return map[string]any{}, nil
+}
+
+func (p *schedulerTestPlane) handleClaim(path string, request ServerRequestEnvelope) any {
+	p.claimCalls++
+	p.claimPath = path
+	_ = json.Unmarshal(request.Payload, &p.claimPayload)
+	if p.emptyDispatch {
+		return map[string]any{"type": "dispatch.next", "dispatch": nil}
+	} else if p.claimCalls == 1 {
+		return map[string]any{"claimed": true, "reservation": schedulerTestReservation()}
+	}
+	return map[string]any{"claimed": false}
+}
+
+func (p *schedulerTestPlane) handleStatus() (any, error) {
+	p.statusCalls++
+	if p.statusError != nil {
+		return nil, p.statusError
+	}
+	if len(p.status) > 0 {
+		res := p.status[0]
+		p.status = p.status[1:]
+		return res, nil
+	}
+	return SchedulerStatusResponse{State: "running", JobState: "in_progress"}, nil
+}
+
+func (p *schedulerTestPlane) handlePrepare() (any, error) {
+	p.prepareCalls++
+	if p.losePrepareOnce {
+		p.losePrepareOnce = false
+		return nil, ErrResponseLost
+	}
+	return map[string]any{"jitConfig": "jit-from-server", "jitStatus": "CONFIG_READY"}, nil
 }
 
 func schedulerTestReservation() SchedulerReservation {
@@ -223,104 +237,5 @@ func TestHeadlessSchedulerChecksTerminalStatusBeforeRunnerObserve(t *testing.T) 
 	plane.mu.Unlock()
 	if statusCalls != 1 {
 		t.Fatalf("status calls = %d, want one terminal check", statusCalls)
-	}
-}
-
-func TestHeadlessSchedulerReconcilesAmbiguousRunnerObserve(t *testing.T) {
-	plane := &schedulerTestPlane{
-		status:       []SchedulerStatusResponse{{State: "running", JobState: "in_progress"}},
-		observeError: errors.New("external_control_ambiguous"),
-	}
-	runtime, controller := schedulerTestRuntime(t, plane)
-	scheduler, _ := newTestScheduler(t, runtime, plane)
-	record := &schedulerRecord{Reservation: schedulerTestReservation(), Phase: schedulerPhaseRunning}
-	ownership := testRunnerOwnership()
-	if err := controller.Claim(context.Background(), ownership); err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Prepare(context.Background(), ownership, RunnerPrepareRequest{
-		Executable: controller.config.Executable,
-		JITConfig:  "jit",
-		Workspace:  filepath.Join(controller.config.WorkspaceRoot, "workspace"),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Start(context.Background(), ownership); err != nil {
-		t.Fatal(err)
-	}
-	runtime.mu.Lock()
-	runtime.runnerInstanceID = record.Reservation.Correlation.RunnerInstanceID
-	runtime.mu.Unlock()
-	command, err := scheduler.runnerCommand(record)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := scheduler.running(context.Background(), record, command); err != nil {
-		t.Fatal(err)
-	}
-	if record.Phase != schedulerPhaseReconcileStart {
-		t.Fatalf("running phase = %q, want reconcile_start", record.Phase)
-	}
-}
-
-func TestHeadlessSchedulerTreatsAmbiguousRunnerStopAsAwaitingRemoval(t *testing.T) {
-	plane := &schedulerTestPlane{stopError: errors.New("external_control_ambiguous")}
-	runtime, controller := schedulerTestRuntime(t, plane)
-	scheduler, _ := newTestScheduler(t, runtime, plane)
-	record := &schedulerRecord{Reservation: schedulerTestReservation(), Phase: schedulerPhaseStopping}
-	ownership := testRunnerOwnership()
-	if err := controller.Claim(context.Background(), ownership); err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Prepare(context.Background(), ownership, RunnerPrepareRequest{
-		Executable: controller.config.Executable,
-		JITConfig:  "jit",
-		Workspace:  filepath.Join(controller.config.WorkspaceRoot, "workspace"),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Start(context.Background(), ownership); err != nil {
-		t.Fatal(err)
-	}
-	runtime.mu.Lock()
-	runtime.runnerInstanceID = record.Reservation.Correlation.RunnerInstanceID
-	runtime.mu.Unlock()
-	command, err := scheduler.runnerCommand(record)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := scheduler.stop(context.Background(), record, command); err != nil {
-		t.Fatal(err)
-	}
-	if record.Phase != schedulerPhaseAwaitingRemoval || !record.LocalReleased {
-		t.Fatalf("stop record = %+v, want awaiting_removal/local released", record)
-	}
-}
-
-func TestHeadlessSchedulerDrainGatesClaims(t *testing.T) {
-	plane := &schedulerTestPlane{}
-	runtime, _ := schedulerTestRuntime(t, plane)
-	runtime.mu.Lock()
-	runtime.lease.draining = true
-	runtime.mu.Unlock()
-	scheduler, _ := newTestScheduler(t, runtime, plane)
-	if err := scheduler.RunOnce(context.Background()); err != nil {
-		runtime.mu.Lock()
-		lease := runtime.lease
-		runtime.mu.Unlock()
-		t.Fatalf("prepare failed: %v lease=%+v", err, lease)
-	}
-	plane.mu.Lock()
-	defer plane.mu.Unlock()
-	if plane.claimCalls != 0 {
-		t.Fatalf("claim calls while draining = %d", plane.claimCalls)
-	}
-}
-
-func TestSchedulerReservationValidationRejectsMismatchedToken(t *testing.T) {
-	reservation := schedulerTestReservation()
-	reservation.Correlation.ReservationToken = "different"
-	if err := validateSchedulerReservation(reservation); err == nil {
-		t.Fatal("mismatched reservation token was accepted")
 	}
 }

@@ -5,7 +5,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-BROKER_PATH = Path(__file__).resolve().parents[2] / "CI Scope" / "Broker" / "CI Scope Broker"
+BROKER_PATH = (
+    Path(__file__).resolve().parents[2] / "CI Scope" / "Broker" / "CI Scope Broker"
+)
 ACTIVE_JOB = {
     "id": "ForkHorizon/NexusUnity:1001:2002",
     "repositorySlug": "ForkHorizon/NexusUnity",
@@ -16,7 +18,9 @@ ACTIVE_JOB = {
 
 
 def load_broker():
-    loader = importlib.machinery.SourceFileLoader("broker_finish_active", str(BROKER_PATH))
+    loader = importlib.machinery.SourceFileLoader(
+        "broker_finish_active", str(BROKER_PATH)
+    )
     spec = importlib.util.spec_from_loader("broker_finish_active", loader)
     broker = importlib.util.module_from_spec(spec)
     loader.exec_module(broker)
@@ -38,9 +42,15 @@ class FinishActiveTests(unittest.TestCase):
     def run_finish_active(self, remote_status):
         status_calls = []
         with (
-            patch.object(self.broker, "job_remote_status", lambda _a: {"status": remote_status, "lastError": None}),
             patch.object(
-                self.broker, "server_post_status", lambda job, status, error=None: status_calls.append(status)
+                self.broker,
+                "job_remote_status",
+                lambda _a: {"status": remote_status, "lastError": None},
+            ),
+            patch.object(
+                self.broker,
+                "server_post_status",
+                lambda job, status, error=None: status_calls.append(status),
             ),
             patch.object(self.broker, "cleanup_runner_by_name", lambda *_: None),
             patch.object(self.broker, "remove_runner_dir", lambda *_: None),
