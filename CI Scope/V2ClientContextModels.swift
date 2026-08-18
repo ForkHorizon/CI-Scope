@@ -1,34 +1,20 @@
 import Foundation
 
-public struct V2ClientSessionContext: Codable, Equatable {
-    public let machineId: String
-    public let bootId: String
-    public let agentInstanceId: String
-    public let sessionId: String
-    public let sessionEpoch: Int64
-
-    public init(
-        machineId: String,
-        bootId: String,
-        agentInstanceId: String,
-        sessionId: String,
-        sessionEpoch: Int64
-    ) {
-        self.machineId = machineId
-        self.bootId = bootId
-        self.agentInstanceId = agentInstanceId
-        self.sessionId = sessionId
-        self.sessionEpoch = sessionEpoch
-    }
+nonisolated struct V2ClientSessionContext: Codable, Equatable, Sendable {
+    let machineId: String
+    let bootId: String
+    let agentInstanceId: String
+    let sessionId: String
+    let sessionEpoch: Int64
 }
 
-public struct V2ClientFencingContext: Codable, Equatable {
-    public let localOwnerEpoch: Int64
-    public let sessionEpoch: Int64
-    public let fencingToken: String?
-    public let runnerInstanceId: String?
+nonisolated struct V2ClientFencingContext: Codable, Equatable, Sendable {
+    let localOwnerEpoch: Int64
+    let sessionEpoch: Int64
+    let fencingToken: String?
+    let runnerInstanceId: String?
 
-    public init(
+    init(
         localOwnerEpoch: Int64,
         sessionEpoch: Int64,
         fencingToken: String? = nil,
@@ -40,4 +26,3 @@ public struct V2ClientFencingContext: Codable, Equatable {
         self.runnerInstanceId = runnerInstanceId
     }
 }
-

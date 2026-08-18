@@ -1,24 +1,19 @@
 import Foundation
 import Darwin
 
-public struct V2ClientPeerCredentials: Equatable {
-    public let uid: UInt32
-    public let gid: UInt32
-
-    public init(uid: UInt32, gid: UInt32) {
-        self.uid = uid
-        self.gid = gid
-    }
+nonisolated struct V2ClientPeerCredentials: Equatable, Sendable {
+    let uid: UInt32
+    let gid: UInt32
 }
 
-public struct V2ClientUnixSocketConfiguration {
-    public let socketURL: URL
-    public let expectedPeerUID: UInt32
-    public let requiredMode: UInt16
-    public let maximumFrameBytes: Int
-    public let ioTimeout: TimeInterval
+nonisolated struct V2ClientUnixSocketConfiguration: Sendable {
+    let socketURL: URL
+    let expectedPeerUID: UInt32
+    let requiredMode: UInt16
+    let maximumFrameBytes: Int
+    let ioTimeout: TimeInterval
 
-    public init(
+    init(
         socketURL: URL,
         expectedPeerUID: UInt32 = UInt32(geteuid()),
         maximumFrameBytes: Int = 1_048_576,
@@ -31,4 +26,3 @@ public struct V2ClientUnixSocketConfiguration {
         self.ioTimeout = ioTimeout
     }
 }
-

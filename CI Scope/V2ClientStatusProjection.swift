@@ -1,22 +1,22 @@
 import Foundation
 
-public struct V2ClientStatusProjection: Codable, Equatable {
-    public let processAlive: Bool
-    public let schedulerHealthy: Bool
-    public let controlLeaseActive: Bool
-    public let serverConnected: Bool
-    public let draining: Bool
-    public let recoveryBlocked: Bool
-    public let projectionLagging: Bool
+nonisolated struct V2ClientStatusProjection: Codable, Equatable, Sendable {
+    let processAlive: Bool
+    let schedulerHealthy: Bool
+    let controlLeaseActive: Bool
+    let serverConnected: Bool
+    let draining: Bool
+    let recoveryBlocked: Bool
+    let projectionLagging: Bool
     // The Agent includes these fields in its signed payload. Keep them in the
     // Codable projection so decoding and re-encoding preserves the envelope's
     // payload hash instead of silently dropping server state.
-    public let state: String?
-    public let localEpoch: Int64?
-    public let serverSessionEpoch: Int64?
-    public let controlLeaseExpiresAt: Int64?
+    let state: String?
+    let localEpoch: Int64?
+    let serverSessionEpoch: Int64?
+    let controlLeaseExpiresAt: Int64?
 
-    public var readyToClaim: Bool {
+    var readyToClaim: Bool {
         Self.canClaim(
             health: V2ClientStatusHealth(
                 processAlive: processAlive,
@@ -32,7 +32,7 @@ public struct V2ClientStatusProjection: Codable, Equatable {
         )
     }
 
-    public init(
+    init(
         health: V2ClientStatusHealth,
         safety: V2ClientStatusSafety,
         details: V2ClientStatusDetails = V2ClientStatusDetails()
@@ -50,7 +50,7 @@ public struct V2ClientStatusProjection: Codable, Equatable {
         controlLeaseExpiresAt = details.controlLeaseExpiresAt
     }
 
-    public static func canClaim(
+    static func canClaim(
         health: V2ClientStatusHealth,
         safety: V2ClientStatusSafety
     ) -> Bool {

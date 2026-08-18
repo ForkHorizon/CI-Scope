@@ -1,12 +1,12 @@
 import Foundation
 
-public struct V2ClientStatusDetails {
-    public let state: String?
-    public let localEpoch: Int64?
-    public let serverSessionEpoch: Int64?
-    public let controlLeaseExpiresAt: Int64?
+nonisolated struct V2ClientStatusDetails: Sendable {
+    let state: String?
+    let localEpoch: Int64?
+    let serverSessionEpoch: Int64?
+    let controlLeaseExpiresAt: Int64?
 
-    public init(
+    init(
         state: String? = nil,
         localEpoch: Int64? = nil,
         serverSessionEpoch: Int64? = nil,
@@ -18,4 +18,3 @@ public struct V2ClientStatusDetails {
         self.controlLeaseExpiresAt = controlLeaseExpiresAt
     }
 }
-

@@ -1,14 +1,14 @@
 import Foundation
 
-public struct V2ClientRequestEnvelope<Payload: Codable>: Codable {
-    public let protocolVersion: Int
-    public let requestId: String
-    public let payloadHash: String
-    public let session: V2ClientSessionContext
-    public let fencing: V2ClientFencingContext
-    public let payload: Payload
+nonisolated struct V2ClientRequestEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
+    let protocolVersion: Int
+    let requestId: String
+    let payloadHash: String
+    let session: V2ClientSessionContext
+    let fencing: V2ClientFencingContext
+    let payload: Payload
 
-    public init(
+    init(
         payload: Payload,
         session: V2ClientSessionContext,
         fencing: V2ClientFencingContext,
@@ -32,14 +32,14 @@ public struct V2ClientRequestEnvelope<Payload: Codable>: Codable {
         self.payload = payload
     }
 
-    public func validatePayloadHash() throws {
+    func validatePayloadHash() throws {
         let actual = try V2ClientPayloadHasher.sha256(payload)
         guard actual == payloadHash else {
             throw V2ClientBridgeError.invalidPayloadHash(expected: payloadHash, actual: actual)
         }
     }
 
-    public func validate() throws {
+    func validate() throws {
         guard protocolVersion == 2 else {
             throw V2ClientBridgeError.unsupportedProtocolVersion(protocolVersion)
         }
@@ -53,14 +53,14 @@ public struct V2ClientRequestEnvelope<Payload: Codable>: Codable {
     }
 }
 
-public struct V2ClientResponseContext {
-    public let requestId: String
-    public let session: V2ClientSessionContext
-    public let fencing: V2ClientFencingContext
-    public let operationId: String
-    public let protocolVersion: Int
+nonisolated struct V2ClientResponseContext: Sendable {
+    let requestId: String
+    let session: V2ClientSessionContext
+    let fencing: V2ClientFencingContext
+    let operationId: String
+    let protocolVersion: Int
 
-    public init(
+    init(
         requestId: String,
         session: V2ClientSessionContext,
         fencing: V2ClientFencingContext,
@@ -74,4 +74,3 @@ public struct V2ClientResponseContext {
         self.protocolVersion = protocolVersion
     }
 }
-

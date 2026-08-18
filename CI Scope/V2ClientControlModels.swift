@@ -1,6 +1,6 @@
 import Foundation
 
-public enum V2ClientControlCommand: String, Codable {
+nonisolated enum V2ClientControlCommand: String, Codable, Sendable {
     case acquireControlLease
     case renewControlLease
     case resume
@@ -9,13 +9,13 @@ public enum V2ClientControlCommand: String, Codable {
     case status
 }
 
-public struct V2ClientControlCommandPayload: Codable, Equatable {
-    public let command: V2ClientControlCommand
-    public let appInstanceId: String
-    public let controlToken: String?
-    public let drainDeadline: Date?
+nonisolated struct V2ClientControlCommandPayload: Codable, Equatable, Sendable {
+    let command: V2ClientControlCommand
+    let appInstanceId: String
+    let controlToken: String?
+    let drainDeadline: Date?
 
-    public init(
+    init(
         command: V2ClientControlCommand,
         appInstanceId: String,
         controlToken: String? = nil,
@@ -27,4 +27,3 @@ public struct V2ClientControlCommandPayload: Codable, Equatable {
         self.drainDeadline = drainDeadline
     }
 }
-

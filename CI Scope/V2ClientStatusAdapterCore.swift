@@ -1,24 +1,12 @@
 import Foundation
 
-struct V2ClientStatusAdapter: @unchecked Sendable {
+nonisolated struct V2ClientStatusAdapter: @unchecked Sendable {
     let transport: V2ClientUnixSocketTransport
     let session: V2ClientSessionContext
     let fencing: V2ClientFencingContext
     let appInstanceID: String
 
-    init(
-        transport: V2ClientUnixSocketTransport,
-        session: V2ClientSessionContext,
-        fencing: V2ClientFencingContext,
-        appInstanceID: String
-    ) {
-        self.transport = transport
-        self.session = session
-        self.fencing = fencing
-        self.appInstanceID = appInstanceID
-    }
-
-    static func configured(defaults: UserDefaults = .standard) -> V2ClientStatusAdapter? {
+    nonisolated static func configured(defaults: UserDefaults = .standard) -> V2ClientStatusAdapter? {
         guard V2ClientFeature.statusAdapterEnabled(defaults: defaults) else { return nil }
         let descriptor = V2ClientAgentSessionDescriptor.load()
         let socketPath = descriptor?.socketPath ?? defaults.string(forKey: V2ClientFeature.socketPathKey)
@@ -57,7 +45,9 @@ struct V2ClientStatusAdapter: @unchecked Sendable {
         )
     }
 
-    func makeStatusRequest(requestID: String = UUID().uuidString) throws -> V2ClientRequestEnvelope<V2ClientControlCommandPayload> {
+    nonisolated func makeStatusRequest(requestID: String = UUID().uuidString) throws -> V2ClientRequestEnvelope<
+        V2ClientControlCommandPayload
+    > {
         try V2ClientRequestEnvelope(
             payload: V2ClientControlCommandPayload(command: .status, appInstanceId: appInstanceID),
             session: session,
@@ -88,4 +78,3 @@ struct V2ClientStatusAdapter: @unchecked Sendable {
 /// The narrow transition seam for future V2 mutations. Status remains
 /// available in read-only mode; every other command fails closed until an
 /// explicit authority state and matching live control lease are present.
-

@@ -212,7 +212,7 @@ extension V2ClientControlSession {
         }
     }
 
-    func send(
+    nonisolated func send(
         command: V2ClientControlCommand,
         controlToken: String? = nil,
         drainDeadline: Date? = nil,

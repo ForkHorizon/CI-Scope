@@ -1,13 +1,13 @@
 import Foundation
 import Darwin
 
-public final class V2ClientUnixSocketTransport {
-    public typealias PeerUIDValidationHook = (V2ClientPeerCredentials) -> Bool
+final class V2ClientUnixSocketTransport: @unchecked Sendable {
+    typealias PeerUIDValidationHook = (V2ClientPeerCredentials) -> Bool
 
     private let configuration: V2ClientUnixSocketConfiguration
     private let peerUIDValidationHook: PeerUIDValidationHook
 
-    public init(
+    init(
         configuration: V2ClientUnixSocketConfiguration,
         peerUIDValidationHook: PeerUIDValidationHook? = nil
     ) {
@@ -18,7 +18,7 @@ public final class V2ClientUnixSocketTransport {
             }
     }
 
-    public func send<RequestPayload: Codable, ResponsePayload: Codable>(
+    nonisolated func send<RequestPayload: Codable & Sendable, ResponsePayload: Codable & Sendable>(
         _ request: V2ClientRequestEnvelope<RequestPayload>,
         responseType: ResponsePayload.Type
     ) throws -> V2ClientResponseEnvelope<ResponsePayload> {
@@ -156,4 +156,3 @@ public final class V2ClientUnixSocketTransport {
         throw V2ClientBridgeError.frameTooLarge
     }
 }
-

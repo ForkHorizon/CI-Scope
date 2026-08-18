@@ -1,13 +1,13 @@
 import Foundation
 
-public struct V2ClientControlLeaseMachine {
-    public private(set) var state: V2ClientControlLeaseState
+nonisolated struct V2ClientControlLeaseMachine: Sendable {
+    private(set) var state: V2ClientControlLeaseState
 
-    public init(state: V2ClientControlLeaseState = .inactive) {
+    init(state: V2ClientControlLeaseState = .inactive) {
         self.state = state
     }
 
-    public mutating func apply(_ event: V2ClientControlLeaseEvent, now: Date = Date()) throws {
+    mutating func apply(_ event: V2ClientControlLeaseEvent, now: Date = Date()) throws {
         switch event {
         case .acquired(let controlToken, let expiresAt):
             guard expiresAt > now, !isActive else { throw V2ClientBridgeError.invalidLeaseTransition }
@@ -32,7 +32,7 @@ public struct V2ClientControlLeaseMachine {
         }
     }
 
-    public mutating func expireIfNeeded(at now: Date = Date()) {
+    mutating func expireIfNeeded(at now: Date = Date()) {
         switch state {
         case .active(_, let expiresAt) where expiresAt <= now:
             state = .expired
@@ -48,4 +48,3 @@ public struct V2ClientControlLeaseMachine {
         return false
     }
 }
-

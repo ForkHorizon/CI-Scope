@@ -1,6 +1,6 @@
 import Foundation
 
-struct V2ClientControlResponsePayload: Codable, Equatable {
+nonisolated struct V2ClientControlResponsePayload: Codable, Equatable, Sendable {
     let controlToken: String?
     let expiresAt: Int64?
     let processAlive: Bool?
@@ -95,4 +95,3 @@ struct V2ClientControlResponsePayload: Codable, Equatable {
         try container.encodeIfPresent(controlLeaseExpiresAt, forKey: .controlLeaseExpiresAt)
     }
 }
-

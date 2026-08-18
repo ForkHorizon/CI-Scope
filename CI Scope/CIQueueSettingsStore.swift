@@ -51,7 +51,7 @@ final class CIQueueSettingsStore: ObservableObject {
     }
     @Published var autoMergeGatePRs = false { didSet { persist() } }
 
-    static let autoMergeDefaultsKey = "ciScope.queue.autoMergeGatePRs"
+    nonisolated static let autoMergeDefaultsKey = "ciScope.queue.autoMergeGatePRs"
 
     private let defaults: UserDefaults
     let v2Control: V2ClientControlSession
@@ -77,7 +77,7 @@ final class CIQueueSettingsStore: ObservableObject {
         persist()
     }
 
-    static func snapshot(defaults: UserDefaults = .standard) -> CIQueueSettingsSnapshot {
+    nonisolated static func snapshot(defaults: UserDefaults = .standard) -> CIQueueSettingsSnapshot {
         let fallbackName = Host.current().localizedName ?? "Mac"
         let machineIDKey = "ciScope.queue.machineID"
         let machineID = defaults.string(forKey: machineIDKey) ?? UUID().uuidString

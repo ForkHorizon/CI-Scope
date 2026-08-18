@@ -19,4 +19,3 @@ enum V2ClientStatusResult: Equatable {
 /// Non-secret Agent discovery metadata written atomically by the Go Agent.
 /// The socket still authenticates and fences every request; this file only
 /// removes the need to copy live session values into UserDefaults manually.
-

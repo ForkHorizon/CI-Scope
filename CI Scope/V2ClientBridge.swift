@@ -58,4 +58,3 @@ public enum V2ClientBridgeError: Error, Equatable, CustomStringConvertible {
         }
     }
 }
-

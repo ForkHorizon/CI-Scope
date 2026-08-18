@@ -1,7 +1,7 @@
 import Foundation
 
-public enum V2ClientWireCodec {
-    public static func encodeFrame<T: Encodable>(_ value: T, maximumBytes: Int) throws -> Data {
+nonisolated enum V2ClientWireCodec {
+    static func encodeFrame<T: Encodable>(_ value: T, maximumBytes: Int) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         var data = try encoder.encode(value)
@@ -10,7 +10,7 @@ public enum V2ClientWireCodec {
         return data
     }
 
-    public static func decodeFrame<T: Decodable>(
+    static func decodeFrame<T: Decodable>(
         _ data: Data,
         as type: T.Type,
         maximumBytes: Int
@@ -21,4 +21,3 @@ public enum V2ClientWireCodec {
         return try JSONDecoder().decode(T.self, from: data.dropLast())
     }
 }
-

@@ -1,13 +1,13 @@
 import Foundation
 
-public struct V2ClientControlRequest {
-    public let command: V2ClientControlCommand
-    public let controlToken: String?
-    public let drainDeadline: Date?
-    public let requestID: String
-    public let now: Date
+nonisolated struct V2ClientControlRequest: Sendable {
+    let command: V2ClientControlCommand
+    let controlToken: String?
+    let drainDeadline: Date?
+    let requestID: String
+    let now: Date
 
-    public init(
+    init(
         command: V2ClientControlCommand,
         controlToken: String? = nil,
         drainDeadline: Date? = nil,
@@ -22,7 +22,7 @@ public struct V2ClientControlRequest {
     }
 }
 
-struct V2ClientControlAdapter: @unchecked Sendable {
+nonisolated struct V2ClientControlAdapter: @unchecked Sendable {
     let statusAdapter: V2ClientStatusAdapter
     let authorityState: V2ClientAuthorityState
     let lease: V2ClientControlLeaseMachine
@@ -37,7 +37,7 @@ struct V2ClientControlAdapter: @unchecked Sendable {
         self.lease = lease
     }
 
-    static func configured(defaults: UserDefaults = .standard) -> V2ClientControlAdapter? {
+    nonisolated static func configured(defaults: UserDefaults = .standard) -> V2ClientControlAdapter? {
         guard let statusAdapter = V2ClientStatusAdapter.configured(defaults: defaults) else { return nil }
         return V2ClientControlAdapter(
             statusAdapter: statusAdapter,
@@ -45,7 +45,7 @@ struct V2ClientControlAdapter: @unchecked Sendable {
         )
     }
 
-    func makeControlRequest(
+    nonisolated func makeControlRequest(
         command: V2ClientControlCommand,
         controlToken: String? = nil,
         drainDeadline: Date? = nil,
@@ -91,7 +91,7 @@ struct V2ClientControlAdapter: @unchecked Sendable {
         )
     }
 
-    func sendControl<ResponsePayload: Codable>(
+    nonisolated func sendControl<ResponsePayload: Codable & Sendable>(
         _ request: V2ClientControlRequest,
         responseType: ResponsePayload.Type
     ) throws -> V2ClientResponseEnvelope<ResponsePayload> {
@@ -105,4 +105,3 @@ struct V2ClientControlAdapter: @unchecked Sendable {
         return try statusAdapter.transport.send(envelope, responseType: responseType)
     }
 }
-

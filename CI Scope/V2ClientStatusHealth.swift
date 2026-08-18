@@ -1,37 +1,14 @@
 import Foundation
 
-public struct V2ClientStatusHealth {
-    public let processAlive: Bool
-    public let schedulerHealthy: Bool
-    public let controlLeaseActive: Bool
-    public let serverConnected: Bool
-
-    public init(
-        processAlive: Bool,
-        schedulerHealthy: Bool,
-        controlLeaseActive: Bool,
-        serverConnected: Bool
-    ) {
-        self.processAlive = processAlive
-        self.schedulerHealthy = schedulerHealthy
-        self.controlLeaseActive = controlLeaseActive
-        self.serverConnected = serverConnected
-    }
+nonisolated struct V2ClientStatusHealth: Sendable {
+    let processAlive: Bool
+    let schedulerHealthy: Bool
+    let controlLeaseActive: Bool
+    let serverConnected: Bool
 }
 
-public struct V2ClientStatusSafety {
-    public let draining: Bool
-    public let recoveryBlocked: Bool
-    public let projectionLagging: Bool
-
-    public init(
-        draining: Bool,
-        recoveryBlocked: Bool,
-        projectionLagging: Bool
-    ) {
-        self.draining = draining
-        self.recoveryBlocked = recoveryBlocked
-        self.projectionLagging = projectionLagging
-    }
+nonisolated struct V2ClientStatusSafety: Sendable {
+    let draining: Bool
+    let recoveryBlocked: Bool
+    let projectionLagging: Bool
 }
-

@@ -34,4 +34,3 @@ struct V2ClientAgentSessionDescriptor: Decodable {
 
 /// Read-only, opt-in bridge to the Agent. It is deliberately not a source of
 /// truth for the legacy snapshot; callers may render this as an extra status.
-

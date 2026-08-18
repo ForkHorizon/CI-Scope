@@ -18,7 +18,7 @@ guard !service.isEmpty, !account.isEmpty, !secret.isEmpty else {
 let query: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
     kSecAttrService as String: service,
-    kSecAttrAccount as String: account
+    kSecAttrAccount as String: account,
 ]
 
 SecItemDelete(query as CFDictionary)

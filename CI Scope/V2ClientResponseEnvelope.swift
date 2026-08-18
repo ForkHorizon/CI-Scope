@@ -1,6 +1,6 @@
 import Foundation
 
-public enum V2ClientResponseOutcome: String, Codable {
+nonisolated enum V2ClientResponseOutcome: String, Codable, Sendable {
     case accepted
     case succeeded
     case rejected
@@ -8,19 +8,19 @@ public enum V2ClientResponseOutcome: String, Codable {
     case ambiguous
 }
 
-public struct V2ClientResponseEnvelope<Payload: Codable>: Codable {
-    public let protocolVersion: Int
-    public let requestId: String
-    public let payloadHash: String
-    public let session: V2ClientSessionContext
-    public let fencing: V2ClientFencingContext
-    public let operationId: String
-    public let serverRevision: Int64
-    public let outcome: V2ClientResponseOutcome
-    public let retryAfterMs: Int64?
-    public let payload: Payload
+nonisolated struct V2ClientResponseEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
+    let protocolVersion: Int
+    let requestId: String
+    let payloadHash: String
+    let session: V2ClientSessionContext
+    let fencing: V2ClientFencingContext
+    let operationId: String
+    let serverRevision: Int64
+    let outcome: V2ClientResponseOutcome
+    let retryAfterMs: Int64?
+    let payload: Payload
 
-    public init(
+    init(
         payload: Payload,
         context: V2ClientResponseContext,
         serverRevision: Int64,
@@ -50,14 +50,14 @@ public struct V2ClientResponseEnvelope<Payload: Codable>: Codable {
         self.payload = payload
     }
 
-    public func validatePayloadHash() throws {
+    func validatePayloadHash() throws {
         let actual = try V2ClientPayloadHasher.sha256(payload)
         guard actual == payloadHash else {
             throw V2ClientBridgeError.invalidPayloadHash(expected: payloadHash, actual: actual)
         }
     }
 
-    public func validateAgainst<RequestPayload: Codable>(request: V2ClientRequestEnvelope<RequestPayload>) throws {
+    func validateAgainst<RequestPayload: Codable>(request: V2ClientRequestEnvelope<RequestPayload>) throws {
         guard protocolVersion == request.protocolVersion, protocolVersion == 2,
             request.session == session,
             request.fencing.sessionEpoch == fencing.sessionEpoch,
@@ -72,4 +72,3 @@ public struct V2ClientResponseEnvelope<Payload: Codable>: Codable {
         try validatePayloadHash()
     }
 }
-

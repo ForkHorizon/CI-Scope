@@ -32,7 +32,7 @@
   ],
   "xcode_workspace": "",
   "xcode_project": "",
-  "xcode_scheme": "",
+  "xcode_scheme": "CI Scope",
   "xcode_destination": "generic/platform=macOS",
   "xcode_configuration": "Debug",
   "swift_format_config": ".swift-format",

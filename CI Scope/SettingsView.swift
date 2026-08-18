@@ -43,14 +43,16 @@ struct SettingsView: View {
                     set: { store.setV2AuthorityEnabled($0) }
                 )
             )
-                .font(.callout.weight(.semibold))
-                .disabled(v2Control.isDisablingAuthority)
+            .font(.callout.weight(.semibold))
+            .disabled(v2Control.isDisablingAuthority)
 
             v2ControlSection
 
-            Text("Legacy broker remains authoritative by default. Enabling V2 only opts in this app; authority starts after a successful control-lease acquisition.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(
+                "Legacy broker remains authoritative by default. Enabling V2 only opts in this app; authority starts after a successful control-lease acquisition."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
 
             LabeledTextField(title: "Server URL", text: $store.serverURL)
 
@@ -133,9 +135,13 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 } else if !v2Control.hasLiveAgentSession {
-                    Text(v2Control.isConfigured ? "Agent session/socket is offline. Authority controls are locked until a live status response arrives." : "Agent session is not configured on this Mac.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        v2Control.isConfigured
+                            ? "Agent session/socket is offline. Authority controls are locked until a live status response arrives."
+                            : "Agent session is not configured on this Mac."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 if let projection = v2Control.statusProjection {

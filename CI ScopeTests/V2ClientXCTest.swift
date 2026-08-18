@@ -12,7 +12,10 @@ final class V2ClientXCTest: XCTestCase {
     )
 
     func testEnvelopeHashIsCanonicalAndDetectsTampering() throws {
-        struct Payload: Codable, Equatable { let z: Int; let a: String }
+        struct Payload: Codable, Equatable {
+            let z: Int
+            let a: String
+        }
         let payload = Payload(z: 1, a: "x")
         let request = try V2ClientRequestEnvelope(
             payload: payload,
@@ -62,6 +65,7 @@ final class V2ClientXCTest: XCTestCase {
         let suiteName = "V2ClientXCTest.defaults"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(false, forKey: V2ClientFeature.statusAdapterKey)
         XCTAssertEqual(V2ClientFeature.authorityState(defaults: defaults), .legacyBroker)
         XCTAssertFalse(V2ClientFeature.statusAdapterEnabled(defaults: defaults))
     }
