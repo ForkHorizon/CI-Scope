@@ -13,9 +13,7 @@ def test_shutdown_kills_active_runners_when_quit_marker_present(tmp_path, monkey
     monkeypatch.setattr(
         broker,
         "read_state",
-        lambda: {
-            "actives": [{"id": "job_1", "pid": 4242, "repositorySlug": "test/repo"}]
-        },
+        lambda: {"actives": [{"id": "job_1", "pid": 4242, "repositorySlug": "test/repo"}]},
     )
     monkeypatch.setattr(broker, "write_state", written.append)
     monkeypatch.setattr(broker, "active_is_running", lambda active: True)
@@ -24,9 +22,7 @@ def test_shutdown_kills_active_runners_when_quit_marker_present(tmp_path, monkey
         "terminate_active_process",
         lambda active, reason="": terminated.append((active["id"], reason)),
     )
-    monkeypatch.setattr(
-        broker, "cleanup_runner_by_name", lambda slug, name: cleaned_up.append(slug)
-    )
+    monkeypatch.setattr(broker, "cleanup_runner_by_name", lambda slug, name: cleaned_up.append(slug))
     monkeypatch.setattr(broker, "remove_runner_dir", removed_dirs.append)
     monkeypatch.setattr(
         broker,
@@ -45,9 +41,7 @@ def test_shutdown_kills_active_runners_when_quit_marker_present(tmp_path, monkey
     assert not marker.exists()
 
 
-def test_shutdown_leaves_active_runners_alone_without_quit_marker(
-    tmp_path, monkeypatch
-):
+def test_shutdown_leaves_active_runners_alone_without_quit_marker(tmp_path, monkeypatch):
     broker = load_broker()
     terminated = []
 
@@ -88,9 +82,7 @@ def test_shutdown_for_owner_exit_kills_runners_and_boots_self_out(monkeypatch):
     monkeypatch.setattr(
         broker,
         "read_state",
-        lambda: {
-            "actives": [{"id": "job_1", "pid": 9000, "repositorySlug": "test/repo"}]
-        },
+        lambda: {"actives": [{"id": "job_1", "pid": 9000, "repositorySlug": "test/repo"}]},
     )
     monkeypatch.setattr(broker, "write_state", lambda state: None)
     monkeypatch.setattr(broker, "active_is_running", lambda active: True)
@@ -101,12 +93,8 @@ def test_shutdown_for_owner_exit_kills_runners_and_boots_self_out(monkeypatch):
     )
     monkeypatch.setattr(broker, "cleanup_runner_by_name", lambda slug, name: None)
     monkeypatch.setattr(broker, "remove_runner_dir", lambda job_id: None)
-    monkeypatch.setattr(
-        broker, "server_post_status", lambda job, status, error=None: None
-    )
-    monkeypatch.setattr(
-        broker.subprocess, "run", lambda *args, **kwargs: run_calls.append(args)
-    )
+    monkeypatch.setattr(broker, "server_post_status", lambda job, status, error=None: None)
+    monkeypatch.setattr(broker.subprocess, "run", lambda *args, **kwargs: run_calls.append(args))
 
     with pytest.raises(SystemExit):
         broker.shutdown_for_owner_exit()

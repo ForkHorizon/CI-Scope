@@ -8,17 +8,13 @@ import importlib.util
 broker_dir = Path(__file__).parent.parent.parent / "CI Scope" / "Broker"
 sys.path.insert(0, str(broker_dir))
 
-loader = importlib.machinery.SourceFileLoader(
-    "broker_cleanup", str(broker_dir / "CI Scope Broker")
-)
+loader = importlib.machinery.SourceFileLoader("broker_cleanup", str(broker_dir / "CI Scope Broker"))
 spec = importlib.util.spec_from_loader("broker_cleanup", loader)
 broker = importlib.util.module_from_spec(spec)
 loader.exec_module(broker)
 
 
-def test_remove_runner_dir_removes_matching_derived_data_but_keeps_unrelated(
-    tmp_path, monkeypatch
-):
+def test_remove_runner_dir_removes_matching_derived_data_but_keeps_unrelated(tmp_path, monkeypatch):
     jobs_dir = tmp_path / "jobs"
     legacy_jobs_dir = tmp_path / "legacy-jobs"
     derived_data_dir = tmp_path / "DerivedData"
@@ -32,12 +28,8 @@ def test_remove_runner_dir_removes_matching_derived_data_but_keeps_unrelated(
         with (path / "info.plist").open("wb") as handle:
             plistlib.dump({"WorkspacePath": str(workspace)}, handle)
 
-    write_info(
-        derived_data_dir / "job-cache", runner_dir / "_work" / "repo" / "App.xcodeproj"
-    )
-    write_info(
-        derived_data_dir / "unrelated-cache", tmp_path / "other" / "App.xcodeproj"
-    )
+    write_info(derived_data_dir / "job-cache", runner_dir / "_work" / "repo" / "App.xcodeproj")
+    write_info(derived_data_dir / "unrelated-cache", tmp_path / "other" / "App.xcodeproj")
     monkeypatch.setattr(broker, "JOBS_DIR", jobs_dir)
     monkeypatch.setattr(broker, "LEGACY_JOBS_DIR", legacy_jobs_dir)
     monkeypatch.setattr(broker, "DERIVED_DATA_DIR", derived_data_dir)
@@ -49,9 +41,7 @@ def test_remove_runner_dir_removes_matching_derived_data_but_keeps_unrelated(
     assert (derived_data_dir / "unrelated-cache").exists()
 
 
-def test_prune_orphan_job_dirs_cleans_legacy_jobs_and_orphan_derived_data(
-    tmp_path, monkeypatch
-):
+def test_prune_orphan_job_dirs_cleans_legacy_jobs_and_orphan_derived_data(tmp_path, monkeypatch):
     jobs_dir = tmp_path / "jobs"
     legacy_jobs_dir = tmp_path / "legacy-jobs"
     derived_data_dir = tmp_path / "DerivedData"

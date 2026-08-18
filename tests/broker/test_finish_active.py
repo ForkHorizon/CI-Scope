@@ -5,9 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-BROKER_PATH = (
-    Path(__file__).resolve().parents[2] / "CI Scope" / "Broker" / "CI Scope Broker"
-)
+BROKER_PATH = Path(__file__).resolve().parents[2] / "CI Scope" / "Broker" / "CI Scope Broker"
 ACTIVE_JOB = {
     "id": "ForkHorizon/NexusUnity:1001:2002",
     "repositorySlug": "ForkHorizon/NexusUnity",
@@ -18,9 +16,7 @@ ACTIVE_JOB = {
 
 
 def load_broker():
-    loader = importlib.machinery.SourceFileLoader(
-        "broker_finish_active", str(BROKER_PATH)
-    )
+    loader = importlib.machinery.SourceFileLoader("broker_finish_active", str(BROKER_PATH))
     spec = importlib.util.spec_from_loader("broker_finish_active", loader)
     broker = importlib.util.module_from_spec(spec)
     loader.exec_module(broker)

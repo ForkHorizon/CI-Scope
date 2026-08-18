@@ -35,9 +35,7 @@ class BrokerServerModeTests(unittest.TestCase):
 
     def test_server_claim_releases_unmatched_action(self):
         calls = []
-        action = dict(
-            BACKEND_QUEUE_JOB, id="Other/Repo:1001:2002", repositorySlug="Other/Repo"
-        )
+        action = dict(BACKEND_QUEUE_JOB, id="Other/Repo:1001:2002", repositorySlug="Other/Repo")
 
         def fake_post(path, payload):
             calls.append((path, payload))
@@ -56,9 +54,7 @@ class BrokerServerModeTests(unittest.TestCase):
 
         self.assertEqual(queue, [])
         self.assertEqual(statuses, [])
-        self.assertEqual(
-            calls[1][0], "/api/ci/local/actions/Other%2FRepo%3A1001%3A2002/status"
-        )
+        self.assertEqual(calls[1][0], "/api/ci/local/actions/Other%2FRepo%3A1001%3A2002/status")
         self.assertEqual(calls[1][1]["status"], "released")
 
     def test_server_heartbeat_reports_all_active_jobs(self):
@@ -108,9 +104,7 @@ class BrokerServerModeTests(unittest.TestCase):
             patch.object(
                 self.broker,
                 "server_post_status",
-                lambda job, status, error=None: status_calls.append(
-                    (job, status, error)
-                ),
+                lambda job, status, error=None: status_calls.append((job, status, error)),
             ),
         ):
             self.broker.tick((queue, []), self.broker.DEFAULT_PROFILES)

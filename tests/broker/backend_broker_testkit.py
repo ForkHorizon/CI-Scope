@@ -5,9 +5,7 @@ import importlib.util
 from pathlib import Path
 
 
-BROKER_PATH = (
-    Path(__file__).resolve().parents[2] / "CI Scope" / "Broker" / "CI Scope Broker"
-)
+BROKER_PATH = Path(__file__).resolve().parents[2] / "CI Scope" / "Broker" / "CI Scope Broker"
 BACKEND_QUEUE_JOB = {
     "id": "ForkHorizon/Widget:1001:2002",
     "repositorySlug": "ForkHorizon/Widget",

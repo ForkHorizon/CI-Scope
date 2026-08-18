@@ -29,9 +29,7 @@ class InfraRerunTests(unittest.TestCase):
                 lambda path, payload: posts.append((path, payload)) or {},
             ),
         ):
-            self.broker.process_pending_reruns(
-                [{"repositorySlug": "ForkHorizon/Widget", "runId": 42}]
-            )
+            self.broker.process_pending_reruns([{"repositorySlug": "ForkHorizon/Widget", "runId": 42}])
 
         self.assertEqual(
             gh_calls[0],
@@ -78,16 +76,11 @@ class InfraRerunTests(unittest.TestCase):
             patch.object(
                 self.broker.subprocess,
                 "run",
-                lambda command, **_k: (
-                    gh_calls.append(command)
-                    or SimpleNamespace(returncode=0, stdout="", stderr="")
-                ),
+                lambda command, **_k: gh_calls.append(command) or SimpleNamespace(returncode=0, stdout="", stderr=""),
             ),
             patch.object(self.broker, "server_post_json", lambda path, payload: {}),
         ):
-            self.broker.process_pending_reruns(
-                [{"repositorySlug": "a/b"}, {"runId": 5}, {}]
-            )
+            self.broker.process_pending_reruns([{"repositorySlug": "a/b"}, {"runId": 5}, {}])
         self.assertEqual(gh_calls, [])
 
 

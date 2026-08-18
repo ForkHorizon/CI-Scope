@@ -11,9 +11,7 @@ import hashlib
 broker_dir = Path(__file__).parent.parent.parent / "CI Scope" / "Broker"
 sys.path.insert(0, str(broker_dir))
 
-loader = importlib.machinery.SourceFileLoader(
-    "broker", str(broker_dir / "CI Scope Broker")
-)
+loader = importlib.machinery.SourceFileLoader("broker", str(broker_dir / "CI Scope Broker"))
 spec = importlib.util.spec_from_loader("broker", loader)
 broker = importlib.util.module_from_spec(spec)
 loader.exec_module(broker)
@@ -122,9 +120,7 @@ def test_save_state(monkeypatch):
     profiles = []
     webhook = {}
 
-    state = broker.save_state(
-        actives, queue, statuses, error, retries, profiles, webhook
-    )
+    state = broker.save_state(actives, queue, statuses, error, retries, profiles, webhook)
 
     assert len(state["queue"]) == 1
     assert state["queue"][0]["id"] == "job_1"

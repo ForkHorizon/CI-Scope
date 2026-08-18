@@ -53,9 +53,7 @@ def test_cleanup_stale_runners_only_removes_offline_runners(monkeypatch):
             {"id": 2, "name": "ci-scope-123-2", "busy": False, "status": "offline"},
         ],
     )
-    monkeypatch.setattr(
-        broker, "gh_json", lambda path, method: removed.append((path, method))
-    )
+    monkeypatch.setattr(broker, "gh_json", lambda path, method: removed.append((path, method)))
 
     broker.cleanup_stale_runners({"repositorySlug": "test/repo", "jobId": "123"})
 

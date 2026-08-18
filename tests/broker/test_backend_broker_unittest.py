@@ -45,10 +45,7 @@ class BrokerBackendTests(unittest.TestCase):
         self.assertEqual(queue[0]["id"], "ForkHorizon/Widget:1001:2002")
         self.assertEqual(queue[0]["profileId"], "forkhorizon-organization-broker")
         self.assertTrue(
-            any(
-                status["slug"] == "ForkHorizon/Widget" and status["queuedCount"] == 1
-                for status in statuses
-            )
+            any(status["slug"] == "ForkHorizon/Widget" and status["queuedCount"] == 1 for status in statuses)
         )
 
     def test_tick_dispatches_backend_fed_queue_without_polling_github(self):
@@ -74,9 +71,7 @@ class BrokerBackendTests(unittest.TestCase):
             self.broker.write_state = calls.append
             self.broker.read_state = mock_read_state
             self.broker.start_runner = lambda job: MockProcess()
-            self.broker.queued_jobs = lambda *_: self.fail(
-                "queued_jobs should not be called"
-            )
+            self.broker.queued_jobs = lambda *_: self.fail("queued_jobs should not be called")
             time.time = lambda: 1600000000.0
             self.broker.tick(polled=None, profiles=self.broker.DEFAULT_PROFILES)
         finally:
