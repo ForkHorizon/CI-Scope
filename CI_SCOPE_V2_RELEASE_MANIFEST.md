@@ -27,9 +27,9 @@ for release. A dirty working tree is not release evidence.
 
 | Component | Repository | Commit SHA | Local checks |
 |---|---|---|---|
-| Client + Agent | `ForkHorizon/CI-Scope` | `TBD` | Swift build/tests; Agent go test/race/vet |
-| Worker + DO | `ForkHorizon/CI-Scope-Web` | `TBD` | Web tests/typecheck/build |
-| Gates | `ForkHorizon/ci-gates` | `TBD` | pytest/compile/actionlint |
+| Client + Agent | `ForkHorizon/CI-Scope` | `7f82677` | Swift build/tests; Agent go test/race/vet (passed) |
+| Worker + DO | `ForkHorizon/CI-Scope-Web` | `cb28a12` | Web tests/typecheck/build (21/21 passed) |
+| Gates | `ForkHorizon/ci-gates` | `b0fe9e5be6d6a0e30549a1ddf7eb17d75629ceaf` | pytest/compile/actionlint (922 passed, Ruff clean) |
 
 ## VPS canary evidence
 
@@ -41,8 +41,8 @@ rollback deployment:
 | VPS endpoint | `https://ci.forkhorizon.com` | Authenticated health `200`; runtime `vps` |
 | Repeat clean canary run | `ForkHorizon/CI-Scope#32072265866` | Succeeded end-to-end; both `Same-label canary A` (`95518114288`) and `Same-label canary B` (`95518123512`) claimed sequentially by VPS slot-1 and completed; hosted `routing-validation` jobs properly quarantined |
 | Workflow head SHA | `3b8ea16faec0ad36ea99e4f58c73aa02c462e737` | Observed from GitHub run API for run `32072265866` |
-| Gates routing PR | `ci-gates#66`, branch `daliys/vps-canary-group-fix` | Draft; routing validation passed |
-| Gates branch head | `bce84af833b8094defe27bb4d09eb352e7070a8f` | Pinned routing revision; draft PR Self Check passes, not merged |
+| Gates routing PR | `ci-gates#66` | Merged into `main` (`b0fe9e5be6d6a0e30549a1ddf7eb17d75629ceaf`) |
+| Gates commit | `b0fe9e5be6d6a0e30549a1ddf7eb17d75629ceaf` | Pinned routing revision; Self Check passes |
 | Cleanup proof | VPS RunnerPool state | Both reservations terminal (`satisfied`); slot available; observer intents completed; GitHub disposable runner list empty |
 | Webhook delivery mode | Real GitHub hook deliveries observed; both canary jobs projected | Assignment and terminal projection verified for both jobs; runner removal preceded slot release |
 | Runner wrapper lifecycle | Checked-in `scripts/ci-scope-runner-wrapper.sh` | Supervises Runner.Listener cleanly; shutdown forwards signals without leaving orphan processes |
