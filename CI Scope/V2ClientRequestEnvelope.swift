@@ -59,18 +59,4 @@ nonisolated struct V2ClientResponseContext: Sendable {
     let fencing: V2ClientFencingContext
     let operationId: String
     let protocolVersion: Int
-
-    init(
-        requestId: String,
-        session: V2ClientSessionContext,
-        fencing: V2ClientFencingContext,
-        operationId: String = UUID().uuidString,
-        protocolVersion: Int = 2
-    ) {
-        self.requestId = requestId
-        self.session = session
-        self.fencing = fencing
-        self.operationId = operationId
-        self.protocolVersion = protocolVersion
-    }
 }

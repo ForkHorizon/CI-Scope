@@ -1,11 +1,6 @@
 import Foundation
 import Darwin
 
-nonisolated struct V2ClientPeerCredentials: Equatable, Sendable {
-    let uid: UInt32
-    let gid: UInt32
-}
-
 nonisolated struct V2ClientUnixSocketConfiguration: Sendable {
     let socketURL: URL
     let expectedPeerUID: UInt32

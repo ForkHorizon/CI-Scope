@@ -37,14 +37,6 @@ nonisolated struct V2ClientControlAdapter: @unchecked Sendable {
         self.lease = lease
     }
 
-    nonisolated static func configured(defaults: UserDefaults = .standard) -> V2ClientControlAdapter? {
-        guard let statusAdapter = V2ClientStatusAdapter.configured(defaults: defaults) else { return nil }
-        return V2ClientControlAdapter(
-            statusAdapter: statusAdapter,
-            authorityState: V2ClientFeature.authorityState(defaults: defaults)
-        )
-    }
-
     nonisolated func makeControlRequest(
         command: V2ClientControlCommand,
         controlToken: String? = nil,

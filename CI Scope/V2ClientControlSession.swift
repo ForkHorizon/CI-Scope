@@ -139,8 +139,4 @@ final class V2ClientControlSession: ObservableObject {
             await self?.drainForAuthorityDisable()
         }
     }
-
-    func refreshStatus() {
-        Task { [weak self] in await self?.refreshStatusNow() }
-    }
 }

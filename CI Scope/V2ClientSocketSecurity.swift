@@ -15,11 +15,4 @@ nonisolated enum V2ClientUnixSocketSecurity {
         let owner = UInt32(info.st_uid)
         guard owner == expectedOwnerUID else { throw V2ClientBridgeError.unexpectedSocketOwner(owner) }
     }
-
-    static func enforce0600(socketURL: URL) throws {
-        guard chmod(socketURL.path, mode_t(0o600)) == 0 else {
-            throw V2ClientBridgeError.socketFailure("Could not set Unix socket mode 0600")
-        }
-        try validate(socketURL: socketURL)
-    }
 }

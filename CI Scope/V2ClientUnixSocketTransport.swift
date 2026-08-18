@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 
 final class V2ClientUnixSocketTransport: @unchecked Sendable {
-    typealias PeerUIDValidationHook = (V2ClientPeerCredentials) -> Bool
+    typealias PeerUIDValidationHook = (UInt32) -> Bool
 
     private let configuration: V2ClientUnixSocketConfiguration
     private let peerUIDValidationHook: PeerUIDValidationHook
@@ -13,8 +13,8 @@ final class V2ClientUnixSocketTransport: @unchecked Sendable {
     ) {
         self.configuration = configuration
         self.peerUIDValidationHook =
-            peerUIDValidationHook ?? { credentials in
-                credentials.uid == configuration.expectedPeerUID
+            peerUIDValidationHook ?? { uid in
+                uid == configuration.expectedPeerUID
             }
     }
 
@@ -118,14 +118,14 @@ final class V2ClientUnixSocketTransport: @unchecked Sendable {
         guard getpeereid(descriptor, &uid, &gid) == 0 else {
             throw V2ClientBridgeError.socketFailure("Could not validate Agent peer UID")
         }
-        guard peerUIDValidationHook(V2ClientPeerCredentials(uid: UInt32(uid), gid: UInt32(gid))) else {
+        guard peerUIDValidationHook(UInt32(uid)) else {
             throw V2ClientBridgeError.unexpectedSocketOwner(UInt32(uid))
         }
     }
 
     private func writeAll(_ data: Data, to descriptor: Int32) throws {
         var written = 0
-        try data.withUnsafeBytes { rawBuffer in
+        try data.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) in
             guard let baseAddress = rawBuffer.baseAddress else { return }
             while written < data.count {
                 let result = Darwin.send(

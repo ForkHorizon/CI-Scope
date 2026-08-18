@@ -111,10 +111,6 @@ final class CIQueueSettingsStore: ObservableObject {
         )
     }
 
-    var v2AuthorityState: V2ClientAuthorityState {
-        v2Control.authorityState
-    }
-
     func startV2Lifecycle() {
         v2Control.startLifecycle()
     }

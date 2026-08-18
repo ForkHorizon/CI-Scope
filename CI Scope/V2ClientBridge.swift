@@ -1,6 +1,6 @@
 import Foundation
 
-public enum V2ClientBridgeError: Error, Equatable, CustomStringConvertible {
+enum V2ClientBridgeError: Error, Equatable, CustomStringConvertible {
     case unsupportedProtocolVersion(Int)
     case invalidFencingContext
     case invalidResponseContext
@@ -19,7 +19,7 @@ public enum V2ClientBridgeError: Error, Equatable, CustomStringConvertible {
     case controlLeaseRequired
     case invalidControlCommand
 
-    public var description: String {
+    var description: String {
         switch self {
         case .unsupportedProtocolVersion(let version):
             return "Unsupported protocol version \(version)"

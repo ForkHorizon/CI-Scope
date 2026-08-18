@@ -40,6 +40,9 @@
   "dead_code_enabled": true,
   "dead_code_install_periphery": true,
   "periphery_arguments": [
-    "--retain-codable-properties"
+    "--retain-codable-properties",
+    "--schemes",
+    "CI Scope",
+    "CI ScopeTests"
   ]
 }
