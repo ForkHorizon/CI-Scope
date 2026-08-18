@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.forkhorizon.ci-scope.agent</string>
+  <key>ProgramArguments</key><array><string>{{AGENT_PATH}}</string><string>run</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>ThrottleInterval</key><integer>300</integer>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>EnvironmentVariables</key><dict>
+    <key>CI_SCOPE_CONTROL_PLANE_URL</key><string>{{CONTROL_PLANE_URL}}</string>
+    <key>CI_SCOPE_MACHINE_ID</key><string>{{MACHINE_ID}}</string>
+    <key>CI_SCOPE_BOOT_ID</key><string>{{BOOT_ID}}</string>
+    <key>CI_SCOPE_AGENT_INSTANCE_ID</key><string>{{AGENT_INSTANCE_ID}}</string>
+    <key>CI_SCOPE_CREDENTIAL_ID</key><string>{{CREDENTIAL_ID}}</string>
+    <key>CI_SCOPE_POOL_IDENTITY</key><string>{{POOL_IDENTITY}}</string>
+    <key>CI_SCOPE_SESSION_REQUEST_ID</key><string>{{SESSION_REQUEST_ID}}</string>
+    <key>CI_SCOPE_SOCKET_PATH</key><string>{{SOCKET_PATH}}</string>
+    <key>CI_SCOPE_STATE_ROOT</key><string>{{STATE_ROOT}}</string>
+    <key>CI_SCOPE_KEYCHAIN_SERVICE</key><string>{{KEYCHAIN_SERVICE}}</string>
+    <key>CI_SCOPE_V2_SHADOW_TOKEN_KEYCHAIN_ACCOUNT</key><string>{{SHADOW_ACCOUNT}}</string>
+    <key>CI_SCOPE_RUNNER_EXECUTABLE</key><string>{{RUNNER_EXECUTABLE}}</string>
+    <key>CI_SCOPE_RUNNER_WORKSPACE_ROOT</key><string>{{RUNNER_WORKSPACE_ROOT}}</string>
+    <key>CI_SCOPE_RUNNER_SCRIPT</key><string>{{RUNNER_SCRIPT}}</string>
+    <key>CI_SCOPE_RUNNER_TEMP_ROOT</key><string>{{RUNNER_TEMP_ROOT}}</string>
+  </dict>
+  <key>StandardOutPath</key><string>{{LOG_DIR}}/agent.out.log</string>
+  <key>StandardErrorPath</key><string>{{LOG_DIR}}/agent.err.log</string>
+</dict></plist>

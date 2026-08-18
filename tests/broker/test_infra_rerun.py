@@ -23,13 +23,23 @@ class InfraRerunTests(unittest.TestCase):
 
         with (
             patch.object(self.broker.subprocess, "run", fake_run),
-            patch.object(self.broker, "server_post_json", lambda path, payload: posts.append((path, payload)) or {}),
+            patch.object(
+                self.broker,
+                "server_post_json",
+                lambda path, payload: posts.append((path, payload)) or {},
+            ),
         ):
             self.broker.process_pending_reruns([{"repositorySlug": "ForkHorizon/Widget", "runId": 42}])
 
-        self.assertEqual(gh_calls[0], ["gh", "run", "rerun", "42", "--repo", "ForkHorizon/Widget", "--failed"])
+        self.assertEqual(
+            gh_calls[0],
+            ["gh", "run", "rerun", "42", "--repo", "ForkHorizon/Widget", "--failed"],
+        )
         self.assertEqual(posts[0][0], "/api/ci/local/reruns/ack")
-        self.assertEqual(posts[0][1]["reruns"], [{"repositorySlug": "ForkHorizon/Widget", "runId": 42}])
+        self.assertEqual(
+            posts[0][1]["reruns"],
+            [{"repositorySlug": "ForkHorizon/Widget", "runId": 42}],
+        )
 
     def test_acks_even_when_gh_fails(self):
         posts = []
@@ -39,7 +49,11 @@ class InfraRerunTests(unittest.TestCase):
 
         with (
             patch.object(self.broker.subprocess, "run", fake_run),
-            patch.object(self.broker, "server_post_json", lambda path, payload: posts.append((path, payload)) or {}),
+            patch.object(
+                self.broker,
+                "server_post_json",
+                lambda path, payload: posts.append((path, payload)) or {},
+            ),
         ):
             self.broker.process_pending_reruns([{"repositorySlug": "a/b", "runId": 1}])
 
@@ -48,7 +62,11 @@ class InfraRerunTests(unittest.TestCase):
 
     def test_empty_list_does_nothing(self):
         posts = []
-        with patch.object(self.broker, "server_post_json", lambda path, payload: posts.append((path, payload)) or {}):
+        with patch.object(
+            self.broker,
+            "server_post_json",
+            lambda path, payload: posts.append((path, payload)) or {},
+        ):
             self.broker.process_pending_reruns([])
         self.assertEqual(posts, [])
 

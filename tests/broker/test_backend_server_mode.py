@@ -61,9 +61,15 @@ class BrokerServerModeTests(unittest.TestCase):
         calls = []
 
         with (
-            patch.object(self.broker, "read_state", lambda: {"actives": [{"id": "a"}, {"id": "b"}]}),
             patch.object(
-                self.broker, "server_post_json", lambda path, payload: calls.append((path, payload)) or {"ok": True}
+                self.broker,
+                "read_state",
+                lambda: {"actives": [{"id": "a"}, {"id": "b"}]},
+            ),
+            patch.object(
+                self.broker,
+                "server_post_json",
+                lambda path, payload: calls.append((path, payload)) or {"ok": True},
             ),
             patch.object(self.broker, "record_backend_status", lambda **_kwargs: None),
         ):
@@ -90,7 +96,11 @@ class BrokerServerModeTests(unittest.TestCase):
             patch.object(self.broker, "SERVER_MODE", True),
             patch.object(self.broker, "read_state", mock_read_state),
             patch.object(self.broker, "write_state", lambda _state: None),
-            patch.object(self.broker, "start_runner", lambda _job: (_ for _ in ()).throw(RuntimeError("boom"))),
+            patch.object(
+                self.broker,
+                "start_runner",
+                lambda _job: (_ for _ in ()).throw(RuntimeError("boom")),
+            ),
             patch.object(
                 self.broker,
                 "server_post_status",
@@ -118,7 +128,9 @@ class BrokerServerModeTests(unittest.TestCase):
     def _server_job(self, action, machine_labels):
         with patch.object(self.broker, "MACHINE_LABELS", machine_labels):
             return self.broker.server_job_payload(
-                action, {"repos": [], "profiles": self.broker.DEFAULT_PROFILES}, self.broker.DEFAULT_PROFILES
+                action,
+                {"repos": [], "profiles": self.broker.DEFAULT_PROFILES},
+                self.broker.DEFAULT_PROFILES,
             )
 
     def test_server_job_payload_accepts_managed_job_with_nonmatching_labels(self):
@@ -131,7 +143,14 @@ class BrokerServerModeTests(unittest.TestCase):
                 repositorySlug="ForkHorizon/moodling",
                 labels=["self-hosted", "macOS", "ARM64", "moodling"],
             ),
-            ["self-hosted", "macOS", "ARM64", "ci-scope-broker", "moodling", "deepseek"],
+            [
+                "self-hosted",
+                "macOS",
+                "ARM64",
+                "ci-scope-broker",
+                "moodling",
+                "deepseek",
+            ],
         )
         self.assertEqual(job["labels"], ["self-hosted", "macOS", "ARM64", "moodling"])
 
@@ -167,10 +186,20 @@ class BrokerServerModeTests(unittest.TestCase):
                 lambda path, payload: calls.append((path, payload)) or {"ok": True},
             ),
         ):
-            self.broker.server_post_status({"id": "ForkHorizon/Widget:1001:2002"}, "in_progress")
+            self.broker.server_post_status(
+                {
+                    "id": "ForkHorizon/Widget:1001:2002",
+                    "runnerName": "ci-scope-2002-12345",
+                },
+                "in_progress",
+            )
 
-        self.assertEqual(calls[0][0], "/api/ci/local/actions/ForkHorizon%2FWidget%3A1001%3A2002/status")
+        self.assertEqual(
+            calls[0][0],
+            "/api/ci/local/actions/ForkHorizon%2FWidget%3A1001%3A2002/status",
+        )
         self.assertEqual(calls[0][1]["status"], "in_progress")
+        self.assertEqual(calls[0][1]["runnerName"], "ci-scope-2002-12345")
 
 
 if __name__ == "__main__":

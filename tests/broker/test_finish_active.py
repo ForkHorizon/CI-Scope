@@ -38,9 +38,15 @@ class FinishActiveTests(unittest.TestCase):
     def run_finish_active(self, remote_status):
         status_calls = []
         with (
-            patch.object(self.broker, "job_remote_status", lambda _a: {"status": remote_status, "lastError": None}),
             patch.object(
-                self.broker, "server_post_status", lambda job, status, error=None: status_calls.append(status)
+                self.broker,
+                "job_remote_status",
+                lambda _a: {"status": remote_status, "lastError": None},
+            ),
+            patch.object(
+                self.broker,
+                "server_post_status",
+                lambda job, status, error=None: status_calls.append(status),
             ),
             patch.object(self.broker, "cleanup_runner_by_name", lambda *_: None),
             patch.object(self.broker, "remove_runner_dir", lambda *_: None),

@@ -50,7 +50,14 @@ class DrainTests(unittest.TestCase):
         queue = [dict(BACKEND_QUEUE_JOB)]
 
         def mock_read_state():
-            return {"version": 1, "actives": [], "queue": queue, "repos": [], "retries": {}, "webhook": {}}
+            return {
+                "version": 1,
+                "actives": [],
+                "queue": queue,
+                "repos": [],
+                "retries": {},
+                "webhook": {},
+            }
 
         original_write_state = self.broker.write_state
         original_read_state = self.broker.read_state

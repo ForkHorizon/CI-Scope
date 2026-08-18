@@ -8,6 +8,7 @@ struct ProjectCIPanel: View {
     let liveJobs: [RunnerWorkItem]
     let scripts: [AutomationScript]
     let isBrokerManaged: Bool
+    @ObservedObject var v2Control: V2ClientControlSession
     let removalSnapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
     let onAttachToBroker: () -> Void
     let onRemoveScript: (AutomationScript) -> Void
@@ -85,6 +86,12 @@ struct ProjectCIPanel: View {
                             title: "MacBook runner", value: localRunnerSummary, icon: "desktopcomputer",
                             state: snapshot?.localRunner.state ?? .unknown)
                         brokerAccessRow
+                        if V2ClientFeature.statusAdapterEnabled() {
+                            v2StatusRow
+                        }
+                        if v2Control.isV2ControlVisible {
+                            v2ControlRow
+                        }
                     }
 
                     HStack {
@@ -133,41 +140,6 @@ struct ProjectCIPanel: View {
             }
         }
         .task(id: codeLinterWorkflowPath) { await refreshCodeLinterStatus() }
-    }
-
-    private var brokerAccessRow: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "point.3.filled.connected.trianglepath.dotted")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 18)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("MacBook runner")
-                    .font(.callout.weight(.semibold))
-                    .lineLimit(1)
-                Text(isBrokerManaged ? "Broker managed" : "No MacBook runner access")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer()
-            if isBrokerManaged {
-                StatusDot(state: .online)
-            } else {
-                Button("Attach") {
-                    onAttachToBroker()
-                }
-                .font(.caption.weight(.semibold))
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
     }
 
     var ciSummary: String {
@@ -253,22 +225,6 @@ struct ProjectCIPanel: View {
 
     func openGitHubRepository() {
         NSWorkspace.shared.open(githubURL)
-    }
-}
-
-private struct ProjectLiveWorkSection: View {
-    let items: [RunnerWorkItem]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Label("Running now", systemImage: "waveform.path.ecg")
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
-
-            ForEach(items) { item in
-                LiveWorkCard(item: item, compact: true)
-            }
-        }
     }
 }
 

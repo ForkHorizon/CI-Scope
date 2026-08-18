@@ -85,7 +85,10 @@ class BackendCoreTests(unittest.TestCase):
         self.assertEqual(normalized["repositorySlug"], "ForkHorizon/Widget")
         self.assertEqual(normalized["run"]["id"], 1001)
         self.assertEqual(normalized["job"]["id"], 2002)
-        self.assertEqual(normalized["job"]["labels"], ["self-hosted", "macOS", "ARM64", "ci-scope-broker"])
+        self.assertEqual(
+            normalized["job"]["labels"],
+            ["self-hosted", "macOS", "ARM64", "ci-scope-broker"],
+        )
 
     def test_store_deduplicates_deliveries_and_tracks_queue_transitions(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -148,7 +151,10 @@ class BackendCoreTests(unittest.TestCase):
             self.assertEqual(status["events"]["total"], 3)
             self.assertEqual(status["events"]["latest"]["deliveryId"], "delivery-3")
             self.assertEqual(status["repositories"]["total"], 1)
-            self.assertEqual(status["jobs"]["byStatus"], {"completed": 1, "in_progress": 1, "queued": 1})
+            self.assertEqual(
+                status["jobs"]["byStatus"],
+                {"completed": 1, "in_progress": 1, "queued": 1},
+            )
             self.assertEqual(len(status["jobs"]["queued"]), 1)
             self.assertEqual(len(status["jobs"]["inProgress"]), 1)
 

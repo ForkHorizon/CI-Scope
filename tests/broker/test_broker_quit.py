@@ -18,12 +18,16 @@ def test_shutdown_kills_active_runners_when_quit_marker_present(tmp_path, monkey
     monkeypatch.setattr(broker, "write_state", written.append)
     monkeypatch.setattr(broker, "active_is_running", lambda active: True)
     monkeypatch.setattr(
-        broker, "terminate_active_process", lambda active, reason="": terminated.append((active["id"], reason))
+        broker,
+        "terminate_active_process",
+        lambda active, reason="": terminated.append((active["id"], reason)),
     )
     monkeypatch.setattr(broker, "cleanup_runner_by_name", lambda slug, name: cleaned_up.append(slug))
     monkeypatch.setattr(broker, "remove_runner_dir", removed_dirs.append)
     monkeypatch.setattr(
-        broker, "server_post_status", lambda job, status, error=None: posted.append((job["id"], status))
+        broker,
+        "server_post_status",
+        lambda job, status, error=None: posted.append((job["id"], status)),
     )
 
     with pytest.raises(SystemExit):
@@ -42,7 +46,11 @@ def test_shutdown_leaves_active_runners_alone_without_quit_marker(tmp_path, monk
     terminated = []
 
     monkeypatch.setattr(broker, "QUIT_MARKER_PATH", tmp_path / "quit-requested")
-    monkeypatch.setattr(broker, "terminate_active_process", lambda active, reason="": terminated.append(active))
+    monkeypatch.setattr(
+        broker,
+        "terminate_active_process",
+        lambda active, reason="": terminated.append(active),
+    )
 
     with pytest.raises(SystemExit):
         broker.shutdown()
@@ -79,7 +87,9 @@ def test_shutdown_for_owner_exit_kills_runners_and_boots_self_out(monkeypatch):
     monkeypatch.setattr(broker, "write_state", lambda state: None)
     monkeypatch.setattr(broker, "active_is_running", lambda active: True)
     monkeypatch.setattr(
-        broker, "terminate_active_process", lambda active, reason="": terminated.append((active["id"], reason))
+        broker,
+        "terminate_active_process",
+        lambda active, reason="": terminated.append((active["id"], reason)),
     )
     monkeypatch.setattr(broker, "cleanup_runner_by_name", lambda slug, name: None)
     monkeypatch.setattr(broker, "remove_runner_dir", lambda job_id: None)

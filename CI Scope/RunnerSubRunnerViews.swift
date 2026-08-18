@@ -2,11 +2,10 @@ import SwiftUI
 
 struct RunnerSubRunnerDisclosure: View {
     let subRunners: [RunnerSubRunnerSnapshot]
-    @State private var isExpanded = false
 
     var body: some View {
         if !subRunners.isEmpty {
-            DisclosureGroup(isExpanded: $isExpanded) {
+            DisclosureGroup {
                 VStack(spacing: 7) {
                     ForEach(subRunners) { subRunner in
                         RunnerSubRunnerRow(subRunner: subRunner)

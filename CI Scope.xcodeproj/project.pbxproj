@@ -6,8 +6,24 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		ADD25A823A8144A38444AE1A /* V2ClientXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42D670256517441C9CC91511 /* V2ClientXCTest.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2E77DD09E7AE4E9CAFE22BEB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8EE019262FC70D83008B01AC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8EE0192D2FC70D83008B01AC;
+			remoteInfo = "CI Scope";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		42D670256517441C9CC91511 /* V2ClientXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V2ClientXCTest.swift; sourceTree = "<group>"; };
 		8EE0192E2FC70D83008B01AC /* CI Scope.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CI Scope.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4D581C73F9E4F3DA20E1B6C /* CI ScopeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CI ScopeTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -26,13 +42,29 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9669B1485F1447D28D8B5D2E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		248C4C66F84B4D209809E25A /* CI ScopeTests */ = {
+			isa = PBXGroup;
+			children = (
+				42D670256517441C9CC91511 /* V2ClientXCTest.swift */,
+			);
+			path = "CI ScopeTests";
+			sourceTree = "<group>";
+		};
 		8EE019252FC70D83008B01AC = {
 			isa = PBXGroup;
 			children = (
 				8EE019302FC70D83008B01AC /* CI Scope */,
+				248C4C66F84B4D209809E25A /* CI ScopeTests */,
 				8EE0192F2FC70D83008B01AC /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +73,7 @@
 			isa = PBXGroup;
 			children = (
 				8EE0192E2FC70D83008B01AC /* CI Scope.app */,
+				B4D581C73F9E4F3DA20E1B6C /* CI ScopeTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +81,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		479A11B977714B0CB5C7570F /* CI ScopeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 11EBE69DCC834BA6A11AD57E /* Build configuration list for PBXNativeTarget "CI ScopeTests" */;
+			buildPhases = (
+				56F9260E1554468F8E9650CE /* Sources */,
+				9669B1485F1447D28D8B5D2E /* Frameworks */,
+				56742924300A440FBD0EC46B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8DFF793901FD4CAEBE0F6FA8 /* PBXTargetDependency */,
+			);
+			name = "CI ScopeTests";
+			productName = "CI ScopeTests";
+			productReference = B4D581C73F9E4F3DA20E1B6C /* CI ScopeTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		8EE0192D2FC70D83008B01AC /* CI Scope */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8EE019392FC70D85008B01AC /* Build configuration list for PBXNativeTarget "CI Scope" */;
@@ -80,6 +131,10 @@
 				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
+					479A11B977714B0CB5C7570F = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = 8EE0192D2FC70D83008B01AC;
+					};
 					8EE0192D2FC70D83008B01AC = {
 						CreatedOnToolsVersion = 26.5;
 					};
@@ -100,11 +155,19 @@
 			projectRoot = "";
 			targets = (
 				8EE0192D2FC70D83008B01AC /* CI Scope */,
+				479A11B977714B0CB5C7570F /* CI ScopeTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		56742924300A440FBD0EC46B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8EE0192C2FC70D83008B01AC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +178,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		56F9260E1554468F8E9650CE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ADD25A823A8144A38444AE1A /* V2ClientXCTest.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8EE0192A2FC70D83008B01AC /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -124,7 +195,39 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		8DFF793901FD4CAEBE0F6FA8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8EE0192D2FC70D83008B01AC /* CI Scope */;
+			targetProxy = 2E77DD09E7AE4E9CAFE22BEB /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		7F3126B18EC84E58B80E80CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@loader_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ForkHorizon.CI-ScopeTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CI Scope.app/Contents/MacOS/CI Scope";
+			};
+			name = Release;
+		};
 		8EE019372FC70D85008B01AC /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -272,7 +375,6 @@
 				REGISTER_APP_GROUPS = NO;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -306,16 +408,48 @@
 				REGISTER_APP_GROUPS = NO;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
+		985CBAF5CDC546B78ED49827 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@loader_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ForkHorizon.CI-ScopeTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CI Scope.app/Contents/MacOS/CI Scope";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		11EBE69DCC834BA6A11AD57E /* Build configuration list for PBXNativeTarget "CI ScopeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				985CBAF5CDC546B78ED49827 /* Debug */,
+				7F3126B18EC84E58B80E80CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		8EE019292FC70D83008B01AC /* Build configuration list for PBXProject "CI Scope" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
