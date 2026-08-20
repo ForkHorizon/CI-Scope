@@ -38,7 +38,7 @@ struct ProjectCIService {
         return snapshot
     }
 
-    private func loadV2Status() async -> V2ClientStatusResult? {
+    func loadV2Status() async -> V2ClientStatusResult? {
         guard let adapter = V2ClientStatusAdapter.configured() else { return nil }
         return await adapter.status()
     }
