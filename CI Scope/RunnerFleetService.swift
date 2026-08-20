@@ -33,14 +33,14 @@ struct RunnerFleetService {
 
     private func loadFleetJobs(for projects: [CIProject]) async -> (active: [RunnerWorkItem], queued: [RunnerWorkItem]) {
         guard !projects.isEmpty else { return ([], []) }
-        let workflowService = ProjectCIWorkflowService(config: config)
+        let ciService = ProjectCIService(config: config)
         var active: [RunnerWorkItem] = []
         var queued: [RunnerWorkItem] = []
 
         await withTaskGroup(of: (CIProject, [GitHubRun]).self) { group in
             for project in projects {
                 group.addTask {
-                    let response = await workflowService.loadRuns(for: project)
+                    let response = await ciService.loadRuns(for: project)
                     return (project, response.value ?? [])
                 }
             }

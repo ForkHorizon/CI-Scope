@@ -112,12 +112,12 @@ final class ProjectStore: ObservableObject {
         }
     }
 
-    static func loadConfiguredProjects(from defaults: UserDefaults = .standard) -> [CIProject] {
+    nonisolated static func loadConfiguredProjects(from defaults: UserDefaults = .standard) -> [CIProject] {
         let loaded = loadProjects(from: defaults, key: "ciScope.projects")
         return normalizedProjects(loaded)
     }
 
-    private static func loadProjects(from defaults: UserDefaults, key: String) -> [CIProject] {
+    nonisolated private static func loadProjects(from defaults: UserDefaults, key: String) -> [CIProject] {
         guard
             let data = defaults.data(forKey: key),
             let decoded = try? JSONDecoder().decode([CIProject].self, from: data)
@@ -127,7 +127,7 @@ final class ProjectStore: ObservableObject {
         return decoded
     }
 
-    private static func normalizedProjects(_ projects: [CIProject]) -> [CIProject] {
+    nonisolated private static func normalizedProjects(_ projects: [CIProject]) -> [CIProject] {
         var seen = Set<String>()
         var result: [CIProject] = []
 
