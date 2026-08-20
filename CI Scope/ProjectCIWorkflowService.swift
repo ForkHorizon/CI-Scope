@@ -186,19 +186,12 @@ extension ProjectCIService {
         return result.exitCode == 0 ? result.output : nil
     }
 
-    func loadRuns(for project: CIProject) async -> LoadResponse<[GitHubRun]> {
-        // Prefer the broker's webhook-sourced feed: when it has fresh runs for
-        // this repo, render them with zero GitHub API calls. gh is only a
-        // cold-start / broker-down fallback.
-        let broker = LocalBrokerService(config: config)
-        if let feed = broker.workflowRunsFeed() {
-            let feedRuns = feed.githubRuns(forRepositorySlug: project.repositorySlug)
-            if broker.isManaged(project: project) || !feedRuns.isEmpty {
-                return LoadResponse(value: feedRuns)
+    func loadRuns(for project: CIProject, forceRefresh: Bool = false) async -> LoadResponse<[GitHubRun]> {
+        if !forceRefresh, let cached = ProjectCIResponseCache.shared.cachedRuns(slug: project.repositorySlug, maxAge: 30) {
+            let hasActiveRuns = cached.value?.contains { $0.status == "in_progress" || $0.status == "queued" } ?? false
+            if !hasActiveRuns {
+                return cached
             }
-        }
-        if let cached = ProjectCIResponseCache.shared.cachedRuns(slug: project.repositorySlug, maxAge: 300) {
-            return cached
         }
         if let pause = await GitHubRateLimitGate.shared.activePause() {
             let when = pause.until.formatted(date: .omitted, time: .shortened)

@@ -63,7 +63,7 @@ struct ContentView: View {
         .task {
             settingsStore.startV2Lifecycle()
             runnerFleetViewModel.startLiveUpdates {
-                await refreshSelectedProjectRunnerStatusFromBroker()
+                await refreshSelectedProjectRunnerStatus()
             }
         }
         .onDisappear {

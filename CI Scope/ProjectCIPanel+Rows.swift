@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension ProjectCIPanel {
-    var brokerAccessRow: some View {
+    var runnerAccessRow: some View {
         HStack(spacing: 8) {
             Image(systemName: "point.3.filled.connected.trianglepath.dotted")
                 .font(.system(size: 12, weight: .semibold))
@@ -12,17 +12,17 @@ extension ProjectCIPanel {
                 Text("MacBook runner")
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
-                Text(isBrokerManaged ? "Broker managed" : "No MacBook runner access")
+                Text(isV2Managed ? "V2 Managed" : "No MacBook runner access")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer()
-            if isBrokerManaged {
+            if isV2Managed {
                 StatusDot(state: .online)
             } else {
                 Button("Attach") {
-                    onAttachToBroker()
+                    onAttachToRunner()
                 }
                 .font(.caption.weight(.semibold))
                 .buttonStyle(.bordered)

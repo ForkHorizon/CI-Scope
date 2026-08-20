@@ -80,9 +80,9 @@ struct SettingsView: View {
                 .disabled(isWorking)
 
                 Button {
-                    restartBroker()
+                    restartAgent()
                 } label: {
-                    Label("Install / Restart Broker", systemImage: "arrow.clockwise")
+                    Label("Install / Restart Agent", systemImage: "arrow.clockwise")
                 }
                 .disabled(isWorking)
             }
@@ -236,7 +236,7 @@ struct SettingsView: View {
             }
 
             Text(
-                "Passed to the broker as DEEPSEEK_API_KEY, so JIT runners can call it for ci-gates' advisory slop-review step. Empty means that step just skips itself — it never blocks a merge either way. Restart the broker after changing this."
+                "Passed to the agent as DEEPSEEK_API_KEY, so JIT runners can call it for ci-gates' advisory slop-review step. Empty means that step just skips itself — it never blocks a merge either way. Restart the agent after changing this."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -259,13 +259,13 @@ struct SettingsView: View {
         }
     }
 
-    private func restartBroker() {
+    private func restartAgent() {
         isWorking = true
-        message = "Restarting broker..."
+        message = "Restarting V2 agent..."
         Task {
             do {
-                let path = try await LocalBrokerService(config: DashboardConfig()).installOrUpdateLaunchAgent()
-                message = "Broker installed at \(path)."
+                let path = try await V2AgentLaunchManager(config: DashboardConfig()).installOrUpdateLaunchAgent()
+                message = "V2 Agent installed at \(path)."
             } catch {
                 message = error.localizedDescription
             }

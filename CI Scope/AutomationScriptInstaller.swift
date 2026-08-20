@@ -14,7 +14,7 @@ struct AutomationScriptInstaller {
         variableValues: [String: String],
         mode: AutomationScriptInstallMode
     ) async throws -> AutomationScriptInstallResult {
-        try await prepareBrokerForInstall(script: script, project: project, mode: mode)
+        try await prepareRunnerForInstall(script: script, project: project, mode: mode)
         let defaultBranch = try await defaultBranch(for: project)
         let renderer = AutomationScriptRenderer(
             script: script,
@@ -51,19 +51,15 @@ struct AutomationScriptInstaller {
         return readyResult(script, pullRequestURL: pullRequestURL)
     }
 
-    /// Attach (and create the repo's webhook) before any push or PR: a
-    /// brand-new project's very first PR fires workflow_job:queued the moment
-    /// it opens, and if the webhook doesn't exist yet that event has nowhere
-    /// to go — permanently stuck, unrecoverable (see NexusUnity, 2026-07-04).
-    private func prepareBrokerForInstall(
+    private func prepareRunnerForInstall(
         script: AutomationScript,
         project: CIProject,
         mode: AutomationScriptInstallMode
     ) async throws {
         _ = try await run("NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
-        try await validateBrokerAccessIfNeeded(mode: mode, project: project)
+        try await validateRunnerAccessIfNeeded(mode: mode, project: project)
         try validateRunnerLabelsSatisfiable(mode: mode, script: script, project: project)
-        try await attachBrokerIfNeeded(mode: mode, project: project)
+        try await attachRunnerIfNeeded(mode: mode, project: project)
     }
 
     private func renderAndStageInstall(

@@ -6,7 +6,7 @@ struct ProjectCIService {
     func loadSnapshot(for project: CIProject, forceRefresh: Bool = false) async -> ProjectCISnapshot {
         async let authResult = loadAuthStatus()
         async let workflowsResult = loadWorkflows(for: project, forceRefresh: forceRefresh)
-        async let runsResult = loadRuns(for: project)
+        async let runsResult = loadRuns(for: project, forceRefresh: forceRefresh)
         async let localRunnerResult = loadLocalRunner(for: project)
         async let v2StatusResult = loadV2Status()
 

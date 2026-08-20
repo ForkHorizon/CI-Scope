@@ -1,32 +1,6 @@
 import Foundation
 
-struct BrokerRepoStatus: Identifiable, Codable, Equatable {
-    var slug: String
-    var state: String
-    var queuedCount: Int
-    var lastCheckedAt: String
-    var lastError: String?
-    var profileID: String?
-    var profileTitle: String?
-    var profileScope: String?
-    var labels: [String]?
-
-    var id: String { slug.lowercased() }
-
-    private enum CodingKeys: String, CodingKey {
-        case slug
-        case state
-        case queuedCount
-        case lastCheckedAt
-        case lastError
-        case profileID = "profileId"
-        case profileTitle
-        case profileScope
-        case labels
-    }
-}
-
-struct BrokerJobProgress: Codable, Equatable {
+struct RunnerJobProgress: Codable, Equatable {
     var step: String
     var current: Int?
     var total: Int?
@@ -54,3 +28,5 @@ struct BrokerJobProgress: Codable, Equatable {
             .capitalized
     }
 }
+
+typealias BrokerJobProgress = RunnerJobProgress

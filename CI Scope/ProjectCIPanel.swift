@@ -7,10 +7,10 @@ struct ProjectCIPanel: View {
     let isLoading: Bool
     let liveJobs: [RunnerWorkItem]
     let scripts: [AutomationScript]
-    let isBrokerManaged: Bool
+    let isV2Managed: Bool
     @ObservedObject var v2Control: V2ClientControlSession
     let removalSnapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
-    let onAttachToBroker: () -> Void
+    let onAttachToRunner: () -> Void
     let onRemoveScript: (AutomationScript) -> Void
     @ObservedObject var installViewModel: AutomationScriptInstallViewModel
     @State var codeLinterStatus: CodeLinterWorkflowStatus = .unavailable
@@ -85,7 +85,7 @@ struct ProjectCIPanel: View {
                         LimitedStatusRow(
                             title: "MacBook runner", value: localRunnerSummary, icon: "desktopcomputer",
                             state: snapshot?.localRunner.state ?? .unknown)
-                        brokerAccessRow
+                        runnerAccessRow
                         if V2ClientFeature.statusAdapterEnabled() {
                             v2StatusRow
                         }

@@ -43,7 +43,7 @@ final class CIQueueSettingsStore: ObservableObject {
     @Published var deepSeekAPIKey = "" { didSet { persistSecrets() } }
     @Published var machineID = "" { didSet { persist() } }
     @Published var machineName = "" { didSet { persist() } }
-    @Published var labelsText = "self-hosted, macOS, ARM64, ci-scope-broker" { didSet { persist() } }
+    @Published var labelsText = "self-hosted, macOS, ARM64, ci-scope, ci-scope-v2" { didSet { persist() } }
     @Published var capacity = 1 {
         didSet {
             persist()
@@ -92,7 +92,7 @@ final class CIQueueSettingsStore: ObservableObject {
             deepSeekAPIKey: CIQueueKeychain.read(account: "deepSeekAPIKey") ?? "",
             machineID: machineID,
             machineName: defaults.string(forKey: "ciScope.queue.machineName") ?? fallbackName,
-            labelsText: defaults.string(forKey: "ciScope.queue.labelsText") ?? "self-hosted, macOS, ARM64, ci-scope-broker",
+            labelsText: defaults.string(forKey: "ciScope.queue.labelsText") ?? "self-hosted, macOS, ARM64, ci-scope, ci-scope-v2",
             capacity: max(1, defaults.integer(forKey: "ciScope.queue.capacity"))
         )
     }

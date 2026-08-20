@@ -65,13 +65,13 @@ extension ContentView {
                     isLoading: projectCIViewModel.loadingProjectID == selectedProject.id,
                     liveJobs: liveJobs(for: selectedProject),
                     scripts: scriptStore.scripts,
-                    isBrokerManaged: isBrokerManaged(selectedProject),
+                    isV2Managed: isV2Managed(selectedProject),
                     v2Control: settingsStore.v2Control,
                     removalSnapshot: { script in
                         scriptInstallViewModel.removalSnapshot(for: script, project: selectedProject)
                     },
-                    onAttachToBroker: {
-                        attachToBroker(selectedProject)
+                    onAttachToRunner: {
+                        attachToRunner(selectedProject)
                     },
                     onRemoveScript: { script in
                         scriptInstallViewModel.remove(script: script, project: selectedProject) {
@@ -92,9 +92,34 @@ extension ContentView {
     }
 
     func liveJobs(for project: CIProject) -> [RunnerWorkItem] {
-        runnerFleetViewModel.snapshot.runners
+        var items = runnerFleetViewModel.snapshot.runners
             .flatMap(\.activeJobs)
             .filter { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
+
+        let localActiveIDs = Set(items.map(\.id))
+        if let runs = projectCIViewModel.snapshot(for: project.id)?.runs {
+            for run in runs where run.status == "in_progress" || run.status == "queued" {
+                let idStr = String(run.databaseId)
+                if !localActiveIDs.contains(idStr) {
+                    items.append(
+                        RunnerWorkItem(
+                            id: idStr,
+                            repositorySlug: project.repositorySlug,
+                            workflowName: run.workflowName,
+                            title: run.displayTitle,
+                            jobName: run.workflowName,
+                            headBranch: run.headBranch,
+                            status: run.status,
+                            url: run.url,
+                            assemblerTitle: nil,
+                            assemblerScope: nil,
+                            progress: nil
+                        )
+                    )
+                }
+            }
+        }
+        return items
     }
 
     var header: some View {

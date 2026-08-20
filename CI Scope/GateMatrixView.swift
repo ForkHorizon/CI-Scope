@@ -118,7 +118,7 @@ struct GateMatrixView: View {
             script: script,
             project: project,
             variableValues: defaultValues(for: script),
-            mode: .localBroker
+            mode: .localRunner
         ) {
             onInstalled(project)
             Task { await model.load(projects) }

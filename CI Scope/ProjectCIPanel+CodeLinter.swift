@@ -16,7 +16,7 @@ extension ProjectCIPanel {
                         script: script.workflowOnly,
                         project: project,
                         variableValues: [:],
-                        mode: .localBroker
+                        mode: .localRunner
                     )
                 }
                 .font(.caption.weight(.semibold))

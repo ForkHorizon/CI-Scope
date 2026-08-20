@@ -1,9 +1,17 @@
 import Foundation
 
 extension ProjectCIService {
-    func loadLocalRunner(for project: CIProject, prepareBroker: Bool = true) async -> ProjectLocalRunnerStatus {
-        if LocalBrokerService(config: config).isManaged(project: project) {
-            return await brokerRunnerStatus(for: project, prepareBroker: prepareBroker)
+    func loadLocalRunner(for project: CIProject) async -> ProjectLocalRunnerStatus {
+        if let v2Result = await loadV2Status(), case .available(let projection) = v2Result {
+            let isOnline = projection.processAlive && projection.serverConnected
+            let state: ServiceState = projection.readyToClaim ? .online : (isOnline ? .warning : .offline)
+            let summary = projection.readyToClaim ? "V2 Agent Ready" : (projection.draining ? "V2 Agent Draining" : (projection.processAlive ? "V2 Agent Active" : "V2 Agent Offline"))
+            let detail = projection.state ?? (projection.serverConnected ? "Connected to VPS Control Plane" : "Disconnected from VPS")
+            return ProjectLocalRunnerStatus(
+                state: state,
+                summary: summary,
+                detail: detail
+            )
         }
 
         let localRunners = config.actionsRunners.compactMap(readLocalRunner)
@@ -14,27 +22,6 @@ extension ProjectCIService {
         return await repositoryRunnerStatus(
             for: project,
             localRunners: localRunners
-        )
-    }
-
-    func brokerRunnerStatus(for project: CIProject, prepareBroker: Bool = true) async -> ProjectLocalRunnerStatus {
-        let broker = await LocalBrokerService(config: config).loadRunnerSnapshot(prepareBroker: prepareBroker)
-        let active = broker.activeJobs.first { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
-        let queued = broker.queuedJobs.filter { $0.repositorySlug.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
-        let summary =
-            if active != nil {
-                "Running locally"
-            } else if !queued.isEmpty {
-                "Waiting for broker"
-            } else {
-                "Broker managed"
-            }
-        let detail = active?.title ?? (queued.first?.title ?? "MacBook Runner · \(broker.uptime)")
-
-        return ProjectLocalRunnerStatus(
-            state: broker.state,
-            summary: summary,
-            detail: detail
         )
     }
 
@@ -221,7 +208,7 @@ extension ProjectCIService {
             return false
         }) {
             return
-                "Attach \(project.repositorySlug) to MacBook Runner. Private sub-runner labels: \(LocalBrokerConstants.runnerLabels.joined(separator: ", "))."
+                "Attach \(project.repositorySlug) to MacBook Runner. V2 runner labels: self-hosted, macOS, ARM64, ci-scope, ci-scope-v2."
         }
 
         if let localRunner = localRunners.first {

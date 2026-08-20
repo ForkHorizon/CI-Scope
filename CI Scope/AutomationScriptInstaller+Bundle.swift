@@ -11,11 +11,11 @@ extension AutomationScriptInstaller {
         mode: AutomationScriptInstallMode
     ) async throws -> AutomationScriptInstallResult {
         _ = try await run("NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
-        try await validateBrokerAccessIfNeeded(mode: mode, project: project)
+        try await validateRunnerAccessIfNeeded(mode: mode, project: project)
         for script in scripts {
             try validateRunnerLabelsSatisfiable(mode: mode, script: script, project: project)
         }
-        try await attachBrokerIfNeeded(mode: mode, project: project)
+        try await attachRunnerIfNeeded(mode: mode, project: project)
 
         let defaultBranch = try await defaultBranch(for: project)
         let tempRoot = try temporaryRoot()

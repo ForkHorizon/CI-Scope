@@ -12,7 +12,7 @@ struct ScriptsView: View {
     @State private var originalScriptID: String?
     @State private var selectedProjectID: CIProject.ID?
     @State private var variableValues: [String: String] = [:]
-    @State private var runnerMode: AutomationScriptInstallMode = .localBroker
+    @State private var runnerMode: AutomationScriptInstallMode = .localRunner
     @State private var errorMessage: String?
     @State private var editorSection: ScriptEditorSection = .details
     @State private var expandedScriptID: AutomationScript.ID?

@@ -77,9 +77,9 @@ struct RunnerCard: View {
             }
 
             LazyVGrid(columns: columns, spacing: 8) {
-                RunnerMetric(title: "Broker", value: runner.launchctlState.capitalized, detail: localDetail, state: runner.localState)
+                RunnerMetric(title: "Agent", value: runner.launchctlState.capitalized, detail: localDetail, state: runner.localState)
                 RunnerMetric(
-                    title: "Dispatcher", value: runner.remoteStatus.capitalized, detail: "one job at a time", state: runner.githubState)
+                    title: "Control Plane", value: runner.remoteStatus.capitalized, detail: "VPS connected", state: runner.githubState)
                 RunnerMetric(
                     title: "Running", value: "\(runner.activeJobs.count)", detail: activeSummary,
                     state: runner.activeJobs.isEmpty ? .online : .warning)
@@ -87,7 +87,7 @@ struct RunnerCard: View {
                     title: "Queue", value: "\(runner.queuedJobs.count)", detail: "shared jobs",
                     state: runner.queuedJobs.isEmpty ? .online : .warning
                 )
-                .help("Queued jobs from organization and private sub-runners. Only one job is dispatched at a time.")
+                .help("Queued jobs from the V2 control plane.")
             }
 
             VStack(alignment: .leading, spacing: 7) {

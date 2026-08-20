@@ -103,6 +103,6 @@ struct RecommendedGatesButton: View {
 
     private func install() {
         let chosen = detected.filter { selected.contains($0.id) }
-        installViewModel.installBundle(scripts: chosen, project: project, mode: .localBroker)
+        installViewModel.installBundle(scripts: chosen, project: project, mode: .localRunner)
     }
 }
