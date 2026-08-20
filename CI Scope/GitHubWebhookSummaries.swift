@@ -1,9 +1,9 @@
 import Foundation
 
 struct GitHubWebhookSummary: Decodable {
-    let config: GitHubWebhookConfigSummary
+  let config: GitHubWebhookConfigSummary
 }
 
 struct GitHubWebhookConfigSummary: Decodable {
-    let url: String?
+  let url: String?
 }
