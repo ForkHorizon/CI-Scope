@@ -9,18 +9,67 @@ struct RunnerFleetService {
         self.launchManager = V2AgentLaunchManager(config: config)
     }
 
-    func loadSnapshot() async -> RunnerFleetSnapshot {
+    func loadSnapshot(projects: [CIProject]? = nil) async -> RunnerFleetSnapshot {
         let launch = await launchManager.launchStatus()
         let v2Adapter = V2ClientStatusAdapter.configured()
         let v2Result = await v2Adapter?.status()
 
-        let runner = runnerSnapshot(launch: launch, v2Result: v2Result)
+        let projectList = (projects?.isEmpty == false ? projects : nil) ?? ProjectStore.loadConfiguredProjects()
+        let (activeJobs, queuedJobs) = await loadFleetJobs(for: projectList)
+
+        var runner = runnerSnapshot(launch: launch, v2Result: v2Result)
+        runner.activeJobs = activeJobs
+        runner.queuedJobs = queuedJobs
+        if !activeJobs.isEmpty {
+            runner.isBusy = true
+        }
 
         return RunnerFleetSnapshot(
             runners: [runner],
             refreshedAt: Date(),
             errors: [runner.error].compactMap { $0 }
         )
+    }
+
+    private func loadFleetJobs(for projects: [CIProject]) async -> (active: [RunnerWorkItem], queued: [RunnerWorkItem]) {
+        guard !projects.isEmpty else { return ([], []) }
+        let workflowService = ProjectCIWorkflowService(config: config)
+        var active: [RunnerWorkItem] = []
+        var queued: [RunnerWorkItem] = []
+
+        await withTaskGroup(of: (CIProject, [GitHubRun]).self) { group in
+            for project in projects {
+                group.addTask {
+                    let response = await workflowService.loadRuns(for: project)
+                    return (project, response.value ?? [])
+                }
+            }
+
+            for await (project, runs) in group {
+                for run in runs {
+                    let item = RunnerWorkItem(
+                        id: String(run.databaseId),
+                        repositorySlug: project.repositorySlug,
+                        workflowName: run.workflowName,
+                        title: run.displayTitle,
+                        jobName: run.workflowName,
+                        headBranch: run.headBranch,
+                        status: run.status,
+                        url: run.url,
+                        assemblerTitle: nil,
+                        assemblerScope: nil,
+                        progress: nil
+                    )
+                    if run.status == "in_progress" {
+                        active.append(item)
+                    } else if run.status == "queued" {
+                        queued.append(item)
+                    }
+                }
+            }
+        }
+
+        return (active, queued)
     }
 
     private func runnerSnapshot(

@@ -112,6 +112,11 @@ final class ProjectStore: ObservableObject {
         }
     }
 
+    static func loadConfiguredProjects(from defaults: UserDefaults = .standard) -> [CIProject] {
+        let loaded = loadProjects(from: defaults, key: "ciScope.projects")
+        return normalizedProjects(loaded)
+    }
+
     private static func loadProjects(from defaults: UserDefaults, key: String) -> [CIProject] {
         guard
             let data = defaults.data(forKey: key),

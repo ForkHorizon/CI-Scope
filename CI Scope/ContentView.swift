@@ -57,12 +57,13 @@ struct ContentView: View {
         }
         .task(id: workspaceTab) {
             if workspaceTab == .runners {
-                await runnerFleetViewModel.load()
+                await runnerFleetViewModel.load(projects: projectStore.projects)
             }
         }
         .task {
             settingsStore.startV2Lifecycle()
             runnerFleetViewModel.startLiveUpdates {
+                await runnerFleetViewModel.load(projects: projectStore.projects)
                 await refreshSelectedProjectRunnerStatus()
             }
         }
@@ -75,8 +76,7 @@ struct ContentView: View {
                 try projectStore.addProject(from: input)
             }
         }
-        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
-            guard workspaceTab != .runners else { return }
+        .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in
             Task { @MainActor in
                 // Fallback poll only: skip entirely while GitHub is rate-limited
                 // so we never pile requests onto an exhausted quota.

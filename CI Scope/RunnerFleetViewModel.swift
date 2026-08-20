@@ -19,13 +19,13 @@ final class RunnerFleetViewModel: ObservableObject {
         self.service = RunnerFleetService(config: config)
     }
 
-    func load() async {
+    func load(projects: [CIProject]? = nil) async {
         isLoading = true
         let generation = loadGeneration + 1
         loadGeneration = generation
         let signatureAtStart = lastAppliedSignature
 
-        let nextSnapshot = await service.loadSnapshot()
+        let nextSnapshot = await service.loadSnapshot(projects: projects)
         guard loadGeneration == generation else { return }
 
         if lastAppliedSignature == signatureAtStart {

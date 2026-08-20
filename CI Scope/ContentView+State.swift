@@ -148,7 +148,7 @@ extension ContentView {
     func attachToRunner(_ project: CIProject) {
         Task {
             await projectCIViewModel.load(project, forceRefresh: true)
-            await runnerFleetViewModel.load()
+            await runnerFleetViewModel.load(projects: projectStore.projects)
         }
     }
 
@@ -158,7 +158,7 @@ extension ContentView {
             refreshSelectedProject(clearCompletedScriptOperations: true)
         case .runners:
             Task {
-                await runnerFleetViewModel.load()
+                await runnerFleetViewModel.load(projects: projectStore.projects)
             }
         case .scripts, .coverage:
             break

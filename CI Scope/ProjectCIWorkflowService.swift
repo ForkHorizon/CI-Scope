@@ -187,11 +187,8 @@ extension ProjectCIService {
     }
 
     func loadRuns(for project: CIProject, forceRefresh: Bool = false) async -> LoadResponse<[GitHubRun]> {
-        if !forceRefresh, let cached = ProjectCIResponseCache.shared.cachedRuns(slug: project.repositorySlug, maxAge: 30) {
-            let hasActiveRuns = cached.value?.contains { $0.status == "in_progress" || $0.status == "queued" } ?? false
-            if !hasActiveRuns {
-                return cached
-            }
+        if !forceRefresh, let cached = ProjectCIResponseCache.shared.cachedRuns(slug: project.repositorySlug, maxAge: 10) {
+            return cached
         }
         if let pause = await GitHubRateLimitGate.shared.activePause() {
             let when = pause.until.formatted(date: .omitted, time: .shortened)
