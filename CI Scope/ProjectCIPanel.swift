@@ -7,10 +7,10 @@ struct ProjectCIPanel: View {
     let isLoading: Bool
     let liveJobs: [RunnerWorkItem]
     let scripts: [AutomationScript]
-    let isBrokerManaged: Bool
+    let isV2Managed: Bool
     @ObservedObject var v2Control: V2ClientControlSession
     let removalSnapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
-    let onAttachToBroker: () -> Void
+    let onAttachToRunner: () -> Void
     let onRemoveScript: (AutomationScript) -> Void
     @ObservedObject var installViewModel: AutomationScriptInstallViewModel
     @State var codeLinterStatus: CodeLinterWorkflowStatus = .unavailable
@@ -79,13 +79,15 @@ struct ProjectCIPanel: View {
                     }
 
                     LazyVGrid(columns: projectInfoColumns, spacing: 8) {
-                        LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
                         LimitedStatusRow(
-                            title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
+                            title: "Repository", value: project.remoteURL, icon: "link", state: .online)
+                        LimitedStatusRow(
+                            title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal",
+                            state: snapshot?.state ?? .unknown)
                         LimitedStatusRow(
                             title: "MacBook runner", value: localRunnerSummary, icon: "desktopcomputer",
                             state: snapshot?.localRunner.state ?? .unknown)
-                        brokerAccessRow
+                        runnerAccessRow
                         if V2ClientFeature.statusAdapterEnabled() {
                             v2StatusRow
                         }
@@ -132,7 +134,9 @@ struct ProjectCIPanel: View {
                         ProjectRunList(runs: snapshot.runs)
                     }
 
-                    if snapshot?.error == nil, snapshot?.workflows.isEmpty != false, snapshot?.runs.isEmpty != false, !isLoading {
+                    if snapshot?.error == nil, snapshot?.workflows.isEmpty != false,
+                        snapshot?.runs.isEmpty != false, !isLoading
+                    {
                         EmptyState(icon: "icloud.slash", text: "No actions available")
                     }
                 }
@@ -172,7 +176,9 @@ struct ProjectCIPanel: View {
                 result.append(match)
                 return
             }
-            if let existingIndex = result.firstIndex(where: { $0.workflow.path?.normalizedWorkflowPath == workflowPath }) {
+            if let existingIndex = result.firstIndex(where: {
+                $0.workflow.path?.normalizedWorkflowPath == workflowPath
+            }) {
                 if match.workflow.name == match.script.title {
                     result[existingIndex] = match
                 }
@@ -228,8 +234,8 @@ struct ProjectCIPanel: View {
     }
 }
 
-private extension String {
-    var normalizedWorkflowPath: String {
+extension String {
+    fileprivate var normalizedWorkflowPath: String {
         trimmed
             .replacingOccurrences(of: "\\", with: "/")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))

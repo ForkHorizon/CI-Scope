@@ -125,7 +125,9 @@ extension ProjectCIService {
     func firstMatch(in text: String, pattern: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        guard let match = regex.firstMatch(in: text, range: range), match.numberOfRanges > 1 else { return nil }
+        guard let match = regex.firstMatch(in: text, range: range), match.numberOfRanges > 1 else {
+            return nil
+        }
         guard let valueRange = Range(match.range(at: 1), in: text) else { return nil }
         return String(text[valueRange])
     }

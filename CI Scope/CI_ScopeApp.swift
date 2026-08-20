@@ -28,7 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 context: ["callStack": exception.callStackSymbols.joined(separator: "\n")]
             )
         }
-        AppLogger.shared.info("app.launch", "CI Scope launched", context: ["pid": ProcessInfo.processInfo.processIdentifier])
+        AppLogger.shared.info(
+            "app.launch", "CI Scope launched", context: ["pid": ProcessInfo.processInfo.processIdentifier]
+        )
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

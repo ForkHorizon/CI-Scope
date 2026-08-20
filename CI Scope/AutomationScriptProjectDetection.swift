@@ -92,8 +92,8 @@ extension AutomationScript {
     }
 }
 
-private extension String {
-    var normalizedRepositoryPath: String {
+extension String {
+    fileprivate var normalizedRepositoryPath: String {
         trimmed
             .replacingOccurrences(of: "\\", with: "/")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))

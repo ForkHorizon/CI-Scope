@@ -57,7 +57,9 @@ nonisolated struct V2ClientResponseEnvelope<Payload: Codable & Sendable>: Codabl
         }
     }
 
-    func validateAgainst<RequestPayload: Codable>(request: V2ClientRequestEnvelope<RequestPayload>) throws {
+    func validateAgainst<RequestPayload: Codable>(request: V2ClientRequestEnvelope<RequestPayload>)
+        throws
+    {
         guard protocolVersion == request.protocolVersion, protocolVersion == 2,
             request.session == session,
             request.fencing.sessionEpoch == fencing.sessionEpoch,

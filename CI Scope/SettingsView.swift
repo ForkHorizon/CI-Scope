@@ -80,9 +80,9 @@ struct SettingsView: View {
                 .disabled(isWorking)
 
                 Button {
-                    restartBroker()
+                    restartAgent()
                 } label: {
-                    Label("Install / Restart Broker", systemImage: "arrow.clockwise")
+                    Label("Install / Restart Agent", systemImage: "arrow.clockwise")
                 }
                 .disabled(isWorking)
             }
@@ -111,17 +111,20 @@ struct SettingsView: View {
                     Button("Renew") {
                         runV2 { await store.renewV2Lease() }
                     }
-                    .disabled(v2Control.isWorking || !v2Control.hasActiveLease || !v2Control.hasLiveAgentSession)
+                    .disabled(
+                        v2Control.isWorking || !v2Control.hasActiveLease || !v2Control.hasLiveAgentSession)
 
                     Button("Resume") {
                         runV2 { await store.resumeV2() }
                     }
-                    .disabled(v2Control.isWorking || !v2Control.hasActiveLease || !v2Control.hasLiveAgentSession)
+                    .disabled(
+                        v2Control.isWorking || !v2Control.hasActiveLease || !v2Control.hasLiveAgentSession)
 
                     Button("Drain") {
                         runV2 { await store.drainV2() }
                     }
-                    .disabled(v2Control.isWorking || !v2Control.hasActiveLease || !v2Control.hasLiveAgentSession)
+                    .disabled(
+                        v2Control.isWorking || !v2Control.hasActiveLease || !v2Control.hasLiveAgentSession)
 
                     Button("Emergency stop", role: .destructive) {
                         confirmEmergencyStop = true
@@ -177,9 +180,12 @@ struct SettingsView: View {
             Label("GitHub Intake", systemImage: "arrow.down.forward.circle")
                 .font(.callout.weight(.semibold))
 
-            Text(store.snapshot.webhookURL.isEmpty ? "Set a server URL to get the webhook endpoint." : store.snapshot.webhookURL)
-                .font(.caption.monospaced())
-                .textSelection(.enabled)
+            Text(
+                store.snapshot.webhookURL.isEmpty
+                    ? "Set a server URL to get the webhook endpoint." : store.snapshot.webhookURL
+            )
+            .font(.caption.monospaced())
+            .textSelection(.enabled)
 
             Text("Events: workflow_job")
                 .font(.caption)
@@ -190,8 +196,10 @@ struct SettingsView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 92, alignment: .leading)
-                SecureField("Must match CI_SCOPE_GITHUB_WEBHOOK_SECRET on the Worker", text: $store.webhookSecret)
-                    .textFieldStyle(.roundedBorder)
+                SecureField(
+                    "Must match CI_SCOPE_GITHUB_WEBHOOK_SECRET on the Worker", text: $store.webhookSecret
+                )
+                .textFieldStyle(.roundedBorder)
             }
 
             Text("Attaching a project auto-creates its repo webhook (if missing) using this secret.")
@@ -236,7 +244,7 @@ struct SettingsView: View {
             }
 
             Text(
-                "Passed to the broker as DEEPSEEK_API_KEY, so JIT runners can call it for ci-gates' advisory slop-review step. Empty means that step just skips itself — it never blocks a merge either way. Restart the broker after changing this."
+                "Passed to the agent as DEEPSEEK_API_KEY, so JIT runners can call it for ci-gates' advisory slop-review step. Empty means that step just skips itself — it never blocks a merge either way. Restart the agent after changing this."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -259,13 +267,14 @@ struct SettingsView: View {
         }
     }
 
-    private func restartBroker() {
+    private func restartAgent() {
         isWorking = true
-        message = "Restarting broker..."
+        message = "Restarting V2 agent..."
         Task {
             do {
-                let path = try await LocalBrokerService(config: DashboardConfig()).installOrUpdateLaunchAgent()
-                message = "Broker installed at \(path)."
+                let path = try await V2AgentLaunchManager(config: DashboardConfig())
+                    .installOrUpdateLaunchAgent()
+                message = "V2 Agent installed at \(path)."
             } catch {
                 message = error.localizedDescription
             }

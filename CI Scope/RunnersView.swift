@@ -67,7 +67,9 @@ private struct RunnerFleetSummary: View {
                 icon: "tray.full",
                 state: snapshot.queuedJobCount > 0 ? .warning : .online
             )
-            .help("Unified queued workflow jobs from all sub-runners. The broker dispatches one job at a time.")
+            .help(
+                "Unified queued workflow jobs from the V2 control plane. The Agent dispatches jobs to runner instances."
+            )
             RunnerSummaryTile(
                 title: "Sub-runners",
                 value: "\(snapshot.subRunnerCount)",

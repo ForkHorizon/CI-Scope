@@ -4,8 +4,11 @@ extension ProjectCIPanel {
     @ViewBuilder
     func codeLinterStatusRow(script: AutomationScript, workflow: GitHubWorkflow) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: codeLinterStatus == .latest ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundStyle(codeLinterStatus == .latest ? .green : .orange)
+            Image(
+                systemName: codeLinterStatus == .latest
+                    ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(codeLinterStatus == .latest ? .green : .orange)
             Text("Code Linter: \(codeLinterStatus.title)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -16,13 +19,14 @@ extension ProjectCIPanel {
                         script: script.workflowOnly,
                         project: project,
                         variableValues: [:],
-                        mode: .localBroker
+                        mode: .localRunner
                     )
                 }
                 .font(.caption.weight(.semibold))
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help("Creates a PR that updates only \(workflow.path ?? "the Code Linter workflow") to @main.")
+                .help(
+                    "Creates a PR that updates only \(workflow.path ?? "the Code Linter workflow") to @main.")
             }
         }
         .padding(.horizontal, 8)
@@ -45,6 +49,7 @@ extension ProjectCIPanel {
             return
         }
         let service = ProjectCIService(config: DashboardConfig())
-        codeLinterStatus = script.codeLinterStatus(workflowSource: await service.workflowSource(for: project, path: path))
+        codeLinterStatus = script.codeLinterStatus(
+            workflowSource: await service.workflowSource(for: project, path: path))
     }
 }

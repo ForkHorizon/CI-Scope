@@ -86,7 +86,8 @@ nonisolated struct V2ClientStatusProjection: Codable, Equatable, Sendable {
         state = try container.decodeIfPresent(String.self, forKey: .state)
         localEpoch = try container.decodeIfPresent(Int64.self, forKey: .localEpoch)
         serverSessionEpoch = try container.decodeIfPresent(Int64.self, forKey: .serverSessionEpoch)
-        controlLeaseExpiresAt = try container.decodeIfPresent(Int64.self, forKey: .controlLeaseExpiresAt)
+        controlLeaseExpiresAt = try container.decodeIfPresent(
+            Int64.self, forKey: .controlLeaseExpiresAt)
         _ = try container.decodeIfPresent(Bool.self, forKey: .readyToClaim)
     }
 

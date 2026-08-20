@@ -12,7 +12,7 @@ struct ScriptsView: View {
     @State private var originalScriptID: String?
     @State private var selectedProjectID: CIProject.ID?
     @State private var variableValues: [String: String] = [:]
-    @State private var runnerMode: AutomationScriptInstallMode = .localBroker
+    @State private var runnerMode: AutomationScriptInstallMode = .localRunner
     @State private var errorMessage: String?
     @State private var editorSection: ScriptEditorSection = .details
     @State private var expandedScriptID: AutomationScript.ID?
@@ -222,7 +222,10 @@ struct ScriptsView: View {
         do {
             let savedScript = try store.save(draft, replacing: originalScriptID)
             let project = projects.first { $0.id == selectedProjectID }
-            installer.install(script: savedScript, project: project, variableValues: installValues(for: savedScript), mode: runnerMode) {
+            installer.install(
+                script: savedScript, project: project, variableValues: installValues(for: savedScript),
+                mode: runnerMode
+            ) {
                 if let project {
                     onInstallSuccess(project)
                 }
@@ -241,7 +244,9 @@ struct ScriptsView: View {
 
     private func installValues(for script: AutomationScript) -> [String: String] {
         var result = defaultValues(for: script)
-        variableValues.forEach { result[$0.key] = $0.value }
+        for (key, value) in variableValues {
+            result[key] = value
+        }
         return result
     }
 }

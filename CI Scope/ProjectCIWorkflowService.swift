@@ -78,7 +78,8 @@ extension ProjectCIService {
         }
         let command = "NO_COLOR=1 gh auth status -h github.com"
         let result = await ShellClient.run(command, timeout: 10, config: config)
-        let detail = sanitizeAuthOutput(trimmedError(result.output, fallback: "GitHub CLI auth status is unavailable."))
+        let detail = sanitizeAuthOutput(
+            trimmedError(result.output, fallback: "GitHub CLI auth status is unavailable."))
         let account = accountName(from: detail)
 
         if result.exitCode == 0 {
@@ -102,12 +103,18 @@ extension ProjectCIService {
         return snapshot
     }
 
-    func loadWorkflows(for project: CIProject, forceRefresh: Bool = false) async -> LoadResponse<[GitHubWorkflow]> {
-        if !forceRefresh, let cached = ProjectCIResponseCache.shared.cachedWorkflows(slug: project.repositorySlug, maxAge: 900) {
+    func loadWorkflows(for project: CIProject, forceRefresh: Bool = false) async -> LoadResponse<
+        [GitHubWorkflow]
+    > {
+        if !forceRefresh,
+            let cached = ProjectCIResponseCache.shared.cachedWorkflows(
+                slug: project.repositorySlug, maxAge: 900)
+        {
             return cached
         }
         if await GitHubRateLimitGate.shared.isPaused() {
-            let response = await loadWorkflowFilesViaGit(for: project, apiError: "GitHub rate limit reached.")
+            let response = await loadWorkflowFilesViaGit(
+                for: project, apiError: "GitHub rate limit reached.")
             ProjectCIResponseCache.shared.storeWorkflows(response, slug: project.repositorySlug)
             return response
         }
@@ -138,7 +145,8 @@ extension ProjectCIService {
         }
 
         do {
-            let response = LoadResponse(value: try JSONDecoder().decode([GitHubWorkflow].self, from: data))
+            let response = LoadResponse(
+                value: try JSONDecoder().decode([GitHubWorkflow].self, from: data))
             ProjectCIResponseCache.shared.storeWorkflows(response, slug: project.repositorySlug)
             return response
         } catch {
@@ -148,7 +156,9 @@ extension ProjectCIService {
         }
     }
 
-    func loadWorkflowFilesViaGit(for project: CIProject, apiError: String) async -> LoadResponse<[GitHubWorkflow]> {
+    func loadWorkflowFilesViaGit(for project: CIProject, apiError: String) async -> LoadResponse<
+        [GitHubWorkflow]
+    > {
         let command = """
             tmp=$(mktemp -d)
             cleanup() { rm -rf "$tmp"; }
@@ -181,23 +191,19 @@ extension ProjectCIService {
     }
 
     func workflowSource(for project: CIProject, path: String) async -> String? {
-        let command = "set -o pipefail; gh api \(quoted("repos/\(project.repositorySlug)/contents/\(path)")) --jq .content | base64 -D"
+        let command =
+            "set -o pipefail; gh api \(quoted("repos/\(project.repositorySlug)/contents/\(path)")) --jq .content | base64 -D"
         let result = await ShellClient.run(command, timeout: 15, config: config)
         return result.exitCode == 0 ? result.output : nil
     }
 
-    func loadRuns(for project: CIProject) async -> LoadResponse<[GitHubRun]> {
-        // Prefer the broker's webhook-sourced feed: when it has fresh runs for
-        // this repo, render them with zero GitHub API calls. gh is only a
-        // cold-start / broker-down fallback.
-        let broker = LocalBrokerService(config: config)
-        if let feed = broker.workflowRunsFeed() {
-            let feedRuns = feed.githubRuns(forRepositorySlug: project.repositorySlug)
-            if broker.isManaged(project: project) || !feedRuns.isEmpty {
-                return LoadResponse(value: feedRuns)
-            }
-        }
-        if let cached = ProjectCIResponseCache.shared.cachedRuns(slug: project.repositorySlug, maxAge: 300) {
+    func loadRuns(for project: CIProject, forceRefresh: Bool = false) async -> LoadResponse<
+        [GitHubRun]
+    > {
+        if !forceRefresh,
+            let cached = ProjectCIResponseCache.shared.cachedRuns(
+                slug: project.repositorySlug, maxAge: 10)
+        {
             return cached
         }
         if let pause = await GitHubRateLimitGate.shared.activePause() {
@@ -210,7 +216,8 @@ extension ProjectCIService {
         let result = await ShellClient.run(command, timeout: 15, config: config)
         await GitHubRateLimitGate.shared.note(result: result, config: config)
         guard result.exitCode == 0, let data = result.output.data(using: .utf8) else {
-            let response = LoadResponse<[GitHubRun]>(error: trimmedError(result.output, fallback: "Failed to load workflow runs."))
+            let response = LoadResponse<[GitHubRun]>(
+                error: trimmedError(result.output, fallback: "Failed to load workflow runs."))
             ProjectCIResponseCache.shared.storeRuns(response, slug: project.repositorySlug)
             return response
         }

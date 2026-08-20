@@ -66,7 +66,10 @@ final class AppLogger {
         log(.crash, event: event, message, context: context, synchronous: true)
     }
 
-    private func log(_ level: LogLevel, event: String, _ message: String, context: [String: Any], synchronous: Bool = false) {
+    private func log(
+        _ level: LogLevel, event: String, _ message: String, context: [String: Any],
+        synchronous: Bool = false
+    ) {
         osLogger.log(level: level.osType, "\(event, privacy: .public): \(message, privacy: .public)")
 
         let work = { [self] in
@@ -109,7 +112,8 @@ final class AppLogger {
 
     private func rotateIfNeeded(_ url: URL) {
         let fm = FileManager.default
-        guard let size = try? fm.attributesOfItem(atPath: url.path)[.size] as? UInt64, size > maxBytes else { return }
+        guard let size = try? fm.attributesOfItem(atPath: url.path)[.size] as? UInt64, size > maxBytes
+        else { return }
         let base = url.deletingPathExtension().path
         let ext = url.pathExtension
         try? fm.removeItem(atPath: "\(base).\(maxBackups).\(ext)")

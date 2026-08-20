@@ -12,7 +12,8 @@ extension V2ClientControlSession {
             return
         }
         guard Self.canAcquire(status: statusProjection, agentIsLive: isAgentLive) else {
-            lastError = "V2 Agent must be live, connected, healthy, and not draining before authority can be acquired."
+            lastError =
+                "V2 Agent must be live, connected, healthy, and not draining before authority can be acquired."
             return
         }
         isWorking = true

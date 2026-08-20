@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 final class V2ClientUnixSocketTransport: @unchecked Sendable {
     typealias PeerUIDValidationHook = (UInt32) -> Bool
@@ -30,13 +30,16 @@ final class V2ClientUnixSocketTransport: @unchecked Sendable {
         )
 
         let descriptor = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
-        guard descriptor >= 0 else { throw V2ClientBridgeError.socketFailure("Could not create Unix socket") }
+        guard descriptor >= 0 else {
+            throw V2ClientBridgeError.socketFailure("Could not create Unix socket")
+        }
         defer { close(descriptor) }
         try configureTimeouts(descriptor)
         try connect(descriptor)
         try validatePeer(descriptor)
 
-        let requestFrame = try V2ClientWireCodec.encodeFrame(request, maximumBytes: configuration.maximumFrameBytes)
+        let requestFrame = try V2ClientWireCodec.encodeFrame(
+            request, maximumBytes: configuration.maximumFrameBytes)
         try writeAll(requestFrame, to: descriptor)
         let responseFrame = try readFrame(from: descriptor)
         let response = try V2ClientWireCodec.decodeFrame(
@@ -109,7 +112,9 @@ final class V2ClientUnixSocketTransport: @unchecked Sendable {
                 Darwin.connect(descriptor, $0, addressLength)
             }
         }
-        guard result == 0 else { throw V2ClientBridgeError.socketFailure("Could not connect to Agent Unix socket") }
+        guard result == 0 else {
+            throw V2ClientBridgeError.socketFailure("Could not connect to Agent Unix socket")
+        }
     }
 
     private func validatePeer(_ descriptor: Int32) throws {
@@ -149,7 +154,9 @@ final class V2ClientUnixSocketTransport: @unchecked Sendable {
             let result = withUnsafeMutableBytes(of: &byte) { rawBuffer in
                 Darwin.recv(descriptor, rawBuffer.baseAddress!, 1, 0)
             }
-            guard result > 0 else { throw V2ClientBridgeError.socketFailure("Could not read Agent response") }
+            guard result > 0 else {
+                throw V2ClientBridgeError.socketFailure("Could not read Agent response")
+            }
             frame.append(byte)
             if byte == 0x0A { return frame }
         }

@@ -1,23 +1,23 @@
 import Foundation
 
 enum AutomationScriptInstallMode: String, CaseIterable, Identifiable {
-    case localBroker
+    case localRunner
     case githubHosted
 
-    static let allCases: [AutomationScriptInstallMode] = [.localBroker]
+    static let allCases: [AutomationScriptInstallMode] = [.localRunner]
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .localBroker: "MacBook Runner"
+        case .localRunner: "MacBook Runner"
         case .githubHosted: "GitHub hosted"
         }
     }
 
     func detail(for script: AutomationScript?) -> String {
         switch self {
-        case .localBroker: "Runs jobs on this Mac through the serial broker."
+        case .localRunner: "Runs jobs on this Mac through the V2 Agent."
         case .githubHosted:
             if script?.requiresMacGitHubHostedRunner == true {
                 "Uses GitHub-hosted macOS runners for Swift/Xcode scripts."
@@ -29,15 +29,15 @@ enum AutomationScriptInstallMode: String, CaseIterable, Identifiable {
 
     func runnerLabels(for script: AutomationScript?) -> [String] {
         switch self {
-        case .localBroker: LocalBrokerConstants.runnerLabels
+        case .localRunner: ["self-hosted", "macOS", "ARM64", "ci-scope", "ci-scope-v2"]
         case .githubHosted:
             script?.requiresMacGitHubHostedRunner == true ? ["macos-latest"] : ["ubuntu-latest"]
         }
     }
 }
 
-private extension AutomationScript {
-    var requiresMacGitHubHostedRunner: Bool {
+extension AutomationScript {
+    fileprivate var requiresMacGitHubHostedRunner: Bool {
         defaultSeedID == "swift-quality-gate" || id == "swift-quality-gate"
     }
 }

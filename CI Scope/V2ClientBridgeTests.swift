@@ -36,7 +36,8 @@
             XCTAssertEqual(request.requestId, "request-1")
             XCTAssertEqual(request.payloadHash, first)
 
-            var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
+            var object = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
             object["payload"] = ["a": "tampered", "z": 2]
             let tampered = try JSONSerialization.data(withJSONObject: object)
             let decoded = try JSONDecoder().decode(V2ClientRequestEnvelope<Payload>.self, from: tampered)
@@ -129,13 +130,15 @@
             let data = try V2ClientPayloadHasher.canonicalData(projection)
             let decoded = try JSONDecoder().decode(V2ClientStatusProjection.self, from: data)
             XCTAssertEqual(decoded, projection)
-            XCTAssertEqual(try V2ClientPayloadHasher.sha256(decoded), try V2ClientPayloadHasher.sha256(projection))
+            XCTAssertEqual(
+                try V2ClientPayloadHasher.sha256(decoded), try V2ClientPayloadHasher.sha256(projection))
         }
 
         func testLeaseMachineDrainsAndExpiresWithoutStoppingRunner() throws {
             let now = Date(timeIntervalSince1970: 100)
             var machine = V2ClientControlLeaseMachine()
-            try machine.apply(.acquired(controlToken: "token", expiresAt: now.addingTimeInterval(30)), now: now)
+            try machine.apply(
+                .acquired(controlToken: "token", expiresAt: now.addingTimeInterval(30)), now: now)
             XCTAssertTrue(machine.state.canClaim(at: now))
 
             try machine.apply(
@@ -164,9 +167,11 @@
             let value = Payload(z: 1, a: "x")
             let frame = try V2ClientWireCodec.encodeFrame(value, maximumBytes: 100)
             XCTAssertEqual(frame.last, 0x0A)
-            XCTAssertEqual(try V2ClientWireCodec.decodeFrame(frame, as: Payload.self, maximumBytes: 100), value)
+            XCTAssertEqual(
+                try V2ClientWireCodec.decodeFrame(frame, as: Payload.self, maximumBytes: 100), value)
             XCTAssertThrowsError(try V2ClientWireCodec.encodeFrame(value, maximumBytes: 2))
-            XCTAssertThrowsError(try V2ClientWireCodec.decodeFrame(Data("{}".utf8), as: Payload.self, maximumBytes: 100))
+            XCTAssertThrowsError(
+                try V2ClientWireCodec.decodeFrame(Data("{}".utf8), as: Payload.self, maximumBytes: 100))
         }
     }
 #endif

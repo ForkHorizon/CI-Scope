@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 /// The gate definitions the app offers.
 ///
@@ -90,9 +90,11 @@ final class AutomationScriptStore: ObservableObject {
     }
 
     private func userScripts() -> [AutomationScript] {
-        let contents = try? FileManager.default.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil)
+        let contents = try? FileManager.default.contentsOfDirectory(
+            at: directoryURL, includingPropertiesForKeys: nil)
         return (contents ?? []).compactMap { url in
-            guard url.pathExtension == "json", url.lastPathComponent != Self.deletedDefaultsFileName else { return nil }
+            guard url.pathExtension == "json", url.lastPathComponent != Self.deletedDefaultsFileName
+            else { return nil }
             guard let data = try? Data(contentsOf: url) else { return nil }
             return try? decoder.decode(AutomationScript.self, from: data)
         }
@@ -111,13 +113,17 @@ final class AutomationScriptStore: ObservableObject {
     }
 
     private func seedID(for script: AutomationScript) -> String? {
-        if let seedID = script.defaultSeedID, AutomationScriptSeedProvider.defaultSeedIDs.contains(seedID) {
+        if let seedID = script.defaultSeedID,
+            AutomationScriptSeedProvider.defaultSeedIDs.contains(seedID)
+        {
             return seedID
         }
         return AutomationScriptSeedProvider.defaultSeedIDs.contains(script.id) ? script.id : nil
     }
 
-    private func normalizedForSave(_ script: AutomationScript, replacing oldID: String?) -> AutomationScript {
+    private func normalizedForSave(_ script: AutomationScript, replacing oldID: String?)
+        -> AutomationScript
+    {
         var storedScript = script
         storedScript.id = storedScript.id.trimmed
         storedScript.title = storedScript.title.trimmed

@@ -74,7 +74,8 @@ nonisolated struct V2ClientControlResponsePayload: Codable, Equatable, Sendable 
         state = try container.decodeIfPresent(String.self, forKey: .state)
         localEpoch = try container.decodeIfPresent(Int64.self, forKey: .localEpoch)
         serverSessionEpoch = try container.decodeIfPresent(Int64.self, forKey: .serverSessionEpoch)
-        controlLeaseExpiresAt = try container.decodeIfPresent(Int64.self, forKey: .controlLeaseExpiresAt)
+        controlLeaseExpiresAt = try container.decodeIfPresent(
+            Int64.self, forKey: .controlLeaseExpiresAt)
     }
 
     func encode(to encoder: Encoder) throws {

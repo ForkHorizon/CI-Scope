@@ -53,7 +53,8 @@ struct LiveWorkCard: View {
         .padding(compact ? 10 : 13)
         .background(Color.accentColor.opacity(compact ? 0.055 : 0.075))
         .clipShape(RoundedRectangle(cornerRadius: compact ? 8 : 10))
-        .overlay(RoundedRectangle(cornerRadius: compact ? 8 : 10).stroke(Color.accentColor.opacity(0.22)))
+        .overlay(
+            RoundedRectangle(cornerRadius: compact ? 8 : 10).stroke(Color.accentColor.opacity(0.22)))
     }
 
     @ViewBuilder

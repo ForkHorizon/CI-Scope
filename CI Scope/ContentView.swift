@@ -50,20 +50,24 @@ struct ContentView: View {
                 .allowsHitTesting(notificationManager.activeJobNotification != nil)
         }
         .animation(.easeInOut(duration: 0.18), value: isProjectMenuOpen)
-        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: notificationManager.activeJobNotification?.id)
+        .animation(
+            .spring(response: 0.28, dampingFraction: 0.86),
+            value: notificationManager.activeJobNotification?.id
+        )
         .task(id: selectedProject?.id) {
             guard let selectedProject else { return }
             await projectCIViewModel.load(selectedProject)
         }
         .task(id: workspaceTab) {
             if workspaceTab == .runners {
-                await runnerFleetViewModel.load()
+                await runnerFleetViewModel.load(projects: projectStore.projects)
             }
         }
         .task {
             settingsStore.startV2Lifecycle()
             runnerFleetViewModel.startLiveUpdates {
-                await refreshSelectedProjectRunnerStatusFromBroker()
+                await runnerFleetViewModel.load(projects: projectStore.projects)
+                await refreshSelectedProjectRunnerStatus()
             }
         }
         .onDisappear {
@@ -75,8 +79,7 @@ struct ContentView: View {
                 try projectStore.addProject(from: input)
             }
         }
-        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
-            guard workspaceTab != .runners else { return }
+        .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in
             Task { @MainActor in
                 // Fallback poll only: skip entirely while GitHub is rate-limited
                 // so we never pile requests onto an exhausted quota.

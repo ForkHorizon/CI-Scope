@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension ProjectCIPanel {
-    var brokerAccessRow: some View {
+    var runnerAccessRow: some View {
         HStack(spacing: 8) {
             Image(systemName: "point.3.filled.connected.trianglepath.dotted")
                 .font(.system(size: 12, weight: .semibold))
@@ -12,17 +12,17 @@ extension ProjectCIPanel {
                 Text("MacBook runner")
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
-                Text(isBrokerManaged ? "Broker managed" : "No MacBook runner access")
+                Text(isV2Managed ? "V2 Managed" : "No MacBook runner access")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer()
-            if isBrokerManaged {
+            if isV2Managed {
                 StatusDot(state: .online)
             } else {
                 Button("Attach") {
-                    onAttachToBroker()
+                    onAttachToRunner()
                 }
                 .font(.caption.weight(.semibold))
                 .buttonStyle(.bordered)
@@ -38,14 +38,16 @@ extension ProjectCIPanel {
 
     var v2StatusRow: some View {
         let projection = snapshot?.v2Status
-        let state: ServiceState = projection == nil ? .warning : (projection?.readyToClaim == true ? .online : .warning)
+        let state: ServiceState =
+            projection == nil ? .warning : (projection?.readyToClaim == true ? .online : .warning)
         let value: String
         if let projection {
             value = projection.readyToClaim ? "Agent ready" : "Agent not claim-ready"
         } else {
             value = snapshot?.v2StatusError ?? "Not configured"
         }
-        return LimitedStatusRow(title: "V2 Agent", value: value, icon: "arrow.triangle.2.circlepath", state: state)
+        return LimitedStatusRow(
+            title: "V2 Agent", value: value, icon: "arrow.triangle.2.circlepath", state: state)
     }
 
     var v2ControlRow: some View {
@@ -53,9 +55,11 @@ extension ProjectCIPanel {
             title: "V2 control",
             value: v2Control.isDisablingAuthority
                 ? "Draining before fallback"
-                : (v2Control.hasLiveAgentSession ? v2Control.authorityState.displayName : "Agent session offline"),
+                : (v2Control.hasLiveAgentSession
+                    ? v2Control.authorityState.displayName : "Agent session offline"),
             icon: "lock.shield",
-            state: v2Control.authorityState.allowsMutation && v2Control.hasLiveAgentSession ? .online : .warning
+            state: v2Control.authorityState.allowsMutation && v2Control.hasLiveAgentSession
+                ? .online : .warning
         )
     }
 }

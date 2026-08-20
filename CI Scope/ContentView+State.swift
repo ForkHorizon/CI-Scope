@@ -136,20 +136,20 @@ extension ContentView {
         }
     }
 
-    func refreshSelectedProjectRunnerStatusFromBroker() async {
+    func refreshSelectedProjectRunnerStatus() async {
         guard let selectedProject else { return }
-        await projectCIViewModel.refreshLocalRunnerFromBroker(selectedProject)
+        await projectCIViewModel.refreshLocalRunner(selectedProject)
     }
 
-    func isBrokerManaged(_ project: CIProject) -> Bool {
-        LocalBrokerService(config: DashboardConfig()).isManaged(project: project)
+    func isV2Managed(_ project: CIProject) -> Bool {
+        V2ClientFeature.statusAdapterEnabled()
+            || project.repositoryOwner.caseInsensitiveCompare("ForkHorizon") == .orderedSame
     }
 
-    func attachToBroker(_ project: CIProject) {
+    func attachToRunner(_ project: CIProject) {
         Task {
-            try? await LocalBrokerService(config: DashboardConfig()).attach(project: project)
             await projectCIViewModel.load(project, forceRefresh: true)
-            await runnerFleetViewModel.load()
+            await runnerFleetViewModel.load(projects: projectStore.projects)
         }
     }
 
@@ -159,7 +159,7 @@ extension ContentView {
             refreshSelectedProject(clearCompletedScriptOperations: true)
         case .runners:
             Task {
-                await runnerFleetViewModel.load()
+                await runnerFleetViewModel.load(projects: projectStore.projects)
             }
         case .scripts, .coverage:
             break

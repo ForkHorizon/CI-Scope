@@ -6,8 +6,10 @@ extension AutomationScriptSeedProvider {
         AutomationScript(
             id: "code-linter",
             title: "Code Linter",
-            summary: "Checks file & function length, nesting depth, parameter counts, comment blocks, and type counts.",
-            detail: "Installs a GitHub workflow that calls the shared Code Linter in ForkHorizon/ci-gates.",
+            summary:
+                "Checks file & function length, nesting depth, parameter counts, comment blocks, and type counts.",
+            detail:
+                "Installs a GitHub workflow that calls the shared Code Linter in ForkHorizon/ci-gates.",
             runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
@@ -24,7 +26,8 @@ extension AutomationScriptSeedProvider {
             id: "swift-quality-gate",
             title: "Swift Quality Gate",
             summary: "Builds Swift projects and blocks formatting and dead-code regressions.",
-            detail: "Installs a Swift workflow calling the shared ci-gates quality gate, plus JSON and swift-format configs.",
+            detail:
+                "Installs a Swift workflow calling the shared ci-gates quality gate, plus JSON and swift-format configs.",
             runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
@@ -41,7 +44,8 @@ extension AutomationScriptSeedProvider {
             id: "swift-compile-gate",
             title: "Swift Compile Gate",
             summary: "Compiles Swift projects and blocks configured critical warnings.",
-            detail: "Installs a Swift workflow that calls the shared compile gate in ForkHorizon/ci-gates.",
+            detail:
+                "Installs a Swift workflow that calls the shared compile gate in ForkHorizon/ci-gates.",
             runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
@@ -200,7 +204,8 @@ extension AutomationScriptSeedProvider {
                 id: "web-quality-gate",
                 title: "Web Quality Gate",
                 summary: "Typechecks TS/JS and blocks dead code, unused dependencies, and copy-paste.",
-                detail: "Installs a workflow calling the shared ci-gates web gate: tsc, ESLint, knip, jscpd."
+                detail:
+                    "Installs a workflow calling the shared ci-gates web gate: tsc, ESLint, knip, jscpd."
             ),
             gate: "web-quality.yml"
         )
@@ -211,8 +216,10 @@ extension AutomationScriptSeedProvider {
             GateBlurb(
                 id: "unity-quality-gate",
                 title: "Unity Quality Gate",
-                summary: "Compiles Unity C# with analyzers and blocks warnings and copy-paste in first-party code.",
-                detail: "Installs a workflow calling the shared ci-gates Unity gate: dotnet build with analyzers, jscpd."
+                summary:
+                    "Compiles Unity C# with analyzers and blocks warnings and copy-paste in first-party code.",
+                detail:
+                    "Installs a workflow calling the shared ci-gates Unity gate: dotnet build with analyzers, jscpd."
             ),
             gate: "unity-quality.yml",
             withConfig: true
@@ -225,7 +232,8 @@ extension AutomationScriptSeedProvider {
                 id: "python-quality-gate",
                 title: "Python Quality Gate",
                 summary: "Runs ruff lint and format checks with a strict anti-slop fallback config.",
-                detail: "Installs a workflow calling the shared ci-gates Python gate: ruff check and format."
+                detail:
+                    "Installs a workflow calling the shared ci-gates Python gate: ruff check and format."
             ),
             gate: "python-quality.yml"
         )
@@ -237,7 +245,8 @@ extension AutomationScriptSeedProvider {
                 id: "go-quality-gate",
                 title: "Go Quality Gate",
                 summary: "Runs go vet, gofmt, and golangci-lint.",
-                detail: "Installs a workflow calling the shared ci-gates Go gate: vet, format, lint (no go test)."
+                detail:
+                    "Installs a workflow calling the shared ci-gates Go gate: vet, format, lint (no go test)."
             ),
             gate: "go-quality.yml"
         )
@@ -249,7 +258,8 @@ extension AutomationScriptSeedProvider {
                 id: "slop-review",
                 title: "Slop Review",
                 summary: "Advisory DeepSeek LLM review of PR diffs for AI-slop; never blocks the merge.",
-                detail: "Installs a workflow calling the shared advisory ci-gates slop reviewer using DeepSeek."
+                detail:
+                    "Installs a workflow calling the shared advisory ci-gates slop reviewer using DeepSeek."
             ),
             gate: "slop-review.yml"
         )

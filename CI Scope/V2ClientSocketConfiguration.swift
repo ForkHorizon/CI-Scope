@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 nonisolated struct V2ClientUnixSocketConfiguration: Sendable {
     let socketURL: URL

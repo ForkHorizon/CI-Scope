@@ -13,5 +13,5 @@ struct RunnerWorkItem: Identifiable {
     let assemblerScope: String?
     // The synthesized memberwise init already defaults the optionals to nil,
     // so an explicit 11-parameter init would just restate it.
-    let progress: BrokerJobProgress?
+    let progress: RunnerJobProgress?
 }

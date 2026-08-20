@@ -43,7 +43,10 @@ struct ProjectStackDetector {
             config: config
         )
         guard result.exitCode == 0 else { return [] }
-        return Set(result.output.split(separator: "\n").map { String($0).trimmed.lowercased() }.filter { !$0.isEmpty })
+        return Set(
+            result.output.split(separator: "\n").map { String($0).trimmed.lowercased() }.filter {
+                !$0.isEmpty
+            })
     }
 
     private func hasUnityMarker(_ project: CIProject) async -> Bool {

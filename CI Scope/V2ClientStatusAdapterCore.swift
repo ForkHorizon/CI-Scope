@@ -9,19 +9,25 @@ nonisolated struct V2ClientStatusAdapter: @unchecked Sendable {
     nonisolated static func configured(defaults: UserDefaults = .standard) -> V2ClientStatusAdapter? {
         guard V2ClientFeature.statusAdapterEnabled(defaults: defaults) else { return nil }
         let descriptor = V2ClientAgentSessionDescriptor.load()
-        let socketPath = descriptor?.socketPath ?? defaults.string(forKey: V2ClientFeature.socketPathKey)
+        let socketPath =
+            descriptor?.socketPath ?? defaults.string(forKey: V2ClientFeature.socketPathKey)
         let bootID = descriptor?.bootID ?? defaults.string(forKey: V2ClientFeature.bootIDKey)
-        let agentInstanceID = descriptor?.agentInstanceID ?? defaults.string(forKey: V2ClientFeature.agentInstanceIDKey)
+        let agentInstanceID =
+            descriptor?.agentInstanceID ?? defaults.string(forKey: V2ClientFeature.agentInstanceIDKey)
         let sessionID = descriptor?.sessionID ?? defaults.string(forKey: V2ClientFeature.sessionIDKey)
-        let fencingToken = descriptor?.fencingToken ?? defaults.string(forKey: V2ClientFeature.fencingTokenKey)
+        let fencingToken =
+            descriptor?.fencingToken ?? defaults.string(forKey: V2ClientFeature.fencingTokenKey)
         let machineID = descriptor?.machineID ?? defaults.string(forKey: "ciScope.queue.machineID")
-        guard let socketPath, let bootID, let agentInstanceID, let sessionID, let fencingToken, let machineID,
+        guard let socketPath, let bootID, let agentInstanceID, let sessionID, let fencingToken,
+            let machineID,
             !socketPath.isEmpty, !bootID.isEmpty, !agentInstanceID.isEmpty, !sessionID.isEmpty,
             !fencingToken.isEmpty, !machineID.isEmpty
         else { return nil }
 
-        let sessionEpoch = descriptor?.sessionEpoch ?? defaults.integer(forKey: V2ClientFeature.sessionEpochKey)
-        let localOwnerEpoch = descriptor?.localOwnerEpoch ?? defaults.integer(forKey: V2ClientFeature.localOwnerEpochKey)
+        let sessionEpoch =
+            descriptor?.sessionEpoch ?? defaults.integer(forKey: V2ClientFeature.sessionEpochKey)
+        let localOwnerEpoch =
+            descriptor?.localOwnerEpoch ?? defaults.integer(forKey: V2ClientFeature.localOwnerEpochKey)
         guard sessionEpoch > 0, localOwnerEpoch > 0 else { return nil }
 
         let session = V2ClientSessionContext(
@@ -45,9 +51,11 @@ nonisolated struct V2ClientStatusAdapter: @unchecked Sendable {
         )
     }
 
-    nonisolated func makeStatusRequest(requestID: String = UUID().uuidString) throws -> V2ClientRequestEnvelope<
-        V2ClientControlCommandPayload
-    > {
+    nonisolated func makeStatusRequest(requestID: String = UUID().uuidString) throws
+        -> V2ClientRequestEnvelope<
+            V2ClientControlCommandPayload
+        >
+    {
         try V2ClientRequestEnvelope(
             payload: V2ClientControlCommandPayload(command: .status, appInstanceId: appInstanceID),
             session: session,

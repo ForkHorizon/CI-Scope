@@ -1,6 +1,6 @@
-import Foundation
 import Combine
 import Darwin
+import Foundation
 
 @MainActor
 final class RunnerFleetViewModel: ObservableObject {
@@ -8,32 +8,27 @@ final class RunnerFleetViewModel: ObservableObject {
     @Published private(set) var isLoading = false
 
     private let service: RunnerFleetService
-    private let brokerService: LocalBrokerService
-    private var brokerMonitor: BrokerStateMonitor?
+    private var agentMonitor: V2AgentStateMonitor?
     private var isApplyingLiveUpdate = false
-    private var lastAppliedBrokerSignature: String?
-    private var pendingBrokerSignature: String?
+    private var lastAppliedSignature: String?
+    private var pendingSignature: String?
     private var loadGeneration = 0
 
     init() {
         let config = DashboardConfig()
         self.service = RunnerFleetService(config: config)
-        self.brokerService = LocalBrokerService(config: config)
     }
 
-    func load() async {
+    func load(projects: [CIProject]? = nil) async {
         isLoading = true
         let generation = loadGeneration + 1
         loadGeneration = generation
-        let brokerSignatureAtStart = lastAppliedBrokerSignature
+        let signatureAtStart = lastAppliedSignature
 
-        let nextSnapshot = await service.loadSnapshot()
+        let nextSnapshot = await service.loadSnapshot(projects: projects)
         guard loadGeneration == generation else { return }
 
-        // A live broker update applied fresher data while we were loading; don't
-        // clobber it with the snapshot captured before that update (it already
-        // fired its own notifications).
-        if lastAppliedBrokerSignature == brokerSignatureAtStart {
+        if lastAppliedSignature == signatureAtStart {
             snapshot = nextSnapshot
             NotificationManager.shared.checkWorkUpdates(snapshot: nextSnapshot)
             NotificationManager.shared.checkRunnerUpdates(runners: nextSnapshot.runners)
@@ -42,51 +37,50 @@ final class RunnerFleetViewModel: ObservableObject {
         isLoading = false
     }
 
-    func startLiveUpdates(onBrokerChange: @escaping @MainActor () async -> Void) {
-        guard brokerMonitor == nil else { return }
-        let monitor = BrokerStateMonitor(service: brokerService) { [weak self] signature in
+    func startLiveUpdates(onRunnerChange: @escaping @MainActor () async -> Void) {
+        guard agentMonitor == nil else { return }
+        let monitor = V2AgentStateMonitor { [weak self] signature in
             Task { @MainActor [weak self] in
-                await self?.applyLiveUpdate(signature: signature, onBrokerChange: onBrokerChange)
+                await self?.applyLiveUpdate(signature: signature, onRunnerChange: onRunnerChange)
             }
         }
-        brokerMonitor = monitor
+        agentMonitor = monitor
         monitor.start()
     }
 
     func stopLiveUpdates() {
-        brokerMonitor?.stop()
-        brokerMonitor = nil
-        pendingBrokerSignature = nil
+        agentMonitor?.stop()
+        agentMonitor = nil
+        pendingSignature = nil
         isApplyingLiveUpdate = false
     }
 
     private func applyLiveUpdate(
         signature: String,
-        onBrokerChange: @escaping @MainActor () async -> Void
+        onRunnerChange: @escaping @MainActor () async -> Void
     ) async {
-        guard signature != lastAppliedBrokerSignature else { return }
-        pendingBrokerSignature = signature
+        guard signature != lastAppliedSignature else { return }
+        pendingSignature = signature
         guard !isApplyingLiveUpdate else { return }
 
         isApplyingLiveUpdate = true
-        while let nextSignature = pendingBrokerSignature {
-            pendingBrokerSignature = nil
-            guard nextSignature != lastAppliedBrokerSignature else { continue }
+        while let nextSignature = pendingSignature {
+            pendingSignature = nil
+            guard nextSignature != lastAppliedSignature else { continue }
 
-            let nextSnapshot = await service.loadSnapshot(prepareBroker: false)
+            let nextSnapshot = await service.loadSnapshot()
             snapshot = nextSnapshot
-            lastAppliedBrokerSignature = nextSignature
+            lastAppliedSignature = nextSignature
             NotificationManager.shared.checkWorkUpdates(snapshot: nextSnapshot)
             NotificationManager.shared.checkRunnerUpdates(runners: nextSnapshot.runners)
-            await onBrokerChange()
+            await onRunnerChange()
         }
         isApplyingLiveUpdate = false
     }
 }
 
-private final class BrokerStateMonitor {
-    private let service: LocalBrokerService
-    private let queue = DispatchQueue(label: "ci-scope.broker-state-monitor")
+private final class V2AgentStateMonitor {
+    private let queue = DispatchQueue(label: "ci-scope.v2-agent-state-monitor")
     private let fileManager = FileManager.default
     private let onChange: (String) -> Void
 
@@ -96,8 +90,7 @@ private final class BrokerStateMonitor {
     private var lastSignature: String?
     private var isRunning = false
 
-    init(service: LocalBrokerService, onChange: @escaping (String) -> Void) {
-        self.service = service
+    init(onChange: @escaping (String) -> Void) {
         self.onChange = onChange
     }
 
@@ -129,13 +122,15 @@ private final class BrokerStateMonitor {
 
     private func armWatchesLocked() {
         cancelWatchesLocked()
-        watch(path: service.brokerDirectory.path)
-        watch(path: service.stateURL.path)
-        watch(path: service.registryURL.path)
+        let descriptorURL = V2ClientAgentSessionDescriptor.url
+        watch(path: descriptorURL.deletingLastPathComponent().path)
+        watch(path: descriptorURL.path)
     }
 
     private func cancelWatchesLocked() {
-        sources.forEach { $0.cancel() }
+        for source in sources {
+            source.cancel()
+        }
         sources.removeAll()
     }
 
@@ -191,41 +186,17 @@ private final class BrokerStateMonitor {
     }
 
     private func currentSignature() -> String {
-        let registry = service.loadRegistry()
-        let state = service.loadState()
-        let activeID = state.activeJobs.isEmpty ? "-" : state.activeJobs.map(\.id).sorted().joined(separator: ",")
-        let queueIDs = state.queue.map(\.id).joined(separator: ",")
-        let webhook =
-            state.webhook.map { status in
-                [
-                    status.enabled.description,
-                    status.port.map(String.init) ?? "-",
-                    status.lastDeliveryAt ?? "-",
-                    status.lastDeliveryID ?? "-",
-                    status.lastAction ?? "-",
-                    status.lastRepository ?? "-",
-                    status.lastJob ?? "-",
-                    status.lastError ?? "-",
-                ].joined(separator: ":")
-            } ?? "-"
-        let repoStatuses = state.repos
-            .map { "\($0.profileID ?? "-"):\($0.slug):\($0.state):\($0.queuedCount):\($0.lastError ?? "-")" }
-            .joined(separator: ",")
-        let profiles = registry.profiles
-            .map { "\($0.id):\($0.enabled):\($0.labels.joined(separator: "+"))" }
-            .joined(separator: ",")
-        let repos = registry.repos
-            .map { "\($0.slug):\($0.enabled):\($0.labels.joined(separator: "+"))" }
-            .joined(separator: ",")
+        let descriptor = V2ClientAgentSessionDescriptor.load()
+        let descriptorPart =
+            descriptor.map {
+                "\($0.sessionID):\($0.sessionEpoch):\($0.localOwnerEpoch):\($0.fencingToken)"
+            } ?? "no-descriptor"
 
-        return [
-            state.updatedAt,
-            activeID,
-            queueIDs,
-            webhook,
-            repoStatuses,
-            profiles,
-            repos,
-        ].joined(separator: "|")
+        let defaults = UserDefaults.standard
+        let authorityState = V2ClientFeature.authorityState(defaults: defaults).rawValue
+        let adapterPart =
+            "\(V2ClientFeature.statusAdapterEnabled(defaults: defaults)):\(authorityState)"
+
+        return "\(descriptorPart)|\(adapterPart)"
     }
 }

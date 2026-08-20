@@ -43,7 +43,8 @@ enum V2ClientFeature {
 
     static func authorityState(defaults: UserDefaults = .standard) -> V2ClientAuthorityState {
         guard statusAdapterEnabled(defaults: defaults) else { return .legacyBroker }
-        guard defaults.string(forKey: authorityStateKey) == V2ClientAuthorityState.v2Authority.rawValue else {
+        guard defaults.string(forKey: authorityStateKey) == V2ClientAuthorityState.v2Authority.rawValue
+        else {
             return .v2ReadOnly
         }
         return .v2Authority

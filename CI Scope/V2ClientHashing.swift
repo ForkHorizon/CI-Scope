@@ -1,5 +1,5 @@
-import Foundation
 import CryptoKit
+import Foundation
 
 nonisolated enum V2ClientPayloadHasher {
     nonisolated static func canonicalData<T: Encodable>(_ payload: T) throws -> Data {

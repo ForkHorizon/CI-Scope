@@ -27,7 +27,8 @@
                     sessionId: "session-1",
                     sessionEpoch: 2
                 ),
-                fencing: V2ClientFencingContext(localOwnerEpoch: 3, sessionEpoch: 2, fencingToken: "fence-1"),
+                fencing: V2ClientFencingContext(
+                    localOwnerEpoch: 3, sessionEpoch: 2, fencingToken: "fence-1"),
                 appInstanceID: "ui-1"
             )
 
@@ -48,7 +49,8 @@
             defaults.set(true, forKey: V2ClientFeature.statusAdapterKey)
             XCTAssertEqual(V2ClientFeature.authorityState(defaults: defaults), .v2ReadOnly)
 
-            defaults.set(V2ClientAuthorityState.v2Authority.rawValue, forKey: V2ClientFeature.authorityStateKey)
+            defaults.set(
+                V2ClientAuthorityState.v2Authority.rawValue, forKey: V2ClientFeature.authorityStateKey)
             XCTAssertEqual(V2ClientFeature.authorityState(defaults: defaults), .v2Authority)
 
             defaults.set(false, forKey: V2ClientFeature.statusAdapterKey)
@@ -58,8 +60,10 @@
         func testEmergencyStopRequiresDrainingLease() throws {
             let now = Date(timeIntervalSince1970: 100)
             var lease = V2ClientControlLeaseMachine()
-            try lease.apply(.acquired(controlToken: "token", expiresAt: now.addingTimeInterval(30)), now: now)
-            try lease.apply(.drainRequested(controlToken: "token", deadline: now.addingTimeInterval(10)), now: now)
+            try lease.apply(
+                .acquired(controlToken: "token", expiresAt: now.addingTimeInterval(30)), now: now)
+            try lease.apply(
+                .drainRequested(controlToken: "token", deadline: now.addingTimeInterval(10)), now: now)
             let adapter = makeAdapter(authorityState: .v2Authority, lease: lease)
 
             let request = try adapter.makeControlRequest(
@@ -98,7 +102,8 @@
         func testControlAdapterRequiresMatchingLiveLeaseForMutations() throws {
             let now = Date(timeIntervalSince1970: 100)
             var lease = V2ClientControlLeaseMachine()
-            try lease.apply(.acquired(controlToken: "token", expiresAt: now.addingTimeInterval(30)), now: now)
+            try lease.apply(
+                .acquired(controlToken: "token", expiresAt: now.addingTimeInterval(30)), now: now)
             let adapter = makeAdapter(authorityState: .v2Authority, lease: lease)
 
             let request = try adapter.makeControlRequest(
@@ -222,7 +227,8 @@
                     sessionId: "session-1",
                     sessionEpoch: 2
                 ),
-                fencing: V2ClientFencingContext(localOwnerEpoch: 3, sessionEpoch: 2, fencingToken: "fence-1"),
+                fencing: V2ClientFencingContext(
+                    localOwnerEpoch: 3, sessionEpoch: 2, fencingToken: "fence-1"),
                 appInstanceID: "ui-1"
             )
             return V2ClientControlAdapter(
