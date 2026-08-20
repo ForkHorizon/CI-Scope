@@ -148,12 +148,13 @@ struct V2AgentLaunchManager {
         machineID: String,
         credentialID: String
     ) -> String {
-        let socketPath = stateRootURL.appendingPathComponent("agent.sock").path
         let stdoutPath = logDirURL.appendingPathComponent("agent.log").path
         let stderrPath = logDirURL.appendingPathComponent("agent.err.log").path
-        let bootID = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
-        let agentInstanceID = UUID().uuidString.lowercased()
-        let sessionRequestID = UUID().uuidString.lowercased()
+        let envXml = agentEnvironmentXML(
+            controlPlaneURL: controlPlaneURL,
+            machineID: machineID,
+            credentialID: credentialID
+        )
 
         return """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -169,30 +170,7 @@ struct V2AgentLaunchManager {
             </array>
             <key>EnvironmentVariables</key>
             <dict>
-                <key>CI_SCOPE_CONTROL_PLANE_URL</key>
-                <string>\(controlPlaneURL)</string>
-                <key>CI_SCOPE_MACHINE_ID</key>
-                <string>\(machineID)</string>
-                <key>CI_SCOPE_BOOT_ID</key>
-                <string>\(bootID)</string>
-                <key>CI_SCOPE_AGENT_INSTANCE_ID</key>
-                <string>\(agentInstanceID)</string>
-                <key>CI_SCOPE_CREDENTIAL_ID</key>
-                <string>\(credentialID)</string>
-                <key>CI_SCOPE_POOL_IDENTITY</key>
-                <string>forkhorizon-production</string>
-                <key>CI_SCOPE_SESSION_REQUEST_ID</key>
-                <string>\(sessionRequestID)</string>
-                <key>CI_SCOPE_SOCKET_PATH</key>
-                <string>\(socketPath)</string>
-                <key>CI_SCOPE_STATE_ROOT</key>
-                <string>\(stateRootURL.path)</string>
-                <key>CI_SCOPE_LOG_DIR</key>
-                <string>\(logDirURL.path)</string>
-                <key>CI_SCOPE_KEYCHAIN_SERVICE</key>
-                <string>com.forkhorizon.ci-scope.agent</string>
-                <key>CI_SCOPE_V2_SHADOW_TOKEN_KEYCHAIN_ACCOUNT</key>
-                <string>shadow-token</string>
+        \(envXml)
             </dict>
             <key>RunAtLoad</key>
             <true/>
@@ -208,6 +186,30 @@ struct V2AgentLaunchManager {
         </dict>
         </plist>
         """
+    }
+
+    private func agentEnvironmentXML(
+        controlPlaneURL: String,
+        machineID: String,
+        credentialID: String
+    ) -> String {
+        let socketPath = stateRootURL.appendingPathComponent("agent.sock").path
+        let bootID = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+        let env: [(String, String)] = [
+            ("CI_SCOPE_CONTROL_PLANE_URL", controlPlaneURL),
+            ("CI_SCOPE_MACHINE_ID", machineID),
+            ("CI_SCOPE_BOOT_ID", bootID),
+            ("CI_SCOPE_AGENT_INSTANCE_ID", UUID().uuidString.lowercased()),
+            ("CI_SCOPE_CREDENTIAL_ID", credentialID),
+            ("CI_SCOPE_POOL_IDENTITY", "forkhorizon-production"),
+            ("CI_SCOPE_SESSION_REQUEST_ID", UUID().uuidString.lowercased()),
+            ("CI_SCOPE_SOCKET_PATH", socketPath),
+            ("CI_SCOPE_STATE_ROOT", stateRootURL.path),
+            ("CI_SCOPE_LOG_DIR", logDirURL.path),
+            ("CI_SCOPE_KEYCHAIN_SERVICE", "com.forkhorizon.ci-scope.agent"),
+            ("CI_SCOPE_V2_SHADOW_TOKEN_KEYCHAIN_ACCOUNT", "shadow-token")
+        ]
+        return env.map { "        <key>\($0.0)</key>\n        <string>\($0.1)</string>" }.joined(separator: "\n")
     }
 
     private func processUptime(pid: Int?) async -> String {

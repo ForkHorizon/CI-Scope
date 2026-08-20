@@ -76,6 +76,16 @@ struct RunnerFleetService {
         launch: RunnerLaunchStatus,
         v2Result: V2ClientStatusResult?
     ) -> RunnerMonitorSnapshot {
+        var snapshot = initialRunnerSnapshot(launch: launch)
+        guard let v2Result else {
+            applyMissingV2(launch: launch, to: &snapshot)
+            return snapshot
+        }
+        applyV2Result(v2Result, launch: launch, to: &snapshot)
+        return snapshot
+    }
+
+    private func initialRunnerSnapshot(launch: RunnerLaunchStatus) -> RunnerMonitorSnapshot {
         var snapshot = RunnerMonitorSnapshot(
             id: "v2-mac-agent",
             title: "MacBook Runner",
@@ -86,46 +96,45 @@ struct RunnerFleetService {
         snapshot.uptime = launch.uptime
         snapshot.labels = ["self-hosted", "macOS", "ARM64", "ci-scope", "ci-scope-v2"]
         snapshot.registeredTo = "V2 Control Plane (VPS)"
+        return snapshot
+    }
 
-        guard let v2Result else {
-            snapshot.state = launch.state
-            snapshot.localState = launch.state
-            snapshot.githubState = .unknown
-            snapshot.remoteName = "MacBook Agent (V2)"
-            snapshot.remoteStatus = launch.state == .online ? "agent active" : "not running"
-            snapshot.error = launch.state == .offline ? "V2 Agent launchd service is not running." : nil
-            return snapshot
-        }
+    private func applyMissingV2(launch: RunnerLaunchStatus, to snapshot: inout RunnerMonitorSnapshot) {
+        snapshot.state = launch.state
+        snapshot.localState = launch.state
+        snapshot.githubState = .unknown
+        snapshot.remoteName = "MacBook Agent (V2)"
+        snapshot.remoteStatus = launch.state == .online ? "agent active" : "not running"
+        snapshot.error = launch.state == .offline ? "V2 Agent launchd service is not running." : nil
+    }
 
+    private func applyV2Result(
+        _ v2Result: V2ClientStatusResult,
+        launch: RunnerLaunchStatus,
+        to snapshot: inout RunnerMonitorSnapshot
+    ) {
+        snapshot.remoteName = "MacBook Agent (V2)"
         switch v2Result {
         case .available(let projection):
             let isOnline = projection.processAlive && projection.serverConnected
             snapshot.localState = projection.processAlive ? .online : .offline
             snapshot.githubState = projection.serverConnected ? .online : .offline
             snapshot.state = projection.readyToClaim ? .online : (isOnline ? .warning : .offline)
-            snapshot.remoteName = "MacBook Agent (V2)"
             snapshot.remoteStatus = projection.readyToClaim ? "ready to claim" : (projection.draining ? "draining" : (projection.state ?? "connected"))
             snapshot.isBusy = projection.processAlive && !projection.readyToClaim && !projection.draining
 
             var errors: [String] = []
-            if projection.recoveryBlocked {
-                errors.append("Agent recovery is blocked.")
-            }
-            if projection.projectionLagging {
-                errors.append("Control plane projection is lagging.")
-            }
+            if projection.recoveryBlocked { errors.append("Agent recovery is blocked.") }
+            if projection.projectionLagging { errors.append("Control plane projection is lagging.") }
             snapshot.error = errors.joined(separator: "\n").nilIfEmpty
 
         case .unavailable(let error):
             snapshot.localState = launch.state
             snapshot.githubState = .offline
             snapshot.state = .warning
-            snapshot.remoteName = "MacBook Agent (V2)"
             snapshot.remoteStatus = "socket unavailable"
             snapshot.error = error
         }
-
-        return snapshot
     }
 }
 
