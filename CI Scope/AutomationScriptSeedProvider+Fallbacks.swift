@@ -145,26 +145,27 @@ extension AutomationScriptSeedProvider {
     }
 
     static func fallbackCallerWorkflow(jobID: String, gate: String, withConfig: Bool = true) -> String {
-        let runnerInputs = jobID == "slop-review"
+        let runnerInputs =
+            jobID == "slop-review"
             ? "      runner-group: Default\n      runner-labels: '[\\\"self-hosted\\\", \\\"macOS\\\", \\\"ARM64\\\", \\\"ci-scope-ai\\\"]'\n      runner-label: ci-scope-ai"
             : "      runs-on: '{{runner_labels_json}}'"
         return """
-        name: {{script_title}}
+            name: {{script_title}}
 
-        on:
-          pull_request:
-          workflow_dispatch:
+            on:
+              pull_request:
+              workflow_dispatch:
 
-        permissions:
-          contents: read
+            permissions:
+              contents: read
 
-        jobs:
-          \(jobID):
-            uses: ForkHorizon/ci-gates/.github/workflows/\(gate)@main
-            with:
-        \(withConfig ? "      config: .{{script_slug}}.json\n" : "")\(jobID == "code-linter" ? "      gates-ref: main\n" : "")\(runnerInputs)
+            jobs:
+              \(jobID):
+                uses: ForkHorizon/ci-gates/.github/workflows/\(gate)@main
+                with:
+            \(withConfig ? "      config: .{{script_slug}}.json\n" : "")\(jobID == "code-linter" ? "      gates-ref: main\n" : "")\(runnerInputs)
 
-        """
+            """
     }
 
     /// Shared shape for gates that are just one caller workflow file plus the generic PR body.

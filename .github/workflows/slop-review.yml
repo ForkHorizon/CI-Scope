@@ -15,4 +15,6 @@ jobs:
   slop-review:
     uses: ForkHorizon/ci-gates/.github/workflows/slop-review.yml@main
     with:
-      runs-on: '["self-hosted", "macOS", "ARM64", "ci-scope"]'
+      runner-group: Default
+      runner-labels: '["self-hosted", "macOS", "ARM64", "ci-scope-ai"]'
+      runner-label: ci-scope-ai
