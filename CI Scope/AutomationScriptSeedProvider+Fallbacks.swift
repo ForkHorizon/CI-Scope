@@ -147,7 +147,7 @@ extension AutomationScriptSeedProvider {
     static func fallbackCallerWorkflow(jobID: String, gate: String, withConfig: Bool = true) -> String {
         let runnerInputs =
             jobID == "slop-review"
-            ? "      runner-group: Default\n      runner-labels: '[\\\"self-hosted\\\", \\\"macOS\\\", \\\"ARM64\\\", \\\"ci-scope-ai\\\"]'\n      runner-label: ci-scope-ai"
+            ? "      runner-group: Default\n      runner-labels: '[\\\"self-hosted\\\", \\\"macOS\\\", \\\"ARM64\\\", \\\"ci-scope-ai\\\"]'\n      runner-label: ci-scope-ai\n      model: qwen3-coder:30b-a3b-q4_K_M"
             : "      runs-on: '{{runner_labels_json}}'"
         return """
             name: {{script_title}}
