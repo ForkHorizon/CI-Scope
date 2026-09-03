@@ -145,23 +145,27 @@ extension AutomationScriptSeedProvider {
     }
 
     static func fallbackCallerWorkflow(jobID: String, gate: String, withConfig: Bool = true) -> String {
-        """
-        name: {{script_title}}
+        let runnerInputs =
+            jobID == "slop-review"
+            ? "      runner-group: Default\n      runner-labels: '[\\\"self-hosted\\\", \\\"macOS\\\", \\\"ARM64\\\", \\\"ci-scope-ai\\\"]'\n      runner-label: ci-scope-ai\n      model: qwen3-coder:30b-a3b-q4_K_M"
+            : "      runs-on: '{{runner_labels_json}}'"
+        return """
+            name: {{script_title}}
 
-        on:
-          pull_request:
-          workflow_dispatch:
+            on:
+              pull_request:
+              workflow_dispatch:
 
-        permissions:
-          contents: read
+            permissions:
+              contents: read
 
-        jobs:
-          \(jobID):
-            uses: ForkHorizon/ci-gates/.github/workflows/\(gate)@main
-            with:
-        \(withConfig ? "      config: .{{script_slug}}.json\n" : "")\(jobID == "code-linter" ? "      gates-ref: main\n" : "")      runs-on: '{{runner_labels_json}}'
+            jobs:
+              \(jobID):
+                uses: ForkHorizon/ci-gates/.github/workflows/\(gate)@main
+                with:
+            \(withConfig ? "      config: .{{script_slug}}.json\n" : "")\(jobID == "code-linter" ? "      gates-ref: main\n" : "")\(runnerInputs)
 
-        """
+            """
     }
 
     /// Shared shape for gates that are just one caller workflow file plus the generic PR body.
@@ -176,7 +180,9 @@ extension AutomationScriptSeedProvider {
             title: blurb.title,
             summary: blurb.summary,
             detail: blurb.detail,
-            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
+            runnerLabels: id == "slop-review"
+                ? ["self-hosted", "macOS", "ARM64", "ci-scope-ai"]
+                : ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
             pullRequestTitle: "Add {{script_title}}",
