@@ -145,7 +145,10 @@ extension AutomationScriptSeedProvider {
     }
 
     static func fallbackCallerWorkflow(jobID: String, gate: String, withConfig: Bool = true) -> String {
-        """
+        let runnerInputs = jobID == "slop-review"
+            ? "      runner-group: Default\n      runner-labels: '[\\\"self-hosted\\\", \\\"macOS\\\", \\\"ARM64\\\", \\\"ci-scope-ai\\\"]'\n      runner-label: ci-scope-ai"
+            : "      runs-on: '{{runner_labels_json}}'"
+        return """
         name: {{script_title}}
 
         on:
@@ -159,7 +162,7 @@ extension AutomationScriptSeedProvider {
           \(jobID):
             uses: ForkHorizon/ci-gates/.github/workflows/\(gate)@main
             with:
-        \(withConfig ? "      config: .{{script_slug}}.json\n" : "")\(jobID == "code-linter" ? "      gates-ref: main\n" : "")      runs-on: '{{runner_labels_json}}'
+        \(withConfig ? "      config: .{{script_slug}}.json\n" : "")\(jobID == "code-linter" ? "      gates-ref: main\n" : "")\(runnerInputs)
 
         """
     }
@@ -176,7 +179,9 @@ extension AutomationScriptSeedProvider {
             title: blurb.title,
             summary: blurb.summary,
             detail: blurb.detail,
-            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
+            runnerLabels: id == "slop-review"
+                ? ["self-hosted", "macOS", "ARM64", "ci-scope-ai"]
+                : ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
             pullRequestTitle: "Add {{script_title}}",

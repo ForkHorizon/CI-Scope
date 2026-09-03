@@ -4,9 +4,12 @@ set -euo pipefail
 RUNNER_HOME="${RUNNER_HOME:-$HOME/actions-runners}"
 PERSONAL_RUNNER_ROOT="${PERSONAL_RUNNER_ROOT:-$HOME/actions-runner/moodling}"
 RUNNER_VERSION="${RUNNER_VERSION:-}"
+RUNNER_ROLE="${RUNNER_ROLE:-general}"
+RUNNER_INDEX="${RUNNER_INDEX:-1}"
 DEFAULT_LABELS="${DEFAULT_LABELS:-ci-scope,macbook-ci,code-linter}"
 ORG_EXTRA_LABELS="${ORG_EXTRA_LABELS:-nexus-doc-ai,nexus-unity-ci}"
 PERSONAL_EXTRA_LABELS="${PERSONAL_EXTRA_LABELS:-moodling,deepseek}"
+AI_LABELS="${AI_LABELS:-self-hosted,macOS,ARM64,ci-scope-ai}"
 
 usage() {
   cat <<'USAGE'
@@ -15,8 +18,12 @@ Usage:
   scripts/setup-ci-scope-runners.sh personal Daliys/MyPrivateRepo
 
 What this creates:
-  org      -> one organization-level runner for repos allowed by the org
-  personal -> one repository-level runner for one personal repo
+  org      -> an organization-level runner for repos allowed by the org
+  personal -> a repository-level runner for one personal repo
+
+Runner profiles:
+  RUNNER_ROLE=general (default) -> regular CI gates; multiple indexes allowed
+  RUNNER_ROLE=ai                 -> Slop Review; RUNNER_INDEX must be 1
 
 Important:
   GitHub does not support one runner shared across every personal-account repo.
@@ -32,10 +39,17 @@ Environment overrides:
   PERSONAL_RUNNER_ROOT
                     default: $HOME/actions-runner/moodling
   RUNNER_VERSION    default: latest actions/runner release
+  RUNNER_ROLE       default: general; general or ai
+  RUNNER_INDEX      default: 1; use 2, 3, ... for additional general runners
   DEFAULT_LABELS    default: ci-scope,macbook-ci,code-linter
   ORG_EXTRA_LABELS  default: nexus-doc-ai,nexus-unity-ci
   PERSONAL_EXTRA_LABELS
                     default: moodling,deepseek
+  AI_LABELS         default: self-hosted,macOS,ARM64,ci-scope-ai
+
+Examples:
+  RUNNER_INDEX=2 scripts/setup-ci-scope-runners.sh org ForkHorizon
+  RUNNER_ROLE=ai scripts/setup-ci-scope-runners.sh org ForkHorizon
 USAGE
 }
 
@@ -143,11 +157,26 @@ configure_org_runner() {
   local version
   version=$(latest_runner_version)
 
-  local runner_dir="${RUNNER_HOME}/$(lowercase "$org")-org-ci"
-  local runner_name="${org}-MacBook-CI-Scope-Org"
-  local labels="${DEFAULT_LABELS},ci-scope-org"
-  if [ -n "$ORG_EXTRA_LABELS" ]; then
-    labels="${labels},${ORG_EXTRA_LABELS}"
+  local runner_dir runner_name labels
+  if [ "$RUNNER_ROLE" = "general" ] && [ "$RUNNER_INDEX" = "1" ]; then
+    # Preserve the original default registration for existing installations.
+    runner_dir="${RUNNER_HOME}/$(lowercase "$org")-org-ci"
+    runner_name="${org}-MacBook-CI-Scope-Org"
+    labels="${DEFAULT_LABELS},ci-scope-org"
+    if [ -n "$ORG_EXTRA_LABELS" ]; then
+      labels="${labels},${ORG_EXTRA_LABELS}"
+    fi
+  elif [ "$RUNNER_ROLE" = "general" ]; then
+    runner_dir="${RUNNER_HOME}/$(lowercase "$org")-org-general-${RUNNER_INDEX}"
+    runner_name="${org}-MacBook-CI-Scope-General-${RUNNER_INDEX}"
+    labels="${DEFAULT_LABELS},ci-scope-org"
+    if [ -n "$ORG_EXTRA_LABELS" ]; then
+      labels="${labels},${ORG_EXTRA_LABELS}"
+    fi
+  else
+    runner_dir="${RUNNER_HOME}/$(lowercase "$org")-org-ai-${RUNNER_INDEX}"
+    runner_name="${org}-MacBook-CI-Scope-AI-${RUNNER_INDEX}"
+    labels="$AI_LABELS"
   fi
   local token
 
@@ -181,11 +210,26 @@ configure_personal_runner() {
   local version
   version=$(latest_runner_version)
 
-  local runner_dir="$PERSONAL_RUNNER_ROOT"
-  local runner_name="${owner}-MacBook-CI-Scope-Personal"
-  local labels="${DEFAULT_LABELS},ci-scope-personal"
-  if [ -n "$PERSONAL_EXTRA_LABELS" ]; then
-    labels="${labels},${PERSONAL_EXTRA_LABELS}"
+  local runner_dir runner_name labels
+  if [ "$RUNNER_ROLE" = "general" ] && [ "$RUNNER_INDEX" = "1" ]; then
+    # Preserve the original default registration for existing installations.
+    runner_dir="$PERSONAL_RUNNER_ROOT"
+    runner_name="${owner}-MacBook-CI-Scope-Personal"
+    labels="${DEFAULT_LABELS},ci-scope-personal"
+    if [ -n "$PERSONAL_EXTRA_LABELS" ]; then
+      labels="${labels},${PERSONAL_EXTRA_LABELS}"
+    fi
+  elif [ "$RUNNER_ROLE" = "general" ]; then
+    runner_dir="${PERSONAL_RUNNER_ROOT}-general-${RUNNER_INDEX}"
+    runner_name="${owner}-MacBook-CI-Scope-General-${RUNNER_INDEX}"
+    labels="${DEFAULT_LABELS},ci-scope-personal"
+    if [ -n "$PERSONAL_EXTRA_LABELS" ]; then
+      labels="${labels},${PERSONAL_EXTRA_LABELS}"
+    fi
+  else
+    runner_dir="${PERSONAL_RUNNER_ROOT}-ai-${RUNNER_INDEX}"
+    runner_name="${owner}-MacBook-CI-Scope-AI-${RUNNER_INDEX}"
+    labels="$AI_LABELS"
   fi
   local token
 
@@ -224,6 +268,18 @@ main() {
   if [ $# -lt 2 ]; then
     usage
     exit 2
+  fi
+
+  case "$RUNNER_ROLE" in
+    general|ai) ;;
+    *) fail "RUNNER_ROLE must be general or ai" ;;
+  esac
+  [[ "$RUNNER_INDEX" =~ ^[1-9][0-9]*$ ]] || fail "RUNNER_INDEX must be a positive integer"
+  if [ "$RUNNER_ROLE" = "ai" ] && [ "$RUNNER_INDEX" != "1" ]; then
+    fail "Only one AI runner is supported; keep RUNNER_INDEX=1"
+  fi
+  if [ "$RUNNER_ROLE" = "ai" ] && [[ ",$AI_LABELS," == *,ci-scope,* ]]; then
+    fail "AI_LABELS must not include the general ci-scope label"
   fi
 
   case "$1" in
