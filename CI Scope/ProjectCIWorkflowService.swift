@@ -1,14 +1,5 @@
 import Foundation
 
-private struct GitHubArtifactList: Decodable {
-    let artifacts: [GitHubArtifact]
-}
-
-private struct GitHubArtifact: Decodable {
-    let name: String
-    let expired: Bool
-}
-
 private final class ProjectCIResponseCache {
     static let shared = ProjectCIResponseCache()
 
@@ -239,94 +230,6 @@ extension ProjectCIService {
             let response = LoadResponse<[GitHubRun]>(error: error.localizedDescription)
             ProjectCIResponseCache.shared.storeRuns(response, slug: project.repositorySlug)
             return response
-        }
-    }
-
-    func loadUnifiedManifest(for project: CIProject) async -> LoadResponse<CIScopeManifest> {
-        let command = """
-            gh api --cache 30s -H 'Accept: application/vnd.github.raw+json' \(quoted("repos/\(project.repositorySlug)/contents/.ci-scope.json"))
-            """
-        let result = await ShellClient.run(command, timeout: 15, config: config)
-        if result.exitCode != 0 {
-            if result.output.contains("HTTP 404") || result.output.contains("Not Found") {
-                return LoadResponse()
-            }
-            return LoadResponse(error: "Unable to read .ci-scope.json.")
-        }
-        guard let data = result.output.data(using: .utf8) else {
-            return LoadResponse(error: "Unable to decode .ci-scope.json.")
-        }
-        do {
-            return LoadResponse(value: try CIScopeManifest.decode(data))
-        } catch {
-            return LoadResponse(error: error.localizedDescription)
-        }
-    }
-
-    func loadUnifiedChecks(
-        for project: CIProject, manifest: CIScopeManifest, runs: [GitHubRun]
-    ) async -> UnifiedChecksSnapshot {
-        guard
-            let run = runs.first(where: {
-                $0.workflowName == "CI Scope" || $0.workflowName == "CI Scope / Checks"
-            })
-        else {
-            return UnifiedChecksSnapshot(
-                manifest: manifest, run: nil, report: nil, artifact: .missing)
-        }
-        guard run.status == "completed" else {
-            return UnifiedChecksSnapshot(
-                manifest: manifest, run: run, report: nil, artifact: .pending)
-        }
-
-        let artifactCommand = """
-            gh api --cache 30s \(quoted("repos/\(project.repositorySlug)/actions/runs/\(run.databaseId)/artifacts"))
-            """
-        let artifactResult = await ShellClient.run(artifactCommand, timeout: 15, config: config)
-        guard artifactResult.exitCode == 0,
-            let data = artifactResult.output.data(using: .utf8),
-            let list = try? JSONDecoder().decode(GitHubArtifactList.self, from: data),
-            let artifact = list.artifacts.first(where: { $0.name.hasPrefix("ci-scope-") })
-        else {
-            return UnifiedChecksSnapshot(
-                manifest: manifest, run: run, report: nil, artifact: .missing)
-        }
-        guard !artifact.expired else {
-            return UnifiedChecksSnapshot(
-                manifest: manifest, run: run, report: nil, artifact: .expired)
-        }
-
-        let downloadCommand = """
-            tmp=$(mktemp -d)
-            cleanup() { rm -rf "$tmp"; }
-            trap cleanup EXIT
-            gh run download \(run.databaseId) --repo \(quoted(project.repositorySlug)) --name \(quoted(artifact.name)) --dir "$tmp" >/dev/null
-            report_file=$(find "$tmp" -type f -name result.json -print -quit)
-            if [[ -n "$report_file" ]]; then head -c 65537 "$report_file"; fi
-            """
-        let download = await ShellClient.run(downloadCommand, timeout: 30, config: config)
-        guard download.exitCode == 0, let reportData = download.output.data(using: .utf8),
-            !reportData.isEmpty
-        else {
-            return UnifiedChecksSnapshot(
-                manifest: manifest, run: run, report: nil,
-                artifact: .invalid("result.json is unavailable"))
-        }
-        do {
-            let report = try UnifiedChecksReport.decode(reportData, project: project, run: run)
-            guard Set(report.checks.map(\.id)) == Set(manifest.checks.map(\.id)),
-                report.checks.count == manifest.checks.count
-            else {
-                return UnifiedChecksSnapshot(
-                    manifest: manifest, run: run, report: nil,
-                    artifact: .invalid("result.json checks do not match .ci-scope.json"))
-            }
-            return UnifiedChecksSnapshot(
-                manifest: manifest, run: run, report: report, artifact: .available(name: artifact.name))
-        } catch {
-            return UnifiedChecksSnapshot(
-                manifest: manifest, run: run, report: nil,
-                artifact: .invalid(error.localizedDescription))
         }
     }
 

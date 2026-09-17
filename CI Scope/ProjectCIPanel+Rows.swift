@@ -109,45 +109,30 @@ struct UnifiedChecksSection: View {
 
             if let report = snapshot.report {
                 ForEach(report.checks) { check in
-                    checkRow(
-                        id: check.id,
-                        type: check.type,
-                        status: check.status,
-                        detail: check.detail ?? check.reason,
-                        durationMs: check.durationMs,
-                        required: check.required
-                    )
+                    checkRow(CheckRowInfo(check: check))
                 }
             } else {
+                let pendingStatus = snapshot.run?.status == "completed" ? "unavailable" : "queued"
                 ForEach(snapshot.manifest.checks) { check in
-                    checkRow(
-                        id: check.id,
-                        type: check.type,
-                        status: snapshot.run?.status == "completed" ? "unavailable" : "queued",
-                        detail: nil,
-                        durationMs: nil,
-                        required: nil
-                    )
+                    checkRow(CheckRowInfo(pending: check, status: pendingStatus))
                 }
             }
         }
     }
 
-    private func checkRow(
-        id: String, type: String?, status: String, detail: String?, durationMs: Int?, required: Bool?
-    ) -> some View {
+    private func checkRow(_ row: CheckRowInfo) -> some View {
         HStack(spacing: 8) {
-            StatusDot(state: state(status: status, required: required))
+            StatusDot(state: state(status: row.status, required: row.required))
             VStack(alignment: .leading, spacing: 2) {
-                Text(id)
+                Text(row.id)
                     .font(.callout.weight(.semibold))
-                Text([type, detail].compactMap { $0 }.joined(separator: " · "))
+                Text([row.type, row.detail].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer()
-            Text(durationMs.map(duration) ?? status)
+            Text(row.durationMs.map(duration) ?? row.status)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
         }

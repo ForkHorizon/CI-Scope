@@ -131,12 +131,7 @@ struct GateMatrixView: View {
                 .foregroundStyle(Color.accentColor)
             let parts = project.repositorySlug.split(separator: "/")
             if parts.count == 2 {
-                Text(parts[0] + "/")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    + Text(parts[1])
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
+                Text(styledSlug(owner: parts[0], name: parts[1]))
             } else {
                 Text(project.repositorySlug)
                     .font(.caption.weight(.semibold))
@@ -144,6 +139,20 @@ struct GateMatrixView: View {
         }
         .lineLimit(1)
         .truncationMode(.middle)
+    }
+
+    /// `Text` concatenation via `+` is deprecated (macOS 26); build one
+    /// AttributedString with per-run styling instead so "owner/" stays
+    /// secondary and dimmer while the repo name stays bold and primary.
+    private func styledSlug(owner: Substring, name: Substring) -> AttributedString {
+        var result = AttributedString("\(owner)/")
+        result.font = .caption2
+        result.foregroundColor = .secondary
+        var nameRun = AttributedString(String(name))
+        nameRun.font = .caption.weight(.semibold)
+        nameRun.foregroundColor = .primary
+        result.append(nameRun)
+        return result
     }
 
     @ViewBuilder
