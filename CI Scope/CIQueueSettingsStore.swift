@@ -80,6 +80,22 @@ final class CIQueueSettingsStore: ObservableObject {
         persist()
     }
 
+    nonisolated static func migrateLabelsText(_ raw: String?) -> String {
+        guard let raw = raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "self-hosted, macOS, ARM64, ci-scope, ci-scope-v2"
+        }
+        var labels =
+            raw
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let lower = Set(labels.map { $0.lowercased() })
+        if !lower.contains("ci-scope-v2") {
+            labels.append("ci-scope-v2")
+        }
+        return labels.joined(separator: ", ")
+    }
+
     nonisolated static func snapshot(defaults: UserDefaults = .standard) -> CIQueueSettingsSnapshot {
         let fallbackName = Host.current().localizedName ?? "Mac"
         let machineIDKey = "ciScope.queue.machineID"
@@ -95,8 +111,7 @@ final class CIQueueSettingsStore: ObservableObject {
             deepSeekAPIKey: CIQueueKeychain.read(account: "deepSeekAPIKey") ?? "",
             machineID: machineID,
             machineName: defaults.string(forKey: "ciScope.queue.machineName") ?? fallbackName,
-            labelsText: defaults.string(forKey: "ciScope.queue.labelsText")
-                ?? "self-hosted, macOS, ARM64, ci-scope, ci-scope-v2",
+            labelsText: migrateLabelsText(defaults.string(forKey: "ciScope.queue.labelsText")),
             capacity: max(1, defaults.integer(forKey: "ciScope.queue.capacity"))
         )
     }
