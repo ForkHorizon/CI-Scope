@@ -85,6 +85,9 @@ struct ProjectCIPanel: View {
                             title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal",
                             state: snapshot?.state ?? .unknown)
                         LimitedStatusRow(
+                            title: "CI mode", value: ciModeSummary, icon: "square.stack.3d.up",
+                            state: ciModeState)
+                        LimitedStatusRow(
                             title: "MacBook runner", value: localRunnerSummary, icon: "desktopcomputer",
                             state: snapshot?.localRunner.state ?? .unknown)
                         runnerAccessRow
@@ -108,6 +111,14 @@ struct ProjectCIPanel: View {
 
                     if let script = codeLinterScript, let workflow = script.matchingWorkflow(in: snapshot) {
                         codeLinterStatusRow(script: script, workflow: workflow)
+                    }
+
+                    if let unifiedChecks = snapshot?.unifiedChecks {
+                        UnifiedChecksSection(snapshot: unifiedChecks)
+                    }
+
+                    if let error = snapshot?.unifiedChecksError {
+                        ErrorBox(text: "Unified checks: \(error)")
                     }
 
                     if let error = snapshot?.error {
@@ -161,6 +172,20 @@ struct ProjectCIPanel: View {
             return "No actions available"
         }
         return "\(snapshot.workflows.count) workflows · \(snapshot.runs.count) runs"
+    }
+
+    var ciModeSummary: String {
+        if let count = snapshot?.unifiedChecks?.manifest.checks.count {
+            return "Unified · \(count) checks"
+        }
+        if snapshot?.unifiedChecksError != nil { return "Manifest unavailable" }
+        return "Legacy workflows"
+    }
+
+    var ciModeState: ServiceState {
+        if snapshot?.unifiedChecks != nil { return .online }
+        if snapshot?.unifiedChecksError != nil { return .warning }
+        return .unknown
     }
 
     var installedScripts: [InstalledAutomationScript] {

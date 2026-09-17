@@ -52,18 +52,20 @@ struct AutomationScriptRenderer {
     private func placeholders() -> [String: String] {
         var result = builtInPlaceholders()
         for variable in script.variables {
-            result[variable.id] = variableValues[variable.id] ?? variable.defaultValue
+            let value = variableValues[variable.id] ?? variable.defaultValue
+            result[variable.id] = variable.id == "gates_sha" ? value.trimmed : value
         }
         return result
     }
 
     private func builtInPlaceholders() -> [String: String] {
-        [
+        let labels = runnerLabelsOverride ?? script.runnerLabels
+        return [
             "repository_slug": project.repositorySlug,
             "repository_owner": project.repositoryOwner,
             "repository_name": project.repositoryName,
-            "runner_labels": (runnerLabelsOverride ?? script.runnerLabels).joined(separator: ", "),
-            "runner_labels_json": jsonLabelArray(runnerLabelsOverride ?? script.runnerLabels),
+            "runner_labels": labels.joined(separator: ", "),
+            "runner_labels_json": jsonLabelArray(labels),
             "default_branch": defaultBranch,
             "script_id": script.id,
             "script_slug": script.scriptSlug,
@@ -73,7 +75,8 @@ struct AutomationScriptRenderer {
     }
 
     private func jsonLabelArray(_ labels: [String]) -> String {
-        "[" + labels.map { "\"\($0)\"" }.joined(separator: ", ") + "]"
+        guard let data = try? JSONEncoder().encode(labels) else { return "[]" }
+        return String(decoding: data, as: UTF8.self)
     }
 
     private func resolvedVariableValues() -> [String: String] {

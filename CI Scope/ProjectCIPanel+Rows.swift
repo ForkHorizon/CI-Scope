@@ -79,3 +79,94 @@ struct ProjectLiveWorkSection: View {
         }
     }
 }
+
+struct UnifiedChecksSection: View {
+    let snapshot: UnifiedChecksSnapshot
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Label("CI Scope / Checks", systemImage: "checkmark.seal")
+                    .font(.callout.weight(.semibold))
+                Spacer()
+                if let run = snapshot.run, let url = URL(string: run.url) {
+                    Link("Open run", destination: url)
+                        .font(.caption.weight(.semibold))
+                }
+            }
+
+            HStack(spacing: 6) {
+                Text(snapshot.run?.compactConclusion ?? "No runs")
+                Text("·")
+                Text(snapshot.artifact.description)
+                if let timings = snapshot.report?.timings {
+                    Text("·")
+                    Text("checks \(duration(timings.ordinaryMs)) · AI \(duration(timings.aiMs))")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            if let report = snapshot.report {
+                ForEach(report.checks) { check in
+                    checkRow(
+                        id: check.id,
+                        type: check.type,
+                        status: check.status,
+                        detail: check.detail ?? check.reason,
+                        durationMs: check.durationMs,
+                        required: check.required
+                    )
+                }
+            } else {
+                ForEach(snapshot.manifest.checks) { check in
+                    checkRow(
+                        id: check.id,
+                        type: check.type,
+                        status: snapshot.run?.status == "completed" ? "unavailable" : "queued",
+                        detail: nil,
+                        durationMs: nil,
+                        required: nil
+                    )
+                }
+            }
+        }
+    }
+
+    private func checkRow(
+        id: String, type: String?, status: String, detail: String?, durationMs: Int?, required: Bool?
+    ) -> some View {
+        HStack(spacing: 8) {
+            StatusDot(state: state(status: status, required: required))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(id)
+                    .font(.callout.weight(.semibold))
+                Text([type, detail].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Text(durationMs.map(duration) ?? status)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(Color.secondary.opacity(0.055))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+    }
+
+    private func state(status: String, required: Bool?) -> ServiceState {
+        switch status {
+        case "passed": .online
+        case "queued", "running", "skipped", "cancelled": .warning
+        case "failed", "timed_out", "infra_error": required == false ? .warning : .offline
+        default: .unknown
+        }
+    }
+
+    private func duration(_ milliseconds: Int) -> String {
+        milliseconds < 1_000 ? "\(milliseconds) ms" : "\(milliseconds / 1_000) s"
+    }
+}

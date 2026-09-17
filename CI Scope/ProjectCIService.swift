@@ -7,12 +7,14 @@ struct ProjectCIService {
         async let authResult = loadAuthStatus()
         async let workflowsResult = loadWorkflows(for: project, forceRefresh: forceRefresh)
         async let runsResult = loadRuns(for: project, forceRefresh: forceRefresh)
+        async let manifestResult = loadUnifiedManifest(for: project)
         async let localRunnerResult = loadLocalRunner(for: project)
         async let v2StatusResult = loadV2Status()
 
         let authResponse = await authResult
         let workflowResponse = await workflowsResult
         let runResponse = await runsResult
+        let manifestResponse = await manifestResult
         let localRunnerResponse = await localRunnerResult
         let v2StatusResponse = await v2StatusResult
 
@@ -22,6 +24,11 @@ struct ProjectCIService {
         snapshot.v2StatusError = v2StatusResponse?.error
         snapshot.workflows = workflowResponse.value ?? []
         snapshot.runs = runResponse.value ?? []
+        snapshot.unifiedChecksError = manifestResponse.error
+        if let manifest = manifestResponse.value {
+            snapshot.unifiedChecks = await loadUnifiedChecks(
+                for: project, manifest: manifest, runs: snapshot.runs)
+        }
         snapshot.refreshedAt = Date()
 
         var errors = [workflowResponse.error, runResponse.error].compactMap { $0 }

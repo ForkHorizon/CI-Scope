@@ -9,11 +9,13 @@ enum ServiceState: String, Equatable {
 
 struct GitHubRun: Identifiable, Decodable {
     let databaseId: Int
+    let attempt: Int?
     let status: String
     let conclusion: String?
     let displayTitle: String
     let workflowName: String
     let headBranch: String
+    let headSha: String?
     let event: String
     let createdAt: String
     let updatedAt: String

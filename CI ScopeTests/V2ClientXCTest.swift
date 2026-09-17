@@ -69,4 +69,91 @@ final class V2ClientXCTest: XCTestCase {
         XCTAssertEqual(V2ClientFeature.authorityState(defaults: defaults), .legacyBroker)
         XCTAssertFalse(V2ClientFeature.statusAdapterEnabled(defaults: defaults))
     }
+
+    func testUnifiedManifestRejectsUnknownVersionAndDuplicateIDs() throws {
+        XCTAssertThrowsError(
+            try CIScopeManifest.decode(Data(#"{"version":2,"checks":[{"id":"lint","type":"code-linter"}]}"#.utf8))
+        ) { error in
+            XCTAssertEqual(
+                error.localizedDescription, UnifiedChecksError.unsupportedManifestVersion.localizedDescription)
+        }
+        XCTAssertThrowsError(
+            try CIScopeManifest.decode(
+                Data(#"{"version":1,"checks":[{"id":"lint","type":"code-linter"},{"id":"lint","type":"python-quality"}]}"#.utf8)
+            )
+        ) { error in
+            XCTAssertEqual(error.localizedDescription, UnifiedChecksError.duplicateCheckID.localizedDescription)
+        }
+    }
+
+    func testUnifiedReportRequiresMatchingRunIdentity() throws {
+        let project = CIProject(
+            id: "forkhorizon/soma", title: "Soma", repositoryOwner: "ForkHorizon",
+            repositoryName: "Soma", repositorySlug: "ForkHorizon/Soma",
+            remoteURL: "https://github.com/ForkHorizon/Soma.git")
+        let run = GitHubRun(
+            databaseId: 42, attempt: 2, status: "completed", conclusion: "success",
+            displayTitle: "Unified", workflowName: "CI Scope", headBranch: "feature",
+            headSha: "abc123", event: "pull_request", createdAt: "", updatedAt: "",
+            url: "https://github.com/ForkHorizon/Soma/actions/runs/42")
+        let valid = Data(
+            #"{"version":1,"status":"passed","head":"abc123","run":{"repository":"ForkHorizon/Soma","run_id":"42","attempt":"2","checked_sha":"merge456"},"checks":[{"id":"lint","type":"code-linter","status":"passed","required":true,"duration_ms":10}],"timings":{"ordinary_ms":10,"ai_ms":0}}"#
+                .utf8)
+        let report = try UnifiedChecksReport.decode(valid, project: project, run: run)
+        XCTAssertEqual(report.checks.first?.durationMs, 10)
+
+        let wrongAttempt = Data(
+            #"{"version":1,"status":"passed","head":"abc123","run":{"repository":"ForkHorizon/Soma","run_id":"42","attempt":"1","checked_sha":"merge456"},"checks":[]}"#
+                .utf8)
+        XCTAssertThrowsError(
+            try UnifiedChecksReport.decode(wrongAttempt, project: project, run: run)
+        ) { error in
+            XCTAssertEqual(error.localizedDescription, UnifiedChecksError.reportIdentityMismatch.localizedDescription)
+        }
+    }
+
+    func testUnifiedChecksSeedRendersPinnedWorkflowAndManifest() throws {
+        XCTAssertTrue(AutomationScriptSeedProvider.defaultSeedIDs.contains("ci-scope-unified-checks"))
+        let script = AutomationScriptSeedProvider.fallbackUnifiedChecksSeed()
+        let project = CIProject(
+            id: "forkhorizon/soma", title: "Soma", repositoryOwner: "ForkHorizon",
+            repositoryName: "Soma", repositorySlug: "ForkHorizon/Soma",
+            remoteURL: "https://github.com/ForkHorizon/Soma.git")
+        let sha = String(repeating: "a", count: 40)
+        let renderer = AutomationScriptRenderer(
+            script: script,
+            project: project,
+            variableValues: ["gates_sha": sha],
+            defaultBranch: "main")
+
+        try renderer.validate()
+        let files = try renderer.renderedFiles()
+        XCTAssertEqual(Set(files.map(\.destinationPath)), [".ci-scope.json", ".github/workflows/ci-scope-checks.yml"])
+        let workflow = try XCTUnwrap(files.first { $0.id == "workflow" }?.contents)
+        XCTAssertTrue(workflow.contains("CI_SCOPE_GATES_SHA: \(sha)"))
+        XCTAssertTrue(workflow.contains("git show \"$BASE_SHA:.ci-scope.json\""))
+        XCTAssertTrue(workflow.contains("EVENT_NAME\" == \"pull_request\" || \"$EVENT_NAME\" == \"merge_group\""))
+        XCTAssertTrue(workflow.contains("--config \"${{ steps.policy.outputs.config }}\""))
+        XCTAssertTrue(workflow.contains("unsafe policy symlink"))
+        XCTAssertTrue(workflow.contains("target.resolve(strict=False) != target"))
+        XCTAssertFalse(workflow.contains("{{gates_sha}}"))
+        XCTAssertNoThrow(
+            try JSONSerialization.jsonObject(
+                with: Data(try XCTUnwrap(files.first { $0.id == "manifest" }?.contents).utf8)))
+    }
+
+    func testUnifiedChecksSeedRejectsFloatingOrMalformedGatesRef() {
+        let script = AutomationScriptSeedProvider.fallbackUnifiedChecksSeed()
+        let project = CIProject(
+            id: "forkhorizon/soma", title: "Soma", repositoryOwner: "ForkHorizon",
+            repositoryName: "Soma", repositorySlug: "ForkHorizon/Soma",
+            remoteURL: "https://github.com/ForkHorizon/Soma.git")
+        let renderer = AutomationScriptRenderer(
+            script: script,
+            project: project,
+            variableValues: ["gates_sha": "main"],
+            defaultBranch: "main")
+
+        XCTAssertThrowsError(try renderer.validate())
+    }
 }

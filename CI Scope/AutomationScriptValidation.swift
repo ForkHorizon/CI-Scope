@@ -93,6 +93,12 @@ enum AutomationScriptValidator {
         if variable.kind == .option, !trimmed.isEmpty, !variable.options.contains(trimmed) {
             throw AutomationScriptError.invalidValue("\(variable.title) must match one of its options.")
         }
+        if variable.id == "gates_sha",
+            trimmed.count != 40
+                || !trimmed.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "0123456789abcdefABCDEF").contains($0) })
+        {
+            throw AutomationScriptError.invalidValue("\(variable.title) must be a full 40-character Git commit SHA.")
+        }
     }
 
     private static func validateBranchName(_ branch: String) throws {
