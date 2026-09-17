@@ -211,7 +211,7 @@ extension ProjectCIService {
             return LoadResponse(error: "\(pause.reason). Retrying after \(when).")
         }
         let command = """
-            gh run list --repo \(quoted(project.repositorySlug)) --limit 20 --json databaseId,status,conclusion,displayTitle,workflowName,headBranch,event,createdAt,updatedAt,url
+            gh run list --repo \(quoted(project.repositorySlug)) --limit 20 --json databaseId,attempt,status,conclusion,displayTitle,workflowName,headBranch,headSha,event,createdAt,updatedAt,url
             """
         let result = await ShellClient.run(command, timeout: 15, config: config)
         await GitHubRateLimitGate.shared.note(result: result, config: config)

@@ -2,6 +2,7 @@ import Foundation
 
 enum AutomationScriptSeedProvider {
     static let defaultSeedIDs = [
+        "ci-scope-unified-checks",
         "code-linter", "swift-quality-gate", "swift-compile-gate",
         "web-quality-gate", "python-quality-gate", "go-quality-gate",
         "unity-quality-gate", "slop-review",
@@ -12,6 +13,8 @@ enum AutomationScriptSeedProvider {
             return script
         }
         switch id {
+        case "ci-scope-unified-checks":
+            return fallbackUnifiedChecksSeed()
         case "code-linter":
             return fallbackCodeLinterSeed()
         case "swift-quality-gate":

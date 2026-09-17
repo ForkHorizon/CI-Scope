@@ -40,6 +40,8 @@ struct ProjectCISnapshot {
     var v2StatusError: String?
     var workflows: [GitHubWorkflow] = []
     var runs: [GitHubRun] = []
+    var unifiedChecks: UnifiedChecksSnapshot?
+    var unifiedChecksError: String?
     var error: String?
     var refreshedAt = Date()
 }
