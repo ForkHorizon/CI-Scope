@@ -5,7 +5,7 @@
   "detail": "Installs a thin GitHub Actions workflow that calls the shared advisory slop reviewer in ForkHorizon/ci-gates. On every pull request it sends the diff to DeepSeek AI model and posts warning annotations for likely AI-slop (swallowed errors, fake tests, misleading names, insecure patterns). Advisory only: it never blocks the merge.",
   "files": [
     {
-      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: slop-review-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  slop-review:\n    uses: ForkHorizon/ci-gates/.github/workflows/slop-review.yml@main\n    with:\n      runs-on: '{{runner_labels_json}}'\n",
+      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: slop-review-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  slop-review:\n    uses: ForkHorizon/ci-gates/.github/workflows/slop-review.yml@main\n    with:\n      runner-group: Default\n      runner-labels: '[\"self-hosted\", \"macOS\", \"ARM64\", \"ci-scope-ai\"]'\n      runner-label: ci-scope-ai\n",
       "destinationPath": ".github/workflows/{{script_slug}}.yml",
       "id": "workflow",
       "isExecutable": false
@@ -18,7 +18,7 @@
     "self-hosted",
     "macOS",
     "ARM64",
-    "ci-scope"
+    "ci-scope-ai"
   ],
   "summary": "Advisory DeepSeek LLM review of PR diffs for AI-slop; never blocks the merge.",
   "title": "Slop Review",
