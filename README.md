@@ -247,7 +247,24 @@ No open-source license has been declared yet. Until a license file is added, the
 - `Models.swift` contains shared status and snapshot models.
 - `ShellClient.swift` runs local shell commands with timeouts and configured environment.
 
-The app has no backend service. It reads local files, runs local shell commands, and uses the GitHub CLI from the Mac where the app is running.
+## CI Scope v2 Architecture
+
+CI Scope v2 upgrades the execution model from polling-based local brokers to a robust, JIT-dispatched and lease-gated architecture:
+
+- **Linux VPS Control-Plane (`https://ci.forkhorizon.com`)**:
+  - Serves as the central state coordinator, managing slot allocation, queue projection, and GitHub App JIT token minting.
+  - Ingests GitHub `workflow_job` webhooks in real-time, matching jobs by runner group (`ci-scope-v2-canary` / production) and self-hosted labels while quarantining hosted/mismatched runs.
+  - Maintains state in an optimized SQLite database with immediate timer dispatch (`setTimeout`), automated migrations, and daily integrity-checked backups.
+
+- **Headless Go Agent & Runner Supervision (macOS)**:
+  - The Go daemon (`agent/cmd/ci-scope-agent`) connects to the VPS over mutual credential-proofed HTTPS sessions.
+  - Manages runner capacity on the Mac, requesting disposable JIT runner credentials from the VPS when work is queued.
+  - Employs `scripts/ci-scope-runner-wrapper.sh` to supervise GitHub's `run.sh` / `Runner.Listener`, ensuring clean signal propagation and zero orphan processes upon cancellation or shutdown.
+  - Exposes a secure local Unix domain socket (`~/.config/ci-scope/agent.sock`, mode `0600`, UID-restricted) for the macOS desktop UI.
+
+- **Desktop UI Integration (`CI Scope.app`)**:
+  - Automatically interfaces with the Go agent via `V2ClientStatusAdapter` and `V2ClientControlSession`.
+  - Operates dynamically while the application is active and performs a graceful drain and session close when the app is quit.
 
 ## Safety Notes
 

@@ -43,7 +43,10 @@ struct ProjectStackDetector {
             config: config
         )
         guard result.exitCode == 0 else { return [] }
-        return Set(result.output.split(separator: "\n").map { String($0).trimmed.lowercased() }.filter { !$0.isEmpty })
+        return Set(
+            result.output.split(separator: "\n").map { String($0).trimmed.lowercased() }.filter {
+                !$0.isEmpty
+            })
     }
 
     private func hasUnityMarker(_ project: CIProject) async -> Bool {
@@ -60,7 +63,7 @@ struct ProjectStackDetector {
     /// manifest carrying a top-level "unity" version field that npm's never has.
     private func isUnityPackage(_ project: CIProject) async -> Bool {
         let result = await ShellClient.run(
-            "gh api repos/\(quoted(project.repositorySlug))/contents/package.json --jq '.unity'",
+            "gh api -H 'Accept: application/vnd.github.raw+json' repos/\(quoted(project.repositorySlug))/contents/package.json --jq '.unity'",
             timeout: 30,
             config: config
         )
@@ -70,11 +73,12 @@ struct ProjectStackDetector {
 
     private func hasRootPackageJSON(_ project: CIProject) async -> Bool {
         let result = await ShellClient.run(
-            "gh api repos/\(quoted(project.repositorySlug))/contents/package.json --jq '.name'",
+            "gh api -H 'Accept: application/vnd.github.raw+json' repos/\(quoted(project.repositorySlug))/contents/package.json --jq '.name'",
             timeout: 30,
             config: config
         )
-        return result.exitCode == 0 && !result.output.trimmed.isEmpty
+        let value = result.output.trimmed
+        return result.exitCode == 0 && !value.isEmpty && value != "null"
     }
 
     /// Keep the canonical gate order (Code Linter first, slop review last) so the

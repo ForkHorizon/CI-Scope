@@ -10,12 +10,13 @@ extension AutomationScriptInstaller {
         project: CIProject,
         mode: AutomationScriptInstallMode
     ) async throws -> AutomationScriptInstallResult {
-        _ = try await run("NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
-        try await validateBrokerAccessIfNeeded(mode: mode, project: project)
+        _ = try await run(
+            "NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
+        try await validateRunnerAccessIfNeeded(mode: mode, project: project)
         for script in scripts {
             try validateRunnerLabelsSatisfiable(mode: mode, script: script, project: project)
         }
-        try await attachBrokerIfNeeded(mode: mode, project: project)
+        try await attachRunnerIfNeeded(mode: mode, project: project)
 
         let defaultBranch = try await defaultBranch(for: project)
         let tempRoot = try temporaryRoot()
@@ -28,7 +29,8 @@ extension AutomationScriptInstaller {
         let branchExists = await remoteBranchExists(branch, cwd: repoURL)
         try await checkoutBranch(branch, exists: branchExists, cwd: repoURL)
 
-        let touched = try await stageAll(scripts, project: project, defaultBranch: defaultBranch, mode: mode, repoURL: repoURL)
+        let touched = try await stageAll(
+            scripts, project: project, defaultBranch: defaultBranch, mode: mode, repoURL: repoURL)
 
         if try await hasStagedChanges(files: touched, cwd: repoURL) {
             try await commitAndPushBundle(branch: branch, cwd: repoURL)
@@ -37,9 +39,11 @@ extension AutomationScriptInstaller {
             return bundleResult(count: scripts.count, pullRequestURL: nil, alreadyInstalled: true)
         }
         let pullRequestURL = try await bundlePullRequestURL(
-            project: project, scripts: scripts, defaultBranch: defaultBranch, branch: branch, tempRoot: tempRoot
+            project: project, scripts: scripts, defaultBranch: defaultBranch, branch: branch,
+            tempRoot: tempRoot
         )
-        return bundleResult(count: scripts.count, pullRequestURL: pullRequestURL, alreadyInstalled: false)
+        return bundleResult(
+            count: scripts.count, pullRequestURL: pullRequestURL, alreadyInstalled: false)
     }
 
     private func stageAll(
@@ -113,7 +117,9 @@ extension AutomationScriptInstaller {
             """
     }
 
-    private func bundleResult(count: Int, pullRequestURL: URL?, alreadyInstalled: Bool) -> AutomationScriptInstallResult {
+    private func bundleResult(count: Int, pullRequestURL: URL?, alreadyInstalled: Bool)
+        -> AutomationScriptInstallResult
+    {
         if alreadyInstalled {
             return AutomationScriptInstallResult(
                 title: "Gates already installed",

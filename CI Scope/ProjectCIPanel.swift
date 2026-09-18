@@ -7,9 +7,10 @@ struct ProjectCIPanel: View {
     let isLoading: Bool
     let liveJobs: [RunnerWorkItem]
     let scripts: [AutomationScript]
-    let isBrokerManaged: Bool
+    let isV2Managed: Bool
+    @ObservedObject var v2Control: V2ClientControlSession
     let removalSnapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
-    let onAttachToBroker: () -> Void
+    let onAttachToRunner: () -> Void
     let onRemoveScript: (AutomationScript) -> Void
     @ObservedObject var installViewModel: AutomationScriptInstallViewModel
     @State var codeLinterStatus: CodeLinterWorkflowStatus = .unavailable
@@ -78,13 +79,24 @@ struct ProjectCIPanel: View {
                     }
 
                     LazyVGrid(columns: projectInfoColumns, spacing: 8) {
-                        LimitedStatusRow(title: "Repository", value: project.remoteURL, icon: "link", state: .online)
                         LimitedStatusRow(
-                            title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal", state: snapshot?.state ?? .unknown)
+                            title: "Repository", value: project.remoteURL, icon: "link", state: .online)
+                        LimitedStatusRow(
+                            title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal",
+                            state: snapshot?.state ?? .unknown)
+                        LimitedStatusRow(
+                            title: "CI mode", value: ciModeSummary, icon: "square.stack.3d.up",
+                            state: ciModeState)
                         LimitedStatusRow(
                             title: "MacBook runner", value: localRunnerSummary, icon: "desktopcomputer",
                             state: snapshot?.localRunner.state ?? .unknown)
-                        brokerAccessRow
+                        runnerAccessRow
+                        if V2ClientFeature.statusAdapterEnabled() {
+                            v2StatusRow
+                        }
+                        if v2Control.isV2ControlVisible {
+                            v2ControlRow
+                        }
                     }
 
                     HStack {
@@ -99,6 +111,14 @@ struct ProjectCIPanel: View {
 
                     if let script = codeLinterScript, let workflow = script.matchingWorkflow(in: snapshot) {
                         codeLinterStatusRow(script: script, workflow: workflow)
+                    }
+
+                    if let unifiedChecks = snapshot?.unifiedChecks {
+                        UnifiedChecksSection(snapshot: unifiedChecks)
+                    }
+
+                    if let error = snapshot?.unifiedChecksError {
+                        ErrorBox(text: "Unified checks: \(error)")
                     }
 
                     if let error = snapshot?.error {
@@ -125,7 +145,9 @@ struct ProjectCIPanel: View {
                         ProjectRunList(runs: snapshot.runs)
                     }
 
-                    if snapshot?.error == nil, snapshot?.workflows.isEmpty != false, snapshot?.runs.isEmpty != false, !isLoading {
+                    if snapshot?.error == nil, snapshot?.workflows.isEmpty != false,
+                        snapshot?.runs.isEmpty != false, !isLoading
+                    {
                         EmptyState(icon: "icloud.slash", text: "No actions available")
                     }
                 }
@@ -133,41 +155,6 @@ struct ProjectCIPanel: View {
             }
         }
         .task(id: codeLinterWorkflowPath) { await refreshCodeLinterStatus() }
-    }
-
-    private var brokerAccessRow: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "point.3.filled.connected.trianglepath.dotted")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 18)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("MacBook runner")
-                    .font(.callout.weight(.semibold))
-                    .lineLimit(1)
-                Text(isBrokerManaged ? "Broker managed" : "No MacBook runner access")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer()
-            if isBrokerManaged {
-                StatusDot(state: .online)
-            } else {
-                Button("Attach") {
-                    onAttachToBroker()
-                }
-                .font(.caption.weight(.semibold))
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
     }
 
     var ciSummary: String {
@@ -187,6 +174,20 @@ struct ProjectCIPanel: View {
         return "\(snapshot.workflows.count) workflows · \(snapshot.runs.count) runs"
     }
 
+    var ciModeSummary: String {
+        if let count = snapshot?.unifiedChecks?.manifest.checks.count {
+            return "Unified · \(count) checks"
+        }
+        if snapshot?.unifiedChecksError != nil { return "Manifest unavailable" }
+        return "Legacy workflows"
+    }
+
+    var ciModeState: ServiceState {
+        if snapshot?.unifiedChecks != nil { return .online }
+        if snapshot?.unifiedChecksError != nil { return .warning }
+        return .unknown
+    }
+
     var installedScripts: [InstalledAutomationScript] {
         guard snapshot != nil else { return [] }
 
@@ -200,7 +201,9 @@ struct ProjectCIPanel: View {
                 result.append(match)
                 return
             }
-            if let existingIndex = result.firstIndex(where: { $0.workflow.path?.normalizedWorkflowPath == workflowPath }) {
+            if let existingIndex = result.firstIndex(where: {
+                $0.workflow.path?.normalizedWorkflowPath == workflowPath
+            }) {
                 if match.workflow.name == match.script.title {
                     result[existingIndex] = match
                 }
@@ -256,24 +259,8 @@ struct ProjectCIPanel: View {
     }
 }
 
-private struct ProjectLiveWorkSection: View {
-    let items: [RunnerWorkItem]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Label("Running now", systemImage: "waveform.path.ecg")
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
-
-            ForEach(items) { item in
-                LiveWorkCard(item: item, compact: true)
-            }
-        }
-    }
-}
-
-private extension String {
-    var normalizedWorkflowPath: String {
+extension String {
+    fileprivate var normalizedWorkflowPath: String {
         trimmed
             .replacingOccurrences(of: "\\", with: "/")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))

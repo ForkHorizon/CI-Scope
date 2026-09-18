@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 import UserNotifications
 
 @MainActor
@@ -140,7 +140,8 @@ final class NotificationManager: ObservableObject {
         if notification.newJobs.count == 1 {
             content.body = "\(firstJob.workflowName): \(firstJob.jobName)"
         } else {
-            content.body = "\(firstJob.workflowName): \(firstJob.jobName) and \(notification.newJobs.count - 1) more"
+            content.body =
+                "\(firstJob.workflowName): \(firstJob.jobName) and \(notification.newJobs.count - 1) more"
         }
         content.sound = UNNotificationSound.default
 

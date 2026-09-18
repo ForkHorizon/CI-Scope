@@ -53,7 +53,7 @@ struct RunnerWebhookStrip: View {
 
     private var detailText: String {
         guard let webhook else {
-            return "Waiting for broker state."
+            return "Waiting for agent state."
         }
 
         if let error = webhook.lastError, !error.isEmpty {

@@ -32,7 +32,9 @@ struct ScriptInstallSubmenu: View {
                 }
 
                 Button(action: onInstall) {
-                    Label(snapshot.isInstalling ? "Installing" : "Create Pull Request", systemImage: "arrow.up.right.square")
+                    Label(
+                        snapshot.isInstalling ? "Installing" : "Create Pull Request",
+                        systemImage: "arrow.up.right.square")
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(selectedProjectID == nil || snapshot.isInstalling)

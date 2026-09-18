@@ -37,8 +37,8 @@ enum AutomationScriptNaming {
     }
 }
 
-private extension UnicodeScalar {
-    var isASCIIAlphanumeric: Bool {
+extension UnicodeScalar {
+    fileprivate var isASCIIAlphanumeric: Bool {
         ("a"..."z").contains(String(self)) || ("0"..."9").contains(String(self))
     }
 }

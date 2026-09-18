@@ -36,8 +36,12 @@ struct GitHubWorkflow: Identifiable, Decodable {
 struct ProjectCISnapshot {
     var state: ServiceState = .unknown
     var localRunner = ProjectLocalRunnerStatus()
+    var v2Status: V2ClientStatusProjection?
+    var v2StatusError: String?
     var workflows: [GitHubWorkflow] = []
     var runs: [GitHubRun] = []
+    var unifiedChecks: UnifiedChecksSnapshot?
+    var unifiedChecksError: String?
     var error: String?
     var refreshedAt = Date()
 }
