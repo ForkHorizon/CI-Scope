@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 struct CIProject: Identifiable, Codable, Equatable {
     let id: String
@@ -112,7 +112,16 @@ final class ProjectStore: ObservableObject {
         }
     }
 
-    private static func loadProjects(from defaults: UserDefaults, key: String) -> [CIProject] {
+    nonisolated static func loadConfiguredProjects(from defaults: UserDefaults = .standard)
+        -> [CIProject]
+    {
+        let loaded = loadProjects(from: defaults, key: "ciScope.projects")
+        return normalizedProjects(loaded)
+    }
+
+    nonisolated private static func loadProjects(from defaults: UserDefaults, key: String)
+        -> [CIProject]
+    {
         guard
             let data = defaults.data(forKey: key),
             let decoded = try? JSONDecoder().decode([CIProject].self, from: data)
@@ -122,7 +131,7 @@ final class ProjectStore: ObservableObject {
         return decoded
     }
 
-    private static func normalizedProjects(_ projects: [CIProject]) -> [CIProject] {
+    nonisolated private static func normalizedProjects(_ projects: [CIProject]) -> [CIProject] {
         var seen = Set<String>()
         var result: [CIProject] = []
 
@@ -175,7 +184,8 @@ final class ProjectStore: ObservableObject {
     private static func isValidGitHubComponent(_ value: String) -> Bool {
         guard !value.isEmpty else { return false }
         if value.hasPrefix("-") || value.hasPrefix(".") { return false }
-        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+        let allowed = CharacterSet(
+            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
         return value.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 

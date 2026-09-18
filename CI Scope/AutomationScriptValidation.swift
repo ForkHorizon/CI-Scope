@@ -32,7 +32,8 @@ enum AutomationScriptValidator {
             throw AutomationScriptError.invalidValue("File destination path is required.")
         }
         guard !value.hasPrefix("/"), !value.contains("..") else {
-            throw AutomationScriptError.invalidValue("File path must be relative and cannot contain '..'.")
+            throw AutomationScriptError.invalidValue(
+                "File path must be relative and cannot contain '..'.")
         }
         let invalid = CharacterSet.newlines.union(CharacterSet(charactersIn: "\0"))
         guard value.rangeOfCharacter(from: invalid) == nil else {
@@ -42,7 +43,8 @@ enum AutomationScriptValidator {
 
     private static func validateScriptIdentity(_ script: AutomationScript) throws {
         guard isSafeIdentifier(script.id) else {
-            throw AutomationScriptError.invalidValue("Script id can use letters, numbers, '.', '_' and '-'.")
+            throw AutomationScriptError.invalidValue(
+                "Script id can use letters, numbers, '.', '_' and '-'.")
         }
         guard !script.title.trimmed.isEmpty else {
             throw AutomationScriptError.invalidValue("Script title is required.")
@@ -91,6 +93,12 @@ enum AutomationScriptValidator {
         if variable.kind == .option, !trimmed.isEmpty, !variable.options.contains(trimmed) {
             throw AutomationScriptError.invalidValue("\(variable.title) must match one of its options.")
         }
+        if variable.id == "gates_sha",
+            trimmed.count != 40
+                || !trimmed.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "0123456789abcdefABCDEF").contains($0) })
+        {
+            throw AutomationScriptError.invalidValue("\(variable.title) must be a full 40-character Git commit SHA.")
+        }
     }
 
     private static func validateBranchName(_ branch: String) throws {
@@ -99,14 +107,16 @@ enum AutomationScriptValidator {
         guard !value.isEmpty, value.rangeOfCharacter(from: blocked) == nil else {
             throw AutomationScriptError.invalidValue("Rendered branch name is not valid.")
         }
-        guard !value.hasPrefix("-"), !value.hasPrefix("/"), !value.hasSuffix("/"), !value.contains("..") else {
+        guard !value.hasPrefix("-"), !value.hasPrefix("/"), !value.hasSuffix("/"), !value.contains("..")
+        else {
             throw AutomationScriptError.invalidValue("Rendered branch name is not valid.")
         }
     }
 
     private static func isSafeIdentifier(_ value: String) -> Bool {
         guard !value.isEmpty else { return false }
-        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+        let allowed = CharacterSet(
+            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
         return value.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 }

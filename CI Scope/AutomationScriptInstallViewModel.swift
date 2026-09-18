@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 @MainActor
 final class AutomationScriptInstallViewModel: ObservableObject {
@@ -16,7 +16,9 @@ final class AutomationScriptInstallViewModel: ObservableObject {
         return snapshots[installKey(script)] ?? .idle
     }
 
-    func removalSnapshot(for script: AutomationScript, project: CIProject) -> AutomationScriptInstallSnapshot {
+    func removalSnapshot(for script: AutomationScript, project: CIProject)
+        -> AutomationScriptInstallSnapshot
+    {
         snapshots[removeKey(script, project: project)] ?? .idle
     }
 
@@ -69,7 +71,8 @@ final class AutomationScriptInstallViewModel: ObservableObject {
         snapshots[snapshotKey] = .installingBundle(count: scripts.count)
         Task {
             do {
-                let result = try await installer.installBundle(scripts: scripts, project: project, mode: mode)
+                let result = try await installer.installBundle(
+                    scripts: scripts, project: project, mode: mode)
                 ProjectCIService.invalidateWorkflowsCache(forRepositorySlug: project.repositorySlug)
                 snapshots[snapshotKey] = .succeeded(result)
                 onSuccess()

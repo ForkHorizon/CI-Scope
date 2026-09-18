@@ -40,7 +40,8 @@ private struct JobNotificationBanner: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 8) {
                             if !notification.runningJobs.isEmpty {
-                                JobNotificationSection(title: "Running Now", jobs: notification.runningJobs, tint: .green)
+                                JobNotificationSection(
+                                    title: "Running Now", jobs: notification.runningJobs, tint: .green)
                             }
 
                             if !notification.queuedJobs.isEmpty {

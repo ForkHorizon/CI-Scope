@@ -30,7 +30,8 @@ enum ShellClient {
                 do {
                     try process.run()
                 } catch {
-                    continuation.resume(returning: ShellResult(exitCode: 127, output: error.localizedDescription))
+                    continuation.resume(
+                        returning: ShellResult(exitCode: 127, output: error.localizedDescription))
                     return
                 }
 
@@ -38,7 +39,8 @@ enum ShellClient {
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 let output = String(data: data, encoding: .utf8) ?? ""
                 let sanitizedOutput = sanitizeOutput(output)
-                continuation.resume(returning: ShellResult(exitCode: process.terminationStatus, output: sanitizedOutput))
+                continuation.resume(
+                    returning: ShellResult(exitCode: process.terminationStatus, output: sanitizedOutput))
             }
         }
         logResult(loggedCommand, result, durationMs: Int(Date().timeIntervalSince(start) * 1000))
@@ -72,7 +74,8 @@ enum ShellClient {
             "(ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9]+",
             "([Tt]oken[\"'=:\\s]+)[A-Za-z0-9._-]{8,}",
         ] {
-            redacted = redacted.replacingOccurrences(of: pattern, with: "$1<redacted>", options: .regularExpression)
+            redacted = redacted.replacingOccurrences(
+                of: pattern, with: "$1<redacted>", options: .regularExpression)
         }
         return redacted
     }
@@ -107,7 +110,9 @@ enum ShellClient {
 
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = config.shellPath
-        environment.forEach { env[$0.key] = $0.value }
+        for (key, value) in environment {
+            env[key] = value
+        }
         process.environment = env
         return process
     }

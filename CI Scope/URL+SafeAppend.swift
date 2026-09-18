@@ -14,7 +14,9 @@ extension URL {
 
     /// Appends a path component while ensuring the resulting URL is a descendant of `self`.
     /// Throws an error if a path traversal attack is detected (e.g., using "../").
-    func safelyAppendingPathComponent(_ pathComponent: String, isDirectory: Bool = false) throws -> URL {
+    func safelyAppendingPathComponent(_ pathComponent: String, isDirectory: Bool = false) throws
+        -> URL
+    {
         let component = pathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !component.isEmpty else {
             return self

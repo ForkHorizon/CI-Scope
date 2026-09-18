@@ -14,7 +14,9 @@ extension AutomationScriptInstaller {
         renderer: AutomationScriptRenderer,
         tempRoot: URL
     ) async throws -> URL? {
-        if let existingURL = try await existingPullRequestURL(project: project, branch: renderer.branchName) {
+        if let existingURL = try await existingPullRequestURL(
+            project: project, branch: renderer.branchName)
+        {
             return existingURL
         }
         let draft = PullRequestDraft(
@@ -99,7 +101,9 @@ extension AutomationScriptInstaller {
         )
     }
 
-    func alreadyInstalledResult(_ script: AutomationScript, defaultBranch: String) -> AutomationScriptInstallResult {
+    func alreadyInstalledResult(_ script: AutomationScript, defaultBranch: String)
+        -> AutomationScriptInstallResult
+    {
         AutomationScriptInstallResult(
             title: "\(script.title) already installed",
             detail: "The rendered script files already match \(defaultBranch).",
@@ -107,7 +111,9 @@ extension AutomationScriptInstaller {
         )
     }
 
-    func readyResult(_ script: AutomationScript, pullRequestURL: URL?) -> AutomationScriptInstallResult {
+    func readyResult(_ script: AutomationScript, pullRequestURL: URL?)
+        -> AutomationScriptInstallResult
+    {
         AutomationScriptInstallResult(
             title: "\(script.title) PR ready",
             detail: "Open and merge the PR. The workflow uses this script's configured runner labels.",
@@ -115,7 +121,9 @@ extension AutomationScriptInstaller {
         )
     }
 
-    func alreadyRemovedResult(_ script: AutomationScript, defaultBranch: String) -> AutomationScriptInstallResult {
+    func alreadyRemovedResult(_ script: AutomationScript, defaultBranch: String)
+        -> AutomationScriptInstallResult
+    {
         AutomationScriptInstallResult(
             title: "\(script.title) already removed",
             detail: "No installed script files were found on \(defaultBranch).",
@@ -123,7 +131,9 @@ extension AutomationScriptInstaller {
         )
     }
 
-    func removalReadyResult(_ script: AutomationScript, pullRequestURL: URL?) -> AutomationScriptInstallResult {
+    func removalReadyResult(_ script: AutomationScript, pullRequestURL: URL?)
+        -> AutomationScriptInstallResult
+    {
         AutomationScriptInstallResult(
             title: "\(script.title) removal PR ready",
             detail: "Open and merge the PR to remove this script from the project.",
