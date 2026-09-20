@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "checks": [
+    {
+      "id": "code-linter",
+      "type": "code-linter",
+      "config": ".code-linter.json",
+      "params": {"mode": "auto"}
+    },
+    {
+      "id": "python-quality",
+      "type": "python-quality"
+    },
+    {
+      "id": "swift-quality",
+      "type": "swift-quality",
+      "config": ".swift-quality-gate.json",
+      "params": {"run_build": false},
+      "resources": ["xcode"]
+    },
+    {
+      "id": "swift-compile",
+      "type": "swift-compile",
+      "config": ".swift-compile-gate.json",
+      "resources": ["xcode"]
+    },
+    {
+      "id": "slop-review",
+      "type": "slop-review",
+      "events": ["pull_request", "workflow_dispatch"],
+      "resources": ["ollama"],
+      "params": {"model": "qwen3-coder:30b-a3b-q4_K_M"}
+    }
+  ]
+}

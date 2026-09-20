@@ -1,0 +1,6 @@
+/.ci-scope.json @Daliys
+/.code-linter.json @Daliys
+/.swift-quality-gate.json @Daliys
+/.swift-compile-gate.json @Daliys
+/.github/workflows/ @Daliys
+/.github/CODEOWNERS @Daliys
