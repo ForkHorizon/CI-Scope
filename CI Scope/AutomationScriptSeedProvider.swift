@@ -5,7 +5,7 @@ enum AutomationScriptSeedProvider {
         "ci-scope-unified-checks",
         "code-linter", "swift-quality-gate", "swift-compile-gate",
         "web-quality-gate", "python-quality-gate", "go-quality-gate",
-        "unity-quality-gate", "slop-review",
+        "unity-quality-gate",
     ]
 
     static func loadSeed(_ id: String) throws -> AutomationScript {
@@ -29,8 +29,6 @@ enum AutomationScriptSeedProvider {
             return fallbackGoQualityGateSeed()
         case "unity-quality-gate":
             return fallbackUnityQualityGateSeed()
-        case "slop-review":
-            return fallbackSlopReviewSeed()
         default:
             throw AutomationScriptError.missingSeed(id)
         }

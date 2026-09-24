@@ -211,7 +211,6 @@ struct GateMatrixView: View {
         case "python-quality-gate": return ("Python", "Quality")
         case "go-quality-gate": return ("Go", "Quality")
         case "unity-quality-gate": return ("Unity", "Quality")
-        case "slop-review": return ("Slop", "Review")
         default:
             let words = script.title.split(separator: " ").map(String.init)
             if words.count >= 2 {
