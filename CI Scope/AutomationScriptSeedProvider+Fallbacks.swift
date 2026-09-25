@@ -149,10 +149,7 @@ extension AutomationScriptSeedProvider {
     }
 
     static func fallbackCallerWorkflow(jobID: String, gate: String, withConfig: Bool = true) -> String {
-        let runnerInputs =
-            jobID == "slop-review"
-            ? "      runner-group: Default\n      runner-labels: '[\"self-hosted\", \"macOS\", \"ARM64\", \"ci-scope-ai\"]'\n      runner-label: ci-scope-ai\n      model: qwen3-coder:30b-a3b-q4_K_M"
-            : "      runs-on: '{{runner_labels_json}}'"
+        let runnerInputs = "      runs-on: '{{runner_labels_json}}'"
         return """
             name: {{script_title}}
 
@@ -184,9 +181,7 @@ extension AutomationScriptSeedProvider {
             title: blurb.title,
             summary: blurb.summary,
             detail: blurb.detail,
-            runnerLabels: id == "slop-review"
-                ? ["self-hosted", "macOS", "ARM64", "ci-scope-ai"]
-                : ["self-hosted", "macOS", "ARM64", "ci-scope"],
+            runnerLabels: ["self-hosted", "macOS", "ARM64", "ci-scope"],
             branchName: "ci-scope/install-{{script_id}}",
             commitMessage: "Add {{script_title}}",
             pullRequestTitle: "Add {{script_title}}",
@@ -255,19 +250,6 @@ extension AutomationScriptSeedProvider {
                     "Installs a workflow calling the shared ci-gates Go gate: vet, format, lint (no go test)."
             ),
             gate: "go-quality.yml"
-        )
-    }
-
-    static func fallbackSlopReviewSeed() -> AutomationScript {
-        fallbackSimpleGateSeed(
-            GateBlurb(
-                id: "slop-review",
-                title: "Slop Review",
-                summary: "Advisory DeepSeek LLM review of PR diffs for AI-slop; never blocks the merge.",
-                detail:
-                    "Installs a workflow calling the shared advisory ci-gates slop reviewer using DeepSeek."
-            ),
-            gate: "slop-review.yml"
         )
     }
 
