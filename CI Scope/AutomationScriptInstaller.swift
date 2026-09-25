@@ -100,10 +100,11 @@ struct AutomationScriptInstaller {
         defer { try? fileManager.removeItem(at: tempRoot) }
 
         try await clone(project: project, defaultBranch: defaultBranch, into: repoURL)
-        let branchName = "ci-scope/remove-\(script.id)"
+        let files = try renderer.renderedFiles()
+        let branchName = PolicyProtectedPaths.branch(
+            "ci-scope/remove-\(script.id)", forFiles: files.map(\.destinationPath))
         let branchExists = await remoteBranchExists(branchName, cwd: repoURL)
         try await checkoutBranch(branchName, exists: branchExists, cwd: repoURL)
-        let files = try renderer.renderedFiles()
         try await remove(files, cwd: repoURL)
 
         if try await hasStagedChanges(files: files, cwd: repoURL) {
