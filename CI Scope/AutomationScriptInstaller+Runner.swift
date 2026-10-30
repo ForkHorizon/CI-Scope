@@ -57,7 +57,7 @@ extension AutomationScriptInstaller {
             return mode.runnerLabels(for: script)
         }
 
-        return ["self-hosted", "macOS", "ARM64", "ci-scope", "ci-scope-v2"]
+        return script.runnerLabels
     }
 }
 

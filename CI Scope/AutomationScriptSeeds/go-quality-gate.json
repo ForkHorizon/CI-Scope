@@ -5,7 +5,7 @@
   "detail": "Installs a thin GitHub Actions workflow that calls the shared Go gate in ForkHorizon/ci-gates: go vet, gofmt, and golangci-lint. Test execution stays with the repo's own CI.",
   "files": [
     {
-      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: go-quality-gate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  go-quality-gate:\n    uses: ForkHorizon/ci-gates/.github/workflows/go-quality.yml@main\n    with:\n      runs-on: '{{runner_labels_json}}'\n",
+      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: go-quality-gate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  go-quality-gate:\n    uses: ForkHorizon/ci-gates/.github/workflows/go-quality.yml@main\n    with:\n      runner-group: Default\n      runner-labels: '{{runner_labels_json}}'\n",
       "destinationPath": ".github/workflows/{{script_slug}}.yml",
       "id": "workflow",
       "isExecutable": false

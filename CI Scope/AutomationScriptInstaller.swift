@@ -214,7 +214,7 @@ struct AutomationScriptInstaller {
     private func commitAndPush(renderer: AutomationScriptRenderer, cwd: URL) async throws {
         _ = try await run(
             """
-            git -c user.name='CI Scope' -c user.email='ci-scope@users.noreply.github.com' commit -m \(quoted(renderer.commitMessage))
+            git -c user.name='CI Scope' -c user.email='ci-scope@users.noreply.github.com' commit -S -m \(quoted(renderer.commitMessage))
             git push --set-upstream origin \(quoted(renderer.branchName))
             """,
             cwd: cwd,
@@ -228,7 +228,7 @@ struct AutomationScriptInstaller {
     {
         _ = try await run(
             """
-            git -c user.name='CI Scope' -c user.email='ci-scope@users.noreply.github.com' commit -m \(quoted("Remove \(script.title) automation"))
+            git -c user.name='CI Scope' -c user.email='ci-scope@users.noreply.github.com' commit -S -m \(quoted("Remove \(script.title) automation"))
             git push --set-upstream origin \(quoted(branchName))
             """,
             cwd: cwd,

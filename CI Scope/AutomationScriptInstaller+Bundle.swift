@@ -78,7 +78,7 @@ extension AutomationScriptInstaller {
     private func commitAndPushBundle(branch: String, cwd: URL) async throws {
         _ = try await run(
             """
-            git -c user.name='CI Scope' -c user.email='ci-scope@users.noreply.github.com' commit -m 'Add CI Scope quality gates'
+            git -c user.name='CI Scope' -c user.email='ci-scope@users.noreply.github.com' commit -S -m 'Add CI Scope quality gates'
             git push --set-upstream origin \(quoted(branch))
             """,
             cwd: cwd,

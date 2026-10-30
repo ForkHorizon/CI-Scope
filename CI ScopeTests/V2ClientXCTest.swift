@@ -157,3 +157,28 @@ final class V2ClientXCTest: XCTestCase {
         XCTAssertThrowsError(try renderer.validate())
     }
 }
+
+final class GateCoverageXCTest: XCTestCase {
+    @MainActor
+    func testUnifiedGateAndUnknownStates() throws {
+        let script = try AutomationScriptSeedProvider.loadSeed("code-linter")
+        let workflow = GitHubWorkflow(
+            id: "unified", name: "CI Scope", path: ".github/workflows/ci-scope-checks.yml", state: "active")
+        let manifest = try CIScopeManifest.decode(Data(#"{"version":1,"checks":[{"id":"code-linter","type":"code-linter"}]}"#.utf8))
+        XCTAssertEqual(GateMatrixViewModel.presence(script, workflows: [workflow], manifest: manifest, lookupFailed: false), .installed)
+        XCTAssertEqual(GateMatrixViewModel.presence(script, workflows: [], manifest: nil, lookupFailed: false), .missing)
+        XCTAssertEqual(GateMatrixViewModel.presence(script, workflows: [], manifest: nil, lookupFailed: true), .unknown)
+    }
+
+    func testStandaloneSeedsPassEffectiveRoutingInputs() throws {
+        for id in ["code-linter", "swift-quality-gate", "swift-compile-gate", "web-quality-gate",
+                   "python-quality-gate", "go-quality-gate", "unity-quality-gate"] {
+            let seed = try AutomationScriptSeedProvider.loadSeed(id)
+            let workflow = try XCTUnwrap(seed.files.first { $0.destinationPath.hasPrefix(".github/workflows/") })
+            XCTAssertTrue(workflow.contents.contains("runner-group: Default"), id)
+            XCTAssertTrue(workflow.contents.contains("runner-labels: '{{runner_labels_json}}'"), id)
+            XCTAssertFalse(workflow.contents.contains("runs-on: '{{runner_labels_json}}'"), id)
+            XCTAssertEqual(AutomationScriptInstallMode.localRunner.runnerLabels(for: seed), seed.runnerLabels)
+        }
+    }
+}

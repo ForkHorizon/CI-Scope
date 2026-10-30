@@ -5,7 +5,7 @@
   "detail": "Installs a thin GitHub Actions workflow that calls the shared web gate in ForkHorizon/ci-gates: dependency install, tsc --noEmit, ESLint when the repo has a config, knip for dead code and unused dependencies, and jscpd copy-paste detection.",
   "files": [
     {
-      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: web-quality-gate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  web-quality-gate:\n    uses: ForkHorizon/ci-gates/.github/workflows/web-quality.yml@main\n    with:\n      runs-on: '{{runner_labels_json}}'\n      duplication-threshold: \"{{duplication_threshold}}\"\n",
+      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: web-quality-gate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  web-quality-gate:\n    uses: ForkHorizon/ci-gates/.github/workflows/web-quality.yml@main\n    with:\n      runner-group: Default\n      runner-labels: '{{runner_labels_json}}'\n      duplication-threshold: \"{{duplication_threshold}}\"\n",
       "destinationPath": ".github/workflows/{{script_slug}}.yml",
       "id": "workflow",
       "isExecutable": false

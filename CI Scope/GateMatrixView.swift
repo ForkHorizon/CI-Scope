@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Repo-centric overview: a row per project, a column per managed gate, a cell
-/// showing installed (check) or missing (one click to install that gate).
+/// showing configured, missing, or unknown when GitHub cannot be read.
 struct GateMatrixView: View {
     let projects: [CIProject]
     let gateScripts: [AutomationScript]
@@ -48,7 +48,7 @@ struct GateMatrixView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            Text("Overview of installed quality gates per repository")
+            Text("Configured gates on each repository's default branch; check marks do not indicate passing runs")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -157,12 +157,18 @@ struct GateMatrixView: View {
 
     @ViewBuilder
     private func cell(project: CIProject, script: AutomationScript) -> some View {
-        if model.isInstalled(script, projectID: project.id) {
+        switch model.presence(script, projectID: project.id) {
+        case .installed:
             Image(systemName: "checkmark.circle.fill")
                 .font(.body)
                 .foregroundStyle(.green)
-                .help("\(script.title) is installed on \(project.repositorySlug)")
-        } else {
+                .help("\(script.title) is configured on \(project.repositorySlug). Run health and merge protection are separate.")
+        case .unknown:
+            Image(systemName: "questionmark.circle")
+                .font(.body)
+                .foregroundStyle(.orange)
+                .help("Could not verify \(script.title) on \(project.repositorySlug). Refresh after GitHub access recovers.")
+        case .missing:
             Button {
                 install(script, into: project)
             } label: {

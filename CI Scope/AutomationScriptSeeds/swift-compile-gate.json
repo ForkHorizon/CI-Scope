@@ -11,7 +11,7 @@
       "isExecutable": false
     },
     {
-      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: swift-compile-gate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  swift-compile-gate:\n    uses: ForkHorizon/ci-gates/.github/workflows/swift-compile.yml@main\n    with:\n      config: .{{script_slug}}.json\n      runs-on: '{{runner_labels_json}}'\n",
+      "contents": "name: {{script_title}}\n\non:\n  pull_request:\n  merge_group:\n    types: [checks_requested]\n  workflow_dispatch:\n  schedule:\n    - cron: \"0 5 * * 1\"\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: swift-compile-gate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  swift-compile-gate:\n    uses: ForkHorizon/ci-gates/.github/workflows/swift-compile.yml@main\n    with:\n      config: .{{script_slug}}.json\n      runner-group: Default\n      runner-labels: '{{runner_labels_json}}'\n",
       "destinationPath": ".github/workflows/{{script_slug}}.yml",
       "id": "workflow",
       "isExecutable": false

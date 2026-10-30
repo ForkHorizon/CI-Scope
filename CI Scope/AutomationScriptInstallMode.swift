@@ -17,7 +17,7 @@ enum AutomationScriptInstallMode: String, CaseIterable, Identifiable {
 
     func detail(for script: AutomationScript?) -> String {
         switch self {
-        case .localRunner: "Runs jobs on this Mac through the V2 Agent."
+        case .localRunner: "Runs jobs on the configured self-hosted runner."
         case .githubHosted:
             if script?.requiresMacGitHubHostedRunner == true {
                 "Uses GitHub-hosted macOS runners for Swift/Xcode scripts."
@@ -29,7 +29,7 @@ enum AutomationScriptInstallMode: String, CaseIterable, Identifiable {
 
     func runnerLabels(for script: AutomationScript?) -> [String] {
         switch self {
-        case .localRunner: ["self-hosted", "macOS", "ARM64", "ci-scope", "ci-scope-v2"]
+        case .localRunner: script?.runnerLabels ?? ["self-hosted", "macOS", "ARM64", "ci-scope"]
         case .githubHosted:
             script?.requiresMacGitHubHostedRunner == true ? ["macos-latest"] : ["ubuntu-latest"]
         }
