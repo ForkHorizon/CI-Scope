@@ -58,9 +58,7 @@ struct AutomationScriptInstaller {
     ) async throws {
         _ = try await run(
             "NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
-        try await validateRunnerAccessIfNeeded(mode: mode, project: project)
         try validateRunnerLabelsSatisfiable(mode: mode, script: script, project: project)
-        try await attachRunnerIfNeeded(mode: mode, project: project)
     }
 
     private func renderAndStageInstall(

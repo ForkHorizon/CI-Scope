@@ -1,33 +1,6 @@
 import Foundation
 
 extension AutomationScriptInstaller {
-    func validateRunnerAccessIfNeeded(mode: AutomationScriptInstallMode, project: CIProject)
-        async throws
-    {
-        guard mode == .localRunner else { return }
-        let output = try await run(
-            "gh repo view \(quoted(project.repositorySlug)) --json viewerPermission",
-            timeout: 30,
-            step: "Check runner repository access"
-        )
-        guard let data = output.data(using: .utf8),
-            let repo = try? JSONDecoder().decode(RunnerRepositoryAccess.self, from: data)
-        else {
-            throw AutomationScriptError.invalidValue(
-                "Could not read repository permission for MacBook Runner.")
-        }
-        guard repo.viewerPermission == "ADMIN" else {
-            throw AutomationScriptError.invalidValue(
-                "MacBook Runner needs admin access to create JIT runners for \(project.repositorySlug).")
-        }
-    }
-
-    func attachRunnerIfNeeded(mode: AutomationScriptInstallMode, project: CIProject) async throws {
-        _ = project
-        // In V2, repositories within the organization or enrolled machine scope are handled automatically.
-        guard mode == .localRunner else { return }
-    }
-
     func validateRunnerLabelsSatisfiable(
         mode: AutomationScriptInstallMode,
         script: AutomationScript,
@@ -59,8 +32,4 @@ extension AutomationScriptInstaller {
 
         return script.runnerLabels
     }
-}
-
-private struct RunnerRepositoryAccess: Decodable {
-    let viewerPermission: String
 }
