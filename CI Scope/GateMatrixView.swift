@@ -159,9 +159,9 @@ struct GateMatrixView: View {
     private func cell(project: CIProject, script: AutomationScript) -> some View {
         switch model.presence(script, projectID: project.id) {
         case .installed:
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: "checkmark.circle")
                 .font(.body)
-                .foregroundStyle(.green)
+                .foregroundStyle(.secondary)
                 .help("\(script.title) is configured on \(project.repositorySlug). Run health and merge protection are separate.")
         case .unknown:
             Image(systemName: "questionmark.circle")
