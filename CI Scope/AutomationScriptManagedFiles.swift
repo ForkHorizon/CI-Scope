@@ -139,7 +139,9 @@ enum AutomationScriptManagedFiles {
     private static func isManagedHookGroup(_ group: [String: Any]) -> Bool {
         (group["hooks"] as? [[String: Any]] ?? []).contains { hook in
             guard let command = hook["command"] as? String else { return false }
-            return command.contains(hookMarker) || command.contains("scripts/check --quiet")
+            return command.contains(hookMarker)
+                || (command.contains("output=$(scripts/check --quiet 2>&1); status=$?;")
+                    && command.contains("exit \"$status\""))
         }
     }
 }

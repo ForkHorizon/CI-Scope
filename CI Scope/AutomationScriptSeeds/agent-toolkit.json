@@ -33,7 +33,7 @@
       "id": "check",
       "destinationPath": "scripts/check",
       "isExecutable": true,
-      "contents": "#!/usr/bin/env bash\nset -euo pipefail\ngates_sha=\"{{gates_sha}}\"\ngates_root=\"${CI_SCOPE_GATES:-${HOME}/.ci-scope/gates}\"\nif [[ ! -x \"$gates_root/scripts/check\" ]]; then\n  echo \"ci-gates is missing at $gates_root; set CI_SCOPE_GATES to its checkout.\" >&2\n  exit 2\nfi\nactual_sha=\"$(git -C \"$gates_root\" rev-parse HEAD)\"\nif [[ \"$actual_sha\" != \"$gates_sha\" ]]; then\n  echo \"ci-gates SHA mismatch: expected $gates_sha, found $actual_sha.\" >&2\n  exit 2\nfi\nCI_SCOPE_GATES=\"$gates_root\" exec \"$gates_root/scripts/check\" \"$@\"\n"
+      "contents": "#!/usr/bin/env bash\nset -euo pipefail\ngates_sha=\"{{gates_sha}}\"\ngates_root=\"${CI_SCOPE_GATES:-${HOME}/.ci-scope/gates}\"\nif [[ ! -x \"$gates_root/scripts/check\" ]]; then\n  echo \"ci-gates is missing at $gates_root; set CI_SCOPE_GATES to its checkout.\" >&2\n  exit 2\nfi\nactual_sha=\"$(git -C \"$gates_root\" rev-parse HEAD)\"\nif [[ \"$actual_sha\" != \"$gates_sha\" ]]; then\n  echo \"ci-gates SHA mismatch: expected $gates_sha, found $actual_sha.\" >&2\n  exit 2\nfi\nif ! gates_status=\"$(git -C \"$gates_root\" status --porcelain --untracked-files=all)\"; then\n  echo \"Unable to verify ci-gates checkout status.\" >&2\n  exit 2\nfi\nif [[ -n \"$gates_status\" ]]; then\n  echo \"ci-gates checkout has local changes; refusing to run unpinned code.\" >&2\n  exit 2\nfi\nCI_SCOPE_GATES=\"$gates_root\" exec \"$gates_root/scripts/check\" \"$@\"\n"
     },
     {
       "id": "manifest",

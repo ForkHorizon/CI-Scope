@@ -158,33 +158,61 @@ final class V2ClientXCTest: XCTestCase {
     }
 
     func testAgentToolkitSeedRendersProfilesAndPinnedCheckScript() throws {
-        let script = AutomationScriptSeedProvider.fallbackAgentToolkitSeed()
+        let scripts = [
+            try AutomationScriptSeedProvider.loadSeed("agent-toolkit"),
+            AutomationScriptSeedProvider.fallbackAgentToolkitSeed(),
+        ]
         XCTAssertTrue(AutomationScriptSeedProvider.defaultSeedIDs.contains("agent-toolkit"))
-        XCTAssertEqual(script.variables.first(where: { $0.id == "stack_profile" })?.options, ["ts-web", "go", "python"])
         let project = CIProject(
             id: "forkhorizon/demo", title: "Demo", repositoryOwner: "ForkHorizon",
             repositoryName: "Demo", repositorySlug: "ForkHorizon/Demo",
             remoteURL: "https://github.com/ForkHorizon/Demo.git")
         let sha = String(repeating: "a", count: 40)
-        for (profile, expectedType) in [
-            ("ts-web", "web-test"), ("go", "go-quality"), ("python", "python-pytest"),
-        ] {
-            let renderer = AutomationScriptRenderer(
-                script: script, project: project,
-                variableValues: ["gates_sha": sha, "stack_profile": profile], defaultBranch: "main")
-            try renderer.validate()
-            let files = try renderer.renderedFiles()
-            let manifest = try XCTUnwrap(files.first { $0.id == "manifest" }?.contents)
-            XCTAssertTrue(manifest.contains("\"type\" : \"\(expectedType)\""))
-            XCTAssertTrue(manifest.contains("forbidden-constructs"))
-            XCTAssertTrue(manifest.contains("duplicate-blocks"))
-            let check = try XCTUnwrap(files.first { $0.id == "check" }?.contents)
-            XCTAssertTrue(check.contains("gates_sha=\"\(sha)\""))
-            XCTAssertTrue(check.contains("if ! gates_status=\"$(git -C \"$gates_root\" status --porcelain --untracked-files=all)\"; then"))
-            XCTAssertTrue(check.contains("Unable to verify ci-gates checkout status."))
-            XCTAssertTrue(check.contains("refusing to run unpinned code"))
-            XCTAssertFalse(check.contains("{{gates_sha}}"))
+        for script in scripts {
+            XCTAssertEqual(script.variables.first(where: { $0.id == "stack_profile" })?.options, ["ts-web", "go", "python"])
+            for (profile, expectedType) in [
+                ("ts-web", "web-test"), ("go", "go-quality"), ("python", "python-pytest"),
+            ] {
+                let renderer = AutomationScriptRenderer(
+                    script: script, project: project,
+                    variableValues: ["gates_sha": sha, "stack_profile": profile], defaultBranch: "main")
+                try renderer.validate()
+                let files = try renderer.renderedFiles()
+                let manifest = try XCTUnwrap(files.first { $0.id == "manifest" }?.contents)
+                XCTAssertTrue(manifest.contains("\"type\" : \"\(expectedType)\""))
+                XCTAssertTrue(manifest.contains("forbidden-constructs"))
+                XCTAssertTrue(manifest.contains("duplicate-blocks"))
+                let check = try XCTUnwrap(files.first { $0.id == "check" }?.contents)
+                XCTAssertTrue(check.contains("gates_sha=\"\(sha)\""))
+                XCTAssertTrue(
+                    check.contains("if ! gates_status=\"$(git -C \"$gates_root\" status --porcelain --untracked-files=all)\"; then"))
+                XCTAssertTrue(check.contains("Unable to verify ci-gates checkout status."))
+                XCTAssertTrue(check.contains("refusing to run unpinned code"))
+                XCTAssertFalse(check.contains("{{gates_sha}}"))
+            }
         }
+    }
+
+    func testManagedInstallPreservesUserHookThatRunsScriptsCheck() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let userCommand = "scripts/check --quiet # user's own hook"
+        let url = root.appendingPathComponent(".claude/settings.json")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try #"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"scripts/check --quiet # user's own hook"}]}]}}"#
+            .write(to: url, atomically: true, encoding: .utf8)
+        let file = try XCTUnwrap(
+            AutomationScriptSeedProvider.fallbackAgentToolkitSeed().files.first { $0.destinationPath == ".claude/settings.json" })
+
+        try AutomationScriptManagedFiles.install([file], in: root)
+        try AutomationScriptManagedFiles.remove([file], from: root)
+        let settings = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(String(contentsOf: url, encoding: .utf8).utf8)) as? [String: Any])
+        let hooks = try XCTUnwrap(settings["hooks"] as? [String: [[String: Any]]])
+        let stopHooks = try XCTUnwrap(hooks["Stop"])
+        XCTAssertEqual(stopHooks.count, 1)
+        XCTAssertEqual((stopHooks[0]["hooks"] as? [[String: Any]])?.first?["command"] as? String, userCommand)
     }
 
     func testManagedInstallPreservesUnrecognizedClaudeHooksShape() throws {
