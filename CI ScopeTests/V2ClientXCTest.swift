@@ -180,7 +180,8 @@ final class V2ClientXCTest: XCTestCase {
             XCTAssertTrue(manifest.contains("duplicate-blocks"))
             let check = try XCTUnwrap(files.first { $0.id == "check" }?.contents)
             XCTAssertTrue(check.contains("gates_sha=\"\(sha)\""))
-            XCTAssertTrue(check.contains("git -C \"$gates_root\" status --porcelain --untracked-files=all"))
+            XCTAssertTrue(check.contains("if ! gates_status=\"$(git -C \"$gates_root\" status --porcelain --untracked-files=all)\"; then"))
+            XCTAssertTrue(check.contains("Unable to verify ci-gates checkout status."))
             XCTAssertTrue(check.contains("refusing to run unpinned code"))
             XCTAssertFalse(check.contains("{{gates_sha}}"))
         }

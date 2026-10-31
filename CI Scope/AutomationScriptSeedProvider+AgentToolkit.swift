@@ -46,7 +46,11 @@ extension AutomationScriptSeedProvider {
                       echo "ci-gates SHA mismatch: expected $gates_sha, found $actual_sha." >&2
                       exit 2
                     fi
-                    if [[ -n "$(git -C "$gates_root" status --porcelain --untracked-files=all)" ]]; then
+                    if ! gates_status="$(git -C "$gates_root" status --porcelain --untracked-files=all)"; then
+                      echo "Unable to verify ci-gates checkout status." >&2
+                      exit 2
+                    fi
+                    if [[ -n "$gates_status" ]]; then
                       echo "ci-gates checkout has local changes; refusing to run unpinned code." >&2
                       exit 2
                     fi
