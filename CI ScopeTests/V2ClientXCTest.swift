@@ -156,4 +156,89 @@ final class V2ClientXCTest: XCTestCase {
 
         XCTAssertThrowsError(try renderer.validate())
     }
+
+    func testAgentToolkitSeedRendersProfilesAndPinnedCheckScript() throws {
+        let script = AutomationScriptSeedProvider.fallbackAgentToolkitSeed()
+        XCTAssertTrue(AutomationScriptSeedProvider.defaultSeedIDs.contains("agent-toolkit"))
+        XCTAssertEqual(script.variables.first(where: { $0.id == "stack_profile" })?.options, ["ts-web", "go", "python"])
+        let project = CIProject(
+            id: "forkhorizon/demo", title: "Demo", repositoryOwner: "ForkHorizon",
+            repositoryName: "Demo", repositorySlug: "ForkHorizon/Demo",
+            remoteURL: "https://github.com/ForkHorizon/Demo.git")
+        let sha = String(repeating: "a", count: 40)
+        for (profile, expectedType) in [
+            ("ts-web", "web-test"), ("go", "go-quality"), ("python", "python-pytest"),
+        ] {
+            let renderer = AutomationScriptRenderer(
+                script: script, project: project,
+                variableValues: ["gates_sha": sha, "stack_profile": profile], defaultBranch: "main")
+            try renderer.validate()
+            let files = try renderer.renderedFiles()
+            let manifest = try XCTUnwrap(files.first { $0.id == "manifest" }?.contents)
+            XCTAssertTrue(manifest.contains("\"type\" : \"\(expectedType)\""))
+            XCTAssertTrue(manifest.contains("forbidden-constructs"))
+            XCTAssertTrue(manifest.contains("duplicate-blocks"))
+            let check = try XCTUnwrap(files.first { $0.id == "check" }?.contents)
+            XCTAssertTrue(check.contains("gates_sha=\"\(sha)\""))
+            XCTAssertFalse(check.contains("{{gates_sha}}"))
+        }
+    }
+
+    func testManagedInstallIsIdempotentAndRemovalPreservesUserContent() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let project = CIProject(
+            id: "forkhorizon/demo", title: "Demo", repositoryOwner: "ForkHorizon",
+            repositoryName: "Demo", repositorySlug: "ForkHorizon/Demo",
+            remoteURL: "https://github.com/ForkHorizon/Demo.git")
+        let files = try AutomationScriptRenderer(
+            script: AutomationScriptSeedProvider.fallbackAgentToolkitSeed(), project: project,
+            variableValues: ["gates_sha": String(repeating: "b", count: 40)], defaultBranch: "main"
+        ).renderedFiles()
+        let agents = root.appendingPathComponent("AGENTS.md")
+        try "Project-specific instructions.\n".write(to: agents, atomically: true, encoding: .utf8)
+        let claude = root.appendingPathComponent(".claude/settings.json")
+        try FileManager.default.createDirectory(at: claude.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try #"{"theme":"dark","hooks":{"Stop":[{"hooks":[{"type":"command","command":"echo user"}]}]}}"#
+            .write(to: claude, atomically: true, encoding: .utf8)
+        try AutomationScriptManagedFiles.install(files, in: root)
+        let firstAgents = try String(contentsOf: agents, encoding: .utf8)
+        let firstClaude = try String(contentsOf: claude, encoding: .utf8)
+        try AutomationScriptManagedFiles.install(files, in: root)
+        XCTAssertEqual(try String(contentsOf: agents, encoding: .utf8), firstAgents)
+        XCTAssertEqual(try String(contentsOf: claude, encoding: .utf8), firstClaude)
+        let editedClaude = firstClaude.replacingOccurrences(
+            of: AutomationScriptManagedFiles.hookMarker, with: "# user-edited-hook")
+        try editedClaude.write(to: claude, atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try AutomationScriptManagedFiles.install(files, in: root))
+        XCTAssertThrowsError(try AutomationScriptManagedFiles.remove(files, from: root))
+        try firstClaude.write(to: claude, atomically: true, encoding: .utf8)
+        try AutomationScriptManagedFiles.remove(files, from: root)
+        XCTAssertEqual(try String(contentsOf: agents, encoding: .utf8), "Project-specific instructions.")
+        let settings = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(String(contentsOf: claude, encoding: .utf8).utf8)) as? [String: Any])
+        XCTAssertEqual(settings["theme"] as? String, "dark")
+        let hooks = try XCTUnwrap(settings["hooks"] as? [String: [[String: Any]]])
+        XCTAssertEqual((hooks["Stop"]?.first?["hooks"] as? [[String: Any]])?.count, 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("scripts/check").path))
+    }
+
+    func testManagedInstallRefusesModifiedFilesAndBlocks() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = AutomationScriptFile(id: "check", destinationPath: "scripts/check", isExecutable: true, contents: "original\n")
+        let check = root.appendingPathComponent("scripts/check")
+        try FileManager.default.createDirectory(at: check.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "user edit\n".write(to: check, atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try AutomationScriptManagedFiles.install([file], in: root))
+        let agents = AutomationScriptFile(
+            id: "agents", destinationPath: "AGENTS.md", isExecutable: false,
+            contents: "\(AutomationScriptManagedFiles.agentsStart)\nManaged line.\n\(AutomationScriptManagedFiles.agentsEnd)")
+        let modifiedBlock = "\(AutomationScriptManagedFiles.agentsStart)\nChanged managed line.\n\(AutomationScriptManagedFiles.agentsEnd)"
+        try modifiedBlock.write(to: root.appendingPathComponent("AGENTS.md"), atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try AutomationScriptManagedFiles.install([agents], in: root))
+        XCTAssertThrowsError(try AutomationScriptManagedFiles.remove([file], from: root))
+    }
 }
