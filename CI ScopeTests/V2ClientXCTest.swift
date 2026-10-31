@@ -193,6 +193,21 @@ final class V2ClientXCTest: XCTestCase {
         }
     }
 
+    func testAgentToolkitHooksReportFailuresToAgentViaExitTwo() throws {
+        let file = try XCTUnwrap(
+            AutomationScriptSeedProvider.fallbackAgentToolkitSeed().files.first { $0.destinationPath == ".claude/settings.json" })
+        let settings = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(file.contents.utf8)) as? [String: Any])
+        let hooks = try XCTUnwrap(settings["hooks"] as? [String: [[String: Any]]])
+        for event in ["PostToolUse", "Stop"] {
+            let entry = try XCTUnwrap(hooks[event]?.first?["hooks"] as? [[String: Any]])
+            let command = try XCTUnwrap(entry.first?["command"] as? String)
+            XCTAssertTrue(command.contains("exit 2"), event)
+            XCTAssertTrue(command.contains(">&2"), event)
+            XCTAssertFalse(command.contains("--quiet"), event)
+        }
+    }
+
     func testManagedInstallPreservesUserHookThatRunsScriptsCheck() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

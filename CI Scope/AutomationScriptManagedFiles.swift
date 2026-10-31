@@ -140,8 +140,8 @@ enum AutomationScriptManagedFiles {
         (group["hooks"] as? [[String: Any]] ?? []).contains { hook in
             guard let command = hook["command"] as? String else { return false }
             return command.contains(hookMarker)
-                || (command.contains("output=$(scripts/check --quiet 2>&1); status=$?;")
-                    && command.contains("exit \"$status\""))
+                || (command.contains("output=$(scripts/check 2>&1); status=$?;")
+                    && command.contains("exit 2"))
         }
     }
 }

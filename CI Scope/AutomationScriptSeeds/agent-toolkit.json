@@ -3,7 +3,12 @@
   "title": "CI Scope Agent Toolkit",
   "summary": "Runs local CI Scope checks from coding-agent hooks.",
   "detail": "Adds scripts/check, a stack-profile manifest, and Claude Code hooks. The ci-gates checkout is pinned to a reviewed SHA.",
-  "runnerLabels": ["self-hosted", "macOS", "ARM64", "ci-scope"],
+  "runnerLabels": [
+    "self-hosted",
+    "macOS",
+    "ARM64",
+    "ci-scope"
+  ],
   "branchName": "ci-scope/install-{{script_id}}",
   "commitMessage": "Add {{script_title}}",
   "pullRequestTitle": "Add {{script_title}}",
@@ -25,7 +30,11 @@
       "isRequired": true,
       "defaultValue": "ts-web",
       "help": "Select the repository's main language stack.",
-      "options": ["ts-web", "go", "python"]
+      "options": [
+        "ts-web",
+        "go",
+        "python"
+      ]
     }
   ],
   "files": [
@@ -33,7 +42,7 @@
       "id": "check",
       "destinationPath": "scripts/check",
       "isExecutable": true,
-      "contents": "#!/usr/bin/env bash\nset -euo pipefail\ngates_sha=\"{{gates_sha}}\"\ngates_root=\"${CI_SCOPE_GATES:-${HOME}/.ci-scope/gates}\"\nif [[ ! -x \"$gates_root/scripts/check\" ]]; then\n  echo \"ci-gates is missing at $gates_root; set CI_SCOPE_GATES to its checkout.\" >&2\n  exit 2\nfi\nactual_sha=\"$(git -C \"$gates_root\" rev-parse HEAD)\"\nif [[ \"$actual_sha\" != \"$gates_sha\" ]]; then\n  echo \"ci-gates SHA mismatch: expected $gates_sha, found $actual_sha.\" >&2\n  exit 2\nfi\nif ! gates_status=\"$(git -C \"$gates_root\" status --porcelain --untracked-files=all)\"; then\n  echo \"Unable to verify ci-gates checkout status.\" >&2\n  exit 2\nfi\nif [[ -n \"$gates_status\" ]]; then\n  echo \"ci-gates checkout has local changes; refusing to run unpinned code.\" >&2\n  exit 2\nfi\nCI_SCOPE_GATES=\"$gates_root\" exec \"$gates_root/scripts/check\" \"$@\"\n"
+      "contents": "#!/usr/bin/env bash\nset -euo pipefail\ngates_sha=\"{{gates_sha}}\"\ngates_root=\"${CI_SCOPE_GATES:-${HOME}/.ci-scope/gates}\"\nif [[ ! -x \"$gates_root/scripts/check\" ]]; then\n  echo \"ci-gates is missing at $gates_root. Run: git clone https://github.com/ForkHorizon/ci-gates \\\"$gates_root\\\" && git -C \\\"$gates_root\\\" checkout {{gates_sha}}\" >&2\n  exit 2\nfi\nactual_sha=\"$(git -C \"$gates_root\" rev-parse HEAD)\"\nif [[ \"$actual_sha\" != \"$gates_sha\" ]]; then\n  echo \"ci-gates SHA mismatch: expected $gates_sha, found $actual_sha.\" >&2\n  exit 2\nfi\nif ! gates_status=\"$(git -C \"$gates_root\" status --porcelain --untracked-files=all)\"; then\n  echo \"Unable to verify ci-gates checkout status.\" >&2\n  exit 2\nfi\nif [[ -n \"$gates_status\" ]]; then\n  echo \"ci-gates checkout has local changes; refusing to run unpinned code.\" >&2\n  exit 2\nfi\nCI_SCOPE_GATES=\"$gates_root\" exec \"$gates_root/scripts/check\" \"$@\"\n"
     },
     {
       "id": "manifest",
@@ -45,7 +54,7 @@
       "id": "claude-hooks",
       "destinationPath": ".claude/settings.json",
       "isExecutable": false,
-      "contents": "{\n  \"hooks\": {\n    \"PostToolUse\": [{\"matcher\": \"Write|Edit|MultiEdit\", \"hooks\": [{\"type\": \"command\", \"command\": \"output=$(scripts/check --quiet 2>&1); status=$?; if [ \\\"$status\\\" -ne 0 ]; then printf '%s\\\\n' \\\"$output\\\"; fi; exit \\\"$status\\\" # ci-scope-agent-toolkit\"}]}],\n    \"Stop\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"output=$(scripts/check --quiet 2>&1); status=$?; if [ \\\"$status\\\" -ne 0 ]; then printf '%s\\\\n' \\\"$output\\\"; fi; exit \\\"$status\\\" # ci-scope-agent-toolkit\"}]}]\n  }\n}\n"
+      "contents": "{\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Write|Edit|MultiEdit\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"output=$(scripts/check 2>&1); status=$?; if [ \\\"$status\\\" -ne 0 ]; then printf '%s\\\\n' \\\"$output\\\" >&2; exit 2; fi # ci-scope-agent-toolkit\"\n          }\n        ]\n      }\n    ],\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"if cat | grep -Eq '\\\"stop_hook_active\\\": *true'; then exit 0; fi; output=$(scripts/check 2>&1); status=$?; if [ \\\"$status\\\" -ne 0 ]; then printf '%s\\\\n' \\\"$output\\\" >&2; exit 2; fi # ci-scope-agent-toolkit\"\n          }\n        ]\n      }\n    ]\n  }\n}\n"
     },
     {
       "id": "agents",

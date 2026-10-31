@@ -38,7 +38,7 @@ extension AutomationScriptSeedProvider {
                     gates_sha="{{gates_sha}}"
                     gates_root="${CI_SCOPE_GATES:-${HOME}/.ci-scope/gates}"
                     if [[ ! -x "$gates_root/scripts/check" ]]; then
-                      echo "ci-gates is missing at $gates_root; set CI_SCOPE_GATES to its checkout." >&2
+                      echo "ci-gates is missing at $gates_root. Run: git clone https://github.com/ForkHorizon/ci-gates \"$gates_root\" && git -C \"$gates_root\" checkout {{gates_sha}}" >&2
                       exit 2
                     fi
                     actual_sha="$(git -C "$gates_root" rev-parse HEAD)"
@@ -66,8 +66,8 @@ extension AutomationScriptSeedProvider {
                 contents: """
                     {
                       "hooks": {
-                        "PostToolUse": [{"matcher": "Write|Edit|MultiEdit", "hooks": [{"type": "command", "command": "output=$(scripts/check --quiet 2>&1); status=$?; if [ \\"$status\\" -ne 0 ]; then printf '%s\\n' \\"$output\\"; fi; exit \\"$status\\" # ci-scope-agent-toolkit"}]}],
-                        "Stop": [{"hooks": [{"type": "command", "command": "output=$(scripts/check --quiet 2>&1); status=$?; if [ \\"$status\\" -ne 0 ]; then printf '%s\\n' \\"$output\\"; fi; exit \\"$status\\" # ci-scope-agent-toolkit"}]}]
+                        "PostToolUse": [{"matcher": "Write|Edit|MultiEdit", "hooks": [{"type": "command", "command": "output=$(scripts/check 2>&1); status=$?; if [ \\"$status\\" -ne 0 ]; then printf '%s\\n' \\"$output\\" >&2; exit 2; fi # ci-scope-agent-toolkit"}]}],
+                        "Stop": [{"hooks": [{"type": "command", "command": "if cat | grep -Eq '\\"stop_hook_active\\": *true'; then exit 0; fi; output=$(scripts/check 2>&1); status=$?; if [ \\"$status\\" -ne 0 ]; then printf '%s\\n' \\"$output\\" >&2; exit 2; fi # ci-scope-agent-toolkit"}]}]
                       }
                     }
                     """
