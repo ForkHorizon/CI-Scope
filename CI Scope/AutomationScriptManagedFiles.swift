@@ -87,7 +87,14 @@ enum AutomationScriptManagedFiles {
         }
         let managed = try JSONSerialization.jsonObject(with: Data(contents.utf8)) as? [String: Any] ?? [:]
         let managedHooks = managed["hooks"] as? [String: [[String: Any]]] ?? [:]
-        var hooks = settings["hooks"] as? [String: [[String: Any]]] ?? [:]
+        var hooks: [String: [[String: Any]]] = [:]
+        if let existingHooks = settings["hooks"] {
+            guard let parsedHooks = existingHooks as? [String: [[String: Any]]] else {
+                throw AutomationScriptError.invalidValue(
+                    ".claude/settings.json hooks must map event names to hook arrays.")
+            }
+            hooks = parsedHooks
+        }
         for (event, groups) in managedHooks {
             let existingGroups = hooks[event] ?? []
             let markedGroups = existingGroups.filter { group in

@@ -180,8 +180,25 @@ final class V2ClientXCTest: XCTestCase {
             XCTAssertTrue(manifest.contains("duplicate-blocks"))
             let check = try XCTUnwrap(files.first { $0.id == "check" }?.contents)
             XCTAssertTrue(check.contains("gates_sha=\"\(sha)\""))
+            XCTAssertTrue(check.contains("git -C \"$gates_root\" status --porcelain --untracked-files=all"))
+            XCTAssertTrue(check.contains("refusing to run unpinned code"))
             XCTAssertFalse(check.contains("{{gates_sha}}"))
         }
+    }
+
+    func testManagedInstallPreservesUnrecognizedClaudeHooksShape() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let original = #"{"hooks":{"custom":"preserve me"}}"#
+        let url = root.appendingPathComponent(".claude/settings.json")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try original.write(to: url, atomically: true, encoding: .utf8)
+        let file = try XCTUnwrap(
+            AutomationScriptSeedProvider.fallbackAgentToolkitSeed().files.first { $0.destinationPath == ".claude/settings.json" })
+
+        XCTAssertThrowsError(try AutomationScriptManagedFiles.install([file], in: root))
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), original)
     }
 
     func testManagedInstallIsIdempotentAndRemovalPreservesUserContent() throws {

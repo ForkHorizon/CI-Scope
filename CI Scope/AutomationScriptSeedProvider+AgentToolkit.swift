@@ -46,6 +46,10 @@ extension AutomationScriptSeedProvider {
                       echo "ci-gates SHA mismatch: expected $gates_sha, found $actual_sha." >&2
                       exit 2
                     fi
+                    if [[ -n "$(git -C "$gates_root" status --porcelain --untracked-files=all)" ]]; then
+                      echo "ci-gates checkout has local changes; refusing to run unpinned code." >&2
+                      exit 2
+                    fi
                     CI_SCOPE_GATES="$gates_root" exec "$gates_root/scripts/check" "$@"
                     """
             ),
