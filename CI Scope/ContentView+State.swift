@@ -16,6 +16,8 @@ extension ContentView {
             return runnerFleetViewModel.isLoading
         case .policy:
             return policyAdmin.isLoading
+        case .tests:
+            return testProtection.isLoading
         case .scripts, .coverage:
             return false
         case .settings:
@@ -30,7 +32,7 @@ extension ContentView {
             return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt
         case .runners:
             return runnerFleetViewModel.snapshot.refreshedAt
-        case .scripts, .coverage, .policy:
+        case .scripts, .coverage, .policy, .tests:
             return nil
         case .settings:
             return nil
@@ -41,7 +43,7 @@ extension ContentView {
         switch workspaceTab {
         case .projects:
             selectedProject != nil
-        case .runners, .policy:
+        case .runners, .policy, .tests:
             true
         case .scripts, .coverage:
             false
@@ -62,6 +64,8 @@ extension ContentView {
             "\(projectStore.projects.count) repositories"
         case .policy:
             "\(policyAdmin.pendingCount) waiting for Touch ID approval"
+        case .tests:
+            "\(testProtection.openCount) open alerts"
         case .settings:
             settingsStore.serverModeEnabled ? "Server queue enabled" : "Server queue off"
         }
@@ -79,6 +83,8 @@ extension ContentView {
             "Coverage"
         case .policy:
             "Policy"
+        case .tests:
+            "Test protection"
         case .settings:
             "Settings"
         }
@@ -96,6 +102,8 @@ extension ContentView {
             "tablecells"
         case .policy:
             "touchid"
+        case .tests:
+            "checkmark.shield"
         case .settings:
             "gearshape"
         }
@@ -114,6 +122,8 @@ extension ContentView {
             return .unknown
         case .policy:
             return policyAdmin.pendingCount > 0 ? .warning : .online
+        case .tests:
+            return testProtection.openCount > 0 ? .warning : .online
         case .settings:
             return settingsStore.serverModeEnabled ? .online : .unknown
         }
@@ -174,6 +184,10 @@ extension ContentView {
         case .policy:
             Task {
                 await policyAdmin.load(projects: projectStore.projects)
+            }
+        case .tests:
+            Task {
+                await testProtection.load(projects: projectStore.projects)
             }
         case .scripts, .coverage:
             break
