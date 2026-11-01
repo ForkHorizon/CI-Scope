@@ -14,6 +14,7 @@ struct RecommendedGatesButton: View {
     @State private var isDetecting = false
     @State private var detectionError: String?
     @State private var isPresented = false
+    @State private var stackProfile = "ts-web"
 
     var body: some View {
         Button(action: detect) {
@@ -93,6 +94,7 @@ struct RecommendedGatesButton: View {
         Task {
             let detector = ProjectStackDetector(config: DashboardConfig())
             let ids = await detector.recommendedSeedIDs(for: project)
+            stackProfile = await detector.stackProfile(for: project)
             let matched = ids.compactMap { id in scripts.first { $0.defaultSeedID == id || $0.id == id } }
             detected = matched
             selected = Set(matched.filter { !isInstalled($0) }.map(\.id))
@@ -103,6 +105,8 @@ struct RecommendedGatesButton: View {
 
     private func install() {
         let chosen = detected.filter { selected.contains($0.id) }
-        installViewModel.installBundle(scripts: chosen, project: project, mode: .localRunner)
+        installViewModel.installBundle(
+            scripts: chosen, project: project, mode: .localRunner,
+            variableOverrides: ["agent-toolkit": ["stack_profile": stackProfile]])
     }
 }

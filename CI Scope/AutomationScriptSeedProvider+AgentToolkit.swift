@@ -1,6 +1,9 @@
 import Foundation
 
 extension AutomationScriptSeedProvider {
+    /// ci-gates commit reviewed by the release owner (main after file-roles and agent-docs-stable).
+    static let reviewedGatesSHA = "1e599f0b7451ffc334a823e5a4a78af122bef49e"
+
     static func fallbackAgentToolkitSeed() -> AutomationScript {
         AutomationScript(
             id: "agent-toolkit",
@@ -16,12 +19,12 @@ extension AutomationScriptSeedProvider {
             variables: [
                 AutomationScriptVariable(
                     id: "gates_sha", title: "Reviewed ci-gates SHA", kind: .text,
-                    isRequired: true, defaultValue: "REPLACE_WITH_REVIEWED_GATES_SHA",
+                    isRequired: true, defaultValue: reviewedGatesSHA,
                     help: "Full 40-character commit SHA containing the checks.", options: []),
                 AutomationScriptVariable(
                     id: "stack_profile", title: "Stack profile", kind: .option,
                     isRequired: true, defaultValue: "ts-web",
-                    help: "Select the repository's main language stack.", options: ["ts-web", "go", "python"]),
+                    help: "Select the repository's main language stack.", options: ["ts-web", "go", "python", "swift", "unity"]),
             ],
             files: agentToolkitFiles,
             defaultSeedID: "agent-toolkit"
@@ -37,6 +40,11 @@ extension AutomationScriptSeedProvider {
                     set -euo pipefail
                     gates_sha="{{gates_sha}}"
                     gates_root="${CI_SCOPE_GATES:-${HOME}/.ci-scope/gates}"
+                    if [[ ! -x "$gates_root/scripts/check" && -z "${CI_SCOPE_GATES:-}" ]]; then
+                      mkdir -p "$(dirname "$gates_root")"
+                      { gh repo clone ForkHorizon/ci-gates "$gates_root" -- --quiet || git clone --quiet https://github.com/ForkHorizon/ci-gates "$gates_root"; } >&2 || true
+                      git -C "$gates_root" checkout --quiet "$gates_sha" >&2 || true
+                    fi
                     if [[ ! -x "$gates_root/scripts/check" ]]; then
                       echo "ci-gates is missing at $gates_root. Run: git clone https://github.com/ForkHorizon/ci-gates \"$gates_root\" && git -C \"$gates_root\" checkout {{gates_sha}}" >&2
                       exit 2
@@ -93,6 +101,13 @@ extension AutomationScriptSeedProvider {
                 ["id": "python-quality", "type": "python-quality"],
                 ["id": "python-tests", "type": "python-pytest"],
             ]
+        case "swift":
+            stackChecks = [
+                ["id": "swift-quality", "type": "swift-quality", "params": ["run_build": false]],
+                ["id": "swift-compile", "type": "swift-compile", "speed": "full"],
+            ]
+        case "unity":
+            stackChecks = []  // no Unity check type in ci-gates yet; the shape gates below still apply
         default:
             stackChecks = [
                 ["id": "web-quality", "type": "web-quality"],
@@ -105,6 +120,8 @@ extension AutomationScriptSeedProvider {
             + [
                 ["id": "forbidden-constructs", "type": "forbidden-constructs", "params": ["mode": "new"]],
                 ["id": "duplicate-blocks", "type": "duplicate-blocks", "params": ["mode": "new"]],
+                ["id": "file-roles", "type": "file-roles", "params": ["mode": "new"]],
+                ["id": "agent-docs-stable", "type": "agent-docs-stable", "params": ["mode": "new"]],
             ]
         let object: [String: Any] = ["version": 1, "checks": checks]
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
