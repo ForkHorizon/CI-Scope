@@ -10,8 +10,8 @@ extension ProjectCIPanel {
             )
             .foregroundStyle(codeLinterStatus == .latest ? .green : .orange)
             Text("Code Linter: \(codeLinterStatus.title)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small)
+                .foregroundStyle(NothingTheme.inkDim)
             Spacer()
             if codeLinterStatus == .pinned {
                 Button("Update to latest") {
@@ -22,7 +22,7 @@ extension ProjectCIPanel {
                         mode: .localRunner
                     )
                 }
-                .font(.caption.weight(.semibold))
+                .font(NothingTheme.small.weight(.semibold))
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .help(

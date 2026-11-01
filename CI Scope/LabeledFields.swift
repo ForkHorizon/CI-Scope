@@ -7,8 +7,8 @@ struct LabeledTextField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
             TextField(title, text: $text)
                 .textFieldStyle(.roundedBorder)
         }
@@ -23,8 +23,8 @@ struct LabeledTextEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
             TextEditor(text: $text)
                 .font(.system(size: 12, design: .monospaced))
                 .frame(minHeight: minHeight)

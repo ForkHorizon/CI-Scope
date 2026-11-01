@@ -5,9 +5,12 @@ import SwiftUI
 struct CI_ScopeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+    init() { NothingTheme.registerFonts() }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .nothingRoot()
         }
     }
 }

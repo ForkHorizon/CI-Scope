@@ -8,8 +8,8 @@ struct ProjectScriptRemovalList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text("Installed Scripts")
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.body.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
 
             ForEach(installedScripts) { installedScript in
                 ProjectScriptRemovalRow(
@@ -34,11 +34,11 @@ struct ProjectScriptRemovalRow: View {
                 StatusDot(state: rowState)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(installedScript.title)
-                        .font(.callout.weight(.semibold))
+                        .font(NothingTheme.body.weight(.semibold))
                         .lineLimit(1)
                     Text(installedScript.detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.small)
+                        .foregroundStyle(NothingTheme.inkDim)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -47,7 +47,7 @@ struct ProjectScriptRemovalRow: View {
 
                 Button(role: .destructive, action: onRemove) {
                     Label(snapshot.isInstalling ? "Removing" : "Remove", systemImage: "trash")
-                        .font(.caption.weight(.semibold))
+                        .font(NothingTheme.small.weight(.semibold))
                 }
                 .buttonStyle(.bordered)
                 .disabled(snapshot.isInstalling)

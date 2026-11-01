@@ -39,7 +39,7 @@ struct ScriptInstallSubmenu: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(selectedProjectID == nil || snapshot.isInstalling)
             }
-            .font(.caption.weight(.semibold))
+            .font(NothingTheme.small.weight(.semibold))
             .buttonStyle(.bordered)
         }
         .padding(10)
@@ -49,8 +49,8 @@ struct ScriptInstallSubmenu: View {
     private var projectPicker: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text("Target project")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
 
             Picker("Project", selection: $selectedProjectID) {
                 if projects.isEmpty {
@@ -69,8 +69,8 @@ struct ScriptInstallSubmenu: View {
     private var runnerModePicker: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text("Runner")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
             Picker("Runner", selection: $runnerMode) {
                 ForEach(AutomationScriptInstallMode.allCases) { mode in
                     Text(mode.title).tag(mode)
@@ -79,8 +79,8 @@ struct ScriptInstallSubmenu: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             Text(runnerMode.detail(for: script))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.tiny)
+                .foregroundStyle(NothingTheme.inkDim)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -89,13 +89,13 @@ struct ScriptInstallSubmenu: View {
     private var variableInputs: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Variables")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
 
             if script.variables.isEmpty {
                 Text("No install variables")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
             } else {
                 LazyVGrid(

@@ -17,91 +17,35 @@ struct ProjectMenuPanel: View {
     let onAddProject: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Label("Menu", systemImage: "sidebar.left")
-                    .font(.caption.weight(.semibold))
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("CI SCOPE")
+                .nothingDisplay(24)
+                .foregroundStyle(NothingTheme.ink)
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 16)
 
-            Divider()
-
-            VStack(spacing: 7) {
-                WorkspaceMenuRow(
-                    tab: .runners,
-                    state: runnerState,
-                    count: runnerCount,
-                    isActive: workspaceTab == .runners
-                ) {
-                    workspaceTab = .runners
-                }
-
-                WorkspaceMenuRow(
-                    tab: .scripts,
-                    state: scriptState,
-                    count: scriptCount,
-                    isActive: workspaceTab == .scripts
-                ) {
-                    workspaceTab = .scripts
-                }
-
-                WorkspaceMenuRow(
-                    tab: .coverage,
-                    state: .unknown,
-                    count: 0,
-                    isActive: workspaceTab == .coverage
-                ) {
-                    workspaceTab = .coverage
-                }
-
-                WorkspaceMenuRow(
-                    tab: .policy,
-                    state: policyPendingCount > 0 ? .warning : .unknown,
-                    count: policyPendingCount,
-                    isActive: workspaceTab == .policy
-                ) {
-                    workspaceTab = .policy
-                }
-
-                WorkspaceMenuRow(
-                    tab: .tests,
-                    state: testAlertCount > 0 ? .warning : .unknown,
-                    count: testAlertCount,
-                    isActive: workspaceTab == .tests
-                ) {
-                    workspaceTab = .tests
-                }
-
-                WorkspaceMenuRow(
-                    tab: .settings,
-                    state: .unknown,
-                    count: 0,
-                    isActive: workspaceTab == .settings
-                ) {
-                    workspaceTab = .settings
+            VStack(spacing: 3) {
+                ForEach(navItems, id: \.tab) { item in
+                    WorkspaceMenuRow(
+                        tab: item.tab, state: item.state, count: item.count,
+                        isActive: workspaceTab == item.tab
+                    ) { workspaceTab = item.tab }
                 }
             }
-            .padding(10)
+            .padding(.horizontal, 10)
 
-            Divider()
+            Text("Projects")
+                .nothingCaption()
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 6)
 
             ScrollView {
-                LazyVStack(spacing: 8) {
-                    HStack {
-                        Text("Projects")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 2)
-
+                LazyVStack(spacing: 2) {
                     if projects.isEmpty {
-                        EmptyState(icon: "folder.badge.plus", text: "No projects saved")
-                            .frame(minHeight: 150)
+                        Text("No projects saved").font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).padding(8)
                     }
-
                     ForEach(projects) { project in
                         ProjectMenuRow(
                             project: project,
@@ -113,45 +57,45 @@ struct ProjectMenuPanel: View {
                             onRemove(project)
                         }
                     }
-
-                    Button {
-                        onAddProject()
-                    } label: {
-                        Label("Add Project", systemImage: "plus")
-                            .font(.caption.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(Color(nsColor: .windowBackgroundColor))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.secondary.opacity(0.12))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .help("Add Project")
                 }
-                .padding(10)
+                .padding(.horizontal, 10)
             }
 
-            Divider()
-
-            VStack(alignment: .leading, spacing: 7) {
-                Text("Projects")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 6) {
-                    StatusDot(state: footerState)
-                    Text(footerText)
-                        .font(.caption2.monospacedDigit())
-                        .lineLimit(1)
-                }
+            Button {
+                onAddProject()
+            } label: {
+                Label("Add project", systemImage: "plus").frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
+            .buttonStyle(.pill)
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+
+            HStack(spacing: 8) {
+                StatusDot(state: footerState)
+                Text(footerText).font(.system(size: 11, design: .monospaced)).foregroundStyle(NothingTheme.inkDim).lineLimit(1)
+            }
+            .padding(18)
         }
-        .frame(width: 204)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.58))
+        .frame(width: 216)
+        .background(NothingTheme.canvas)
+        .overlay(alignment: .trailing) { Rectangle().fill(NothingTheme.line).frame(width: 1) }
+    }
+
+    private struct NavItem {
+        let tab: WorkspaceTab
+        let state: ServiceState
+        let count: Int
+    }
+
+    private var navItems: [NavItem] {
+        [
+            NavItem(tab: .runners, state: runnerState, count: runnerCount),
+            NavItem(tab: .scripts, state: scriptState, count: scriptCount),
+            NavItem(tab: .coverage, state: .unknown, count: 0),
+            NavItem(tab: .policy, state: policyPendingCount > 0 ? .warning : .unknown, count: policyPendingCount),
+            NavItem(tab: .tests, state: testAlertCount > 0 ? .warning : .unknown, count: testAlertCount),
+            NavItem(tab: .settings, state: .unknown, count: 0),
+        ]
     }
 
     var aggregateState: ServiceState {
@@ -211,71 +155,26 @@ struct WorkspaceMenuRow: View {
 
     var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 9) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(stateColor.opacity(isActive ? 0.16 : 0.08))
-                    Image(systemName: tab.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(isActive ? stateColor : .secondary)
-                }
-                .frame(width: 31, height: 31)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 5) {
-                        Text(tab.title)
-                            .font(.callout.weight(.semibold))
-                            .foregroundStyle(isActive ? Color.accentColor : Color.primary)
-                            .lineLimit(1)
-                        Spacer(minLength: 0)
-                        StatusDot(state: state)
-                    }
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                        .lineLimit(1)
+            HStack(spacing: 10) {
+                StatusDot(state: state, onLight: isActive)
+                Text(tab.title)
+                    .font(.system(size: 11, design: .monospaced))
+                    .tracking(1.2)
+                    .textCase(.uppercase)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                if count > 0 {
+                    Text("\(count)").nothingDisplay(15)
                 }
             }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 9)
-            .frame(maxWidth: .infinity, minHeight: 51, alignment: .leading)
-            .contentShape(RoundedRectangle(cornerRadius: 8))
+            .foregroundStyle(isActive ? Color.black : NothingTheme.ink)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(isActive ? NothingTheme.ink : Color.clear, in: Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .background(isActive ? Color.accentColor.opacity(0.11) : Color(nsColor: .windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(isActive ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12))
-        )
         .help(tab.title)
-    }
-
-    var detail: String {
-        switch tab {
-        case .projects:
-            count == 1 ? "1 project" : "\(count) projects"
-        case .runners:
-            count == 0 ? "Load runner status" : "\(count) configured"
-        case .scripts:
-            count == 1 ? "1 script" : "\(count) scripts"
-        case .coverage:
-            "Gate coverage"
-        case .policy:
-            count == 0 ? "Touch ID approvals" : "\(count) waiting"
-        case .tests:
-            count == 0 ? "Weakened tests" : "\(count) open"
-        case .settings:
-            "Server queue"
-        }
-    }
-
-    var stateColor: Color {
-        switch state {
-        case .online: .green
-        case .warning: .orange
-        case .offline: .red
-        case .unknown: .secondary
-        }
     }
 }

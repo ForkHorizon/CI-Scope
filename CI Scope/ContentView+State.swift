@@ -90,25 +90,6 @@ extension ContentView {
         }
     }
 
-    var headerIcon: String {
-        switch workspaceTab {
-        case .projects:
-            "square.grid.2x2"
-        case .runners:
-            "server.rack"
-        case .scripts:
-            "curlybraces.square"
-        case .coverage:
-            "tablecells"
-        case .policy:
-            "touchid"
-        case .tests:
-            "checkmark.shield"
-        case .settings:
-            "gearshape"
-        }
-    }
-
     var headerState: ServiceState {
         switch workspaceTab {
         case .projects:

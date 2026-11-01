@@ -39,7 +39,6 @@ struct ContentView: View {
                     }
                 )
                 .transition(.move(edge: .leading).combined(with: .opacity))
-                Divider()
             }
             dashboardSurface
         }
@@ -49,7 +48,7 @@ struct ContentView: View {
             minHeight: 624,
             idealHeight: 624
         )
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(NothingTheme.canvas)
         .overlay(alignment: .topTrailing) {
             JobNotificationOverlay(manager: notificationManager)
                 .allowsHitTesting(notificationManager.activeJobNotification != nil)

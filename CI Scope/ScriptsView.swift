@@ -20,7 +20,7 @@ struct ScriptsView: View {
     @State private var isConfirmingDelete = false
 
     var body: some View {
-        PanelShell(title: "Scripts Library", icon: "curlybraces.square") {
+        PanelShell(title: "Scripts Library") {
             VStack(spacing: 0) {
                 toolbar
 
@@ -120,8 +120,8 @@ struct ScriptsView: View {
     private var toolbar: some View {
         HStack(spacing: 8) {
             Text(scriptCountText)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
 
             Spacer()
 
@@ -136,7 +136,7 @@ struct ScriptsView: View {
             }
             .disabled(store.selectedScript == nil)
         }
-        .font(.caption.weight(.semibold))
+        .font(NothingTheme.small.weight(.semibold))
         .buttonStyle(.bordered)
         .padding(10)
         .background(Color.secondary.opacity(0.035))
