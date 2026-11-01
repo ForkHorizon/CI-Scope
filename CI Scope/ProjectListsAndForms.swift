@@ -5,9 +5,7 @@ struct ProjectWorkflowList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("Workflows")
-                .font(NothingTheme.body.weight(.semibold))
-                .foregroundStyle(NothingTheme.inkDim)
+            Text("Workflows").nothingCaption()
 
             ForEach(workflows) { workflow in
                 HStack(spacing: 8) {
@@ -28,10 +26,7 @@ struct ProjectWorkflowList: View {
                         .foregroundStyle(NothingTheme.inkDim)
                         .lineLimit(1)
                 }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 7)
-                .background(Color.secondary.opacity(0.055))
-                .clipShape(RoundedRectangle(cornerRadius: 7))
+                .nothingRow()
             }
         }
     }
@@ -42,9 +37,7 @@ struct ProjectRunList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("Recent Runs")
-                .font(NothingTheme.body.weight(.semibold))
-                .foregroundStyle(NothingTheme.inkDim)
+            Text("Recent Runs").nothingCaption()
 
             ForEach(runs.prefix(8)) { run in
                 Link(destination: URL(string: run.url)!) {

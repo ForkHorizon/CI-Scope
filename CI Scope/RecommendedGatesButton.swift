@@ -18,10 +18,9 @@ struct RecommendedGatesButton: View {
 
     var body: some View {
         Button(action: detect) {
-            Label(isDetecting ? "Detecting…" : "Install recommended gates", systemImage: "wand.and.stars")
-                .font(NothingTheme.small.weight(.semibold))
+            Text(isDetecting ? "Detecting…" : "Install recommended gates")
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.pillPrimary)
         .disabled(isDetecting)
         .help("Detect the repository's stack and install the matching gates in one PR")
         .sheet(isPresented: $isPresented) {

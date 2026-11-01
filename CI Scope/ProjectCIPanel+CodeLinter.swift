@@ -8,7 +8,7 @@ extension ProjectCIPanel {
                 systemName: codeLinterStatus == .latest
                     ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
             )
-            .foregroundStyle(codeLinterStatus == .latest ? .green : .orange)
+            .foregroundStyle(codeLinterStatus == .latest ? NothingTheme.green : NothingTheme.amber)
             Text("Code Linter: \(codeLinterStatus.title)")
                 .font(NothingTheme.small)
                 .foregroundStyle(NothingTheme.inkDim)
@@ -22,17 +22,12 @@ extension ProjectCIPanel {
                         mode: .localRunner
                     )
                 }
-                .font(NothingTheme.small.weight(.semibold))
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(.pill)
                 .help(
                     "Creates a PR that updates only \(workflow.path ?? "the Code Linter workflow") to @main.")
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .nothingRow()
     }
 
     var codeLinterScript: AutomationScript? {

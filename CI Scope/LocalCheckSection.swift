@@ -12,8 +12,7 @@ struct LocalCheckSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Label("Local check (this Mac)", systemImage: "laptopcomputer")
-                    .font(NothingTheme.body.weight(.semibold))
+                Text("Local check · this Mac").nothingCaption()
                 Spacer()
                 StatusDot(state: result.passed ? .online : .offline)
             }
@@ -23,12 +22,12 @@ struct LocalCheckSection: View {
             if let message = verdictMessage {
                 Text(message)
                     .font(NothingTheme.small.weight(.semibold))
-                    .foregroundStyle(verdict.isDiscrepancy ? Color.orange : Color.secondary)
+                    .foregroundStyle(verdict.isDiscrepancy ? NothingTheme.amber : NothingTheme.inkDim)
             }
             ForEach(result.failedChecks) { check in
                 Text("\(check.id): \(check.status)")
                     .font(NothingTheme.small)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(NothingTheme.red)
             }
             if !result.slow.isEmpty {
                 Text("Slow: " + result.slow.joined(separator: ", "))
@@ -36,10 +35,7 @@ struct LocalCheckSection: View {
                     .foregroundStyle(NothingTheme.inkDim)
             }
         }
-        .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private var summary: String {
