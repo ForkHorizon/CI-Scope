@@ -51,13 +51,19 @@ struct ProjectMenuPanel: View {
                             project: project,
                             state: stateForProject(project),
                             isActive: workspaceTab == .projects && project.id == selectedProjectID
-                        ) { onSelect(project) } onRemove: { onRemove(project) }
+                        ) {
+                            onSelect(project)
+                        } onRemove: {
+                            onRemove(project)
+                        }
                     }
                 }
                 .padding(.horizontal, 10)
             }
 
-            Button { onAddProject() } label: {
+            Button {
+                onAddProject()
+            } label: {
                 Label("Add project", systemImage: "plus").frame(maxWidth: .infinity)
             }
             .buttonStyle(.pill)
@@ -75,7 +81,11 @@ struct ProjectMenuPanel: View {
         .overlay(alignment: .trailing) { Rectangle().fill(NothingTheme.line).frame(width: 1) }
     }
 
-    private struct NavItem { let tab: WorkspaceTab; let state: ServiceState; let count: Int }
+    private struct NavItem {
+        let tab: WorkspaceTab
+        let state: ServiceState
+        let count: Int
+    }
 
     private var navItems: [NavItem] {
         [

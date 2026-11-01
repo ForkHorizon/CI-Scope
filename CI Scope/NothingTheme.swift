@@ -1,3 +1,4 @@
+// Nothing-style design tokens, dot-matrix display font and pill/card styles shared by all screens.
 import AppKit
 import CoreText
 import SwiftUI
