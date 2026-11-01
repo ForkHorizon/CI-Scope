@@ -11,6 +11,7 @@
 		A9E1D0C2B3F44E5A8C7D6B01 /* AgentToolkitXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */; };
 		A9E1D0C2B3F44E5A8C7D6B31 /* StackChoiceXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B32 /* StackChoiceXCTest.swift */; };
 		A9E1D0C2B3F44E5A8C7D6B33 /* RecommendedGateStatusXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B34 /* RecommendedGateStatusXCTest.swift */; };
+		A9E1D0C2B3F44E5A8C7D6B35 /* DominantStackXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B36 /* DominantStackXCTest.swift */; };
 		ADD25A823A8144A38444AE1A /* V2ClientXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42D670256517441C9CC91511 /* V2ClientXCTest.swift */; };
 		B7A1D0C2B3F44E5A8C7D6C01 /* LocalCheckResultXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */; };
 		C1A1D0C2B3F44E5A8C7D6D01 /* TestProtectionDetectorXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A1D0C2B3F44E5A8C7D6D02 /* TestProtectionDetectorXCTest.swift */; };
@@ -34,6 +35,7 @@
 		A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentToolkitXCTest.swift; sourceTree = "<group>"; };
 		A9E1D0C2B3F44E5A8C7D6B32 /* StackChoiceXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackChoiceXCTest.swift; sourceTree = "<group>"; };
 		A9E1D0C2B3F44E5A8C7D6B34 /* RecommendedGateStatusXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendedGateStatusXCTest.swift; sourceTree = "<group>"; };
+		A9E1D0C2B3F44E5A8C7D6B36 /* DominantStackXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DominantStackXCTest.swift; sourceTree = "<group>"; };
 		B4D581C73F9E4F3DA20E1B6C /* CI ScopeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CI ScopeTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCheckResultXCTest.swift; sourceTree = "<group>"; };
 		C1A1D0C2B3F44E5A8C7D6D02 /* TestProtectionDetectorXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestProtectionDetectorXCTest.swift; sourceTree = "<group>"; };
@@ -77,6 +79,7 @@
 				A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */,
 				A9E1D0C2B3F44E5A8C7D6B32 /* StackChoiceXCTest.swift */,
 				A9E1D0C2B3F44E5A8C7D6B34 /* RecommendedGateStatusXCTest.swift */,
+				A9E1D0C2B3F44E5A8C7D6B36 /* DominantStackXCTest.swift */,
 			);
 			path = "CI ScopeTests";
 			sourceTree = "<group>";
@@ -211,6 +214,7 @@
 				A9E1D0C2B3F44E5A8C7D6B01 /* AgentToolkitXCTest.swift in Sources */,
 				A9E1D0C2B3F44E5A8C7D6B31 /* StackChoiceXCTest.swift in Sources */,
 				A9E1D0C2B3F44E5A8C7D6B33 /* RecommendedGateStatusXCTest.swift in Sources */,
+				A9E1D0C2B3F44E5A8C7D6B35 /* DominantStackXCTest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

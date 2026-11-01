@@ -18,6 +18,7 @@ struct RecommendedGatesButton: View {
     @State private var isPresented = false
     @State private var stackProfile = "ts-web"
     @State private var hasStackChecks = true
+    @State private var toolkitInstalled = false
 
     var body: some View {
         Button(action: detect) {
@@ -69,7 +70,7 @@ struct RecommendedGatesButton: View {
     private func status(of script: AutomationScript) -> RecommendedGateStatus {
         RecommendedGateStatus.status(
             seedID: script.defaultSeedID ?? script.id, hasWorkflow: isInstalled(script),
-            manifestTypes: manifestCheckTypes)
+            manifestTypes: manifestCheckTypes, toolkitInstalled: toolkitInstalled)
     }
 
     private func gateRow(_ script: AutomationScript) -> some View {
@@ -114,6 +115,7 @@ struct RecommendedGatesButton: View {
             let choice = await detector.stackChoice(for: project)
             stackProfile = choice.profile
             hasStackChecks = choice.hasStackChecks
+            toolkitInstalled = choice.toolkitInstalled
             let matched = ids.compactMap { id in scripts.first { $0.defaultSeedID == id || $0.id == id } }
             detected = matched
             selected = Set(matched.filter { status(of: $0).isSelectable }.map(\.id))
