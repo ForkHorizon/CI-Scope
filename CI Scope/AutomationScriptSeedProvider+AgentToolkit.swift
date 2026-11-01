@@ -24,7 +24,7 @@ extension AutomationScriptSeedProvider {
                 AutomationScriptVariable(
                     id: "stack_profile", title: "Stack profile", kind: .option,
                     isRequired: true, defaultValue: "ts-web",
-                    help: "Select the repository's main language stack.", options: ["ts-web", "go", "python", "swift", "unity"]),
+                    help: "Select the repository's main language stack.", options: ["ts-web", "go", "python", "swift", "unity", "generic"]),
             ],
             files: agentToolkitFiles,
             defaultSeedID: "agent-toolkit"
@@ -109,6 +109,8 @@ extension AutomationScriptSeedProvider {
             ]
         case "unity":
             stackChecks = []  // no Unity check type in ci-gates yet; the shape gates below still apply
+        case "generic":
+            stackChecks = []  // no matching stack gate (e.g. Rust); only the universal checks apply
         default:
             stackChecks = [
                 ["id": "web-quality", "type": "web-quality"],

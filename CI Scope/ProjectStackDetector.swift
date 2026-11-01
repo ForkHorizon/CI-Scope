@@ -40,15 +40,18 @@ struct ProjectStackDetector {
     func stackProfile(for project: CIProject) async -> String {
         let languages = await languages(for: project)
         let isUnity = await hasUnityMarker(project) ? true : await isUnityPackage(project)
-        return Self.profile(languages: languages, isUnity: isUnity)
+        return Self.profile(
+            languages: languages, isUnity: isUnity, hasRootPackageJSON: await hasRootPackageJSON(project))
     }
 
-    static func profile(languages: Set<String>, isUnity: Bool) -> String {
+    /// `generic` means no stack gate fits (e.g. Rust, or TypeScript only in sub-packages), so the
+    /// manifest keeps just the universal checks instead of web checks that need a root package.json.
+    static func profile(languages: Set<String>, isUnity: Bool, hasRootPackageJSON: Bool) -> String {
         if isUnity { return "unity" }
         if languages.contains("swift") { return "swift" }
         if languages.contains("go") { return "go" }
         if languages.contains("python") { return "python" }
-        return "ts-web"
+        return hasRootPackageJSON ? "ts-web" : "generic"
     }
 
     private func languages(for project: CIProject) async -> Set<String> {
