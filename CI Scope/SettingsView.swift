@@ -33,19 +33,19 @@ struct SettingsView: View {
                 Toggle("", isOn: $store.serverModeEnabled).labelsHidden()
             }
             SettingsRow(title: "Server URL") {
-                TextField("https://", text: $store.serverURL).textFieldStyle(NothingFieldStyle())
+                TextField("https://", text: $store.serverURL).nothingField()
             }
             SettingsRow(title: "Local token") {
-                SecureField("Bearer token", text: $store.localToken).textFieldStyle(NothingFieldStyle())
+                SecureField("Bearer token", text: $store.localToken).nothingField()
             }
             SettingsRow(title: "Machine ID") {
-                TextField("", text: $store.machineID).textFieldStyle(NothingFieldStyle())
+                TextField("", text: $store.machineID).nothingField()
             }
             SettingsRow(title: "Machine name") {
-                TextField("", text: $store.machineName).textFieldStyle(NothingFieldStyle())
+                TextField("", text: $store.machineName).nothingField()
             }
             SettingsRow(title: "Labels") {
-                TextField("comma separated", text: $store.labelsText).textFieldStyle(NothingFieldStyle())
+                TextField("comma separated", text: $store.labelsText).nothingField()
             }
             SettingsRow(title: "Capacity", hint: "Parallel jobs on this Mac") {
                 Stepper("\(store.capacity)", value: $store.capacity, in: 1...8)
@@ -151,7 +151,7 @@ struct SettingsView: View {
             }
             SettingsRow(title: "Webhook secret", hint: "Attaching a project creates its repo webhook with this secret") {
                 SecureField("CI_SCOPE_GITHUB_WEBHOOK_SECRET", text: $store.webhookSecret)
-                    .textFieldStyle(NothingFieldStyle())
+                    .nothingField()
             }
         }
     }
@@ -173,7 +173,7 @@ struct SettingsView: View {
                 title: "DeepSeek key",
                 hint: "Passed to the agent as DEEPSEEK_API_KEY. Empty skips the advisory step. Restart the agent after changing."
             ) {
-                SecureField("sk-...", text: $store.deepSeekAPIKey).textFieldStyle(NothingFieldStyle())
+                SecureField("sk-...", text: $store.deepSeekAPIKey).nothingField()
             }
         }
     }

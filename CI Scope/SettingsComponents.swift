@@ -37,10 +37,10 @@ struct SettingsRow<Control: View>: View {
     }
 }
 
-struct NothingFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration
-            .textFieldStyle(.plain)
+extension View {
+    /// Outlined field look for plain text and secure fields.
+    func nothingField() -> some View {
+        textFieldStyle(.plain)
             .font(NothingTheme.small)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
