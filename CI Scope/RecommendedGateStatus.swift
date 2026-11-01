@@ -34,8 +34,11 @@ enum RecommendedGateStatus: Equatable {
     ]
 
     /// `manifestTypes` is nil when the repository has no Unified Checks manifest.
-    static func status(seedID: String, hasWorkflow: Bool, manifestTypes: Set<String>?) -> Self {
-        if hasWorkflow { return .installed }
+    /// The toolkit has no workflow, so it counts as installed when `scripts/check` is in the repository.
+    static func status(
+        seedID: String, hasWorkflow: Bool, manifestTypes: Set<String>?, toolkitInstalled: Bool = false
+    ) -> Self {
+        if hasWorkflow || (seedID == "agent-toolkit" && toolkitInstalled) { return .installed }
         guard let manifestTypes else { return .installable }
         if let type = manifestCheckTypes[seedID], manifestTypes.contains(type) { return .inUnifiedChecks }
         return .addViaPolicy
