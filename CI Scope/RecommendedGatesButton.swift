@@ -30,8 +30,8 @@ struct RecommendedGatesButton: View {
 
     private var sheet: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recommended gates for \(project.repositorySlug)")
-                .font(.headline)
+            Text("Recommended gates").nothingDisplay(24)
+            Text(project.repositorySlug).nothingCaption()
 
             if detected.isEmpty {
                 Text("No matching gates were detected for this repository.")
@@ -47,14 +47,15 @@ struct RecommendedGatesButton: View {
 
             HStack {
                 Spacer()
-                Button("Close") { isPresented = false }
+                Button("Close") { isPresented = false }.buttonStyle(.pill)
                 Button(installLabel) { install() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pillPrimary)
                     .disabled(selected.isEmpty || installViewModel.bundleSnapshot(for: project).isInstalling)
             }
         }
-        .padding(18)
-        .frame(width: 460)
+        .padding(22)
+        .frame(width: 480)
+        .background(NothingTheme.canvas)
     }
 
     private func gateRow(_ script: AutomationScript) -> some View {
@@ -71,7 +72,7 @@ struct RecommendedGatesButton: View {
                 Text(script.summary).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
             }
         }
-        .toggleStyle(.checkbox)
+        .toggleStyle(NothingToggleStyle())
     }
 
     private var installLabel: String {

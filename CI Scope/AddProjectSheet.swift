@@ -9,25 +9,19 @@ struct AddProjectSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Label("Add Project", systemImage: "plus")
-                    .font(.headline)
-                Spacer()
-            }
+            Text("Add project").nothingDisplay(24)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Git repository URL")
-                    .font(NothingTheme.small.weight(.semibold))
-                    .foregroundStyle(NothingTheme.inkDim)
+                Text("Git repository URL").nothingCaption()
                 TextField("git@github.com:owner/repo.git", text: $input)
-                    .textFieldStyle(.roundedBorder)
+                    .nothingField()
                     .onSubmit(submit)
             }
 
             if let errorMessage {
                 Text(errorMessage)
                     .font(NothingTheme.small)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(NothingTheme.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -36,16 +30,19 @@ struct AddProjectSheet: View {
                 Button("Cancel") {
                     dismiss()
                 }
+                .buttonStyle(.pill)
                 .keyboardShortcut(.cancelAction)
 
-                Button("Add Project") {
+                Button("Add project") {
                     submit()
                 }
+                .buttonStyle(.pillPrimary)
                 .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(18)
-        .frame(width: 420)
+        .padding(22)
+        .frame(width: 440)
+        .background(NothingTheme.canvas)
     }
 
     func submit() {
@@ -65,39 +62,19 @@ struct EmptyProjectDashboard: View {
         VStack(spacing: 12) {
             Spacer(minLength: 0)
 
-            Image(systemName: "folder.badge.plus")
-                .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(NothingTheme.inkDim)
-
-            VStack(spacing: 4) {
-                Text("No project selected")
-                    .font(.headline)
+            VStack(spacing: 6) {
+                Text("No project selected").nothingDisplay(26)
                 Text("Add a repository to monitor its CI.")
                     .font(NothingTheme.body)
                     .foregroundStyle(NothingTheme.inkDim)
             }
 
-            Button {
-                onAddProject()
-            } label: {
-                Label("Add Project", systemImage: "plus")
-                    .font(NothingTheme.body.weight(.semibold))
-                    .padding(.horizontal, 12)
-                    .frame(height: 32)
-                    .background(NothingTheme.ink.opacity(0.16))
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
-            }
-            .buttonStyle(.plain)
-            .help("Add Project")
+            Button("Add project", action: onAddProject)
+                .buttonStyle(.pillPrimary)
 
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.secondary.opacity(0.13))
-        )
+
     }
 }
