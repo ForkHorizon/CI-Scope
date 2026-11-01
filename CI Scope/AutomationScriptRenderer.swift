@@ -33,7 +33,8 @@ struct AutomationScriptRenderer {
                 contents = contents.replacingOccurrences(
                     of: "{{profile_manifest}}",
                     with: AutomationScriptSeedProvider.agentToolkitManifest(
-                        variableValues["stack_profile"] ?? "ts-web"))
+                        variableValues["stack_profile"] ?? "ts-web",
+                        includeStackChecks: variableValues["stack_checks"] != "false"))
             }
             return AutomationScriptFile(
                 id: file.id,

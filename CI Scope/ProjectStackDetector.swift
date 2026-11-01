@@ -36,11 +36,21 @@ struct ProjectStackDetector {
         return ordered(ids)
     }
 
-    /// Profile for the agent toolkit manifest: the stack the repository is mainly built with.
-    func stackProfile(for project: CIProject) async -> String {
+    /// Agent toolkit stack choice: the main stack profile, and whether a stack gate fits at all.
+    /// A Rust workspace (or TypeScript only in sub-packages) has none, so its manifest keeps just
+    /// the universal checks instead of web checks that need a root package.json.
+    func stackChoice(for project: CIProject) async -> (profile: String, hasStackChecks: Bool) {
         let languages = await languages(for: project)
         let isUnity = await hasUnityMarker(project) ? true : await isUnityPackage(project)
-        return Self.profile(languages: languages, isUnity: isUnity)
+        let hasRootPackage = await hasRootPackageJSON(project)
+        return (
+            Self.profile(languages: languages, isUnity: isUnity),
+            Self.hasStackGate(languages: languages, isUnity: isUnity, hasRootPackageJSON: hasRootPackage)
+        )
+    }
+
+    static func hasStackGate(languages: Set<String>, isUnity: Bool, hasRootPackageJSON: Bool) -> Bool {
+        isUnity || hasRootPackageJSON || !languages.isDisjoint(with: ["swift", "go", "python"])
     }
 
     static func profile(languages: Set<String>, isUnity: Bool) -> String {

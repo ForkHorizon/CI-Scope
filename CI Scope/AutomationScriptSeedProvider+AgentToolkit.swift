@@ -25,6 +25,11 @@ extension AutomationScriptSeedProvider {
                     id: "stack_profile", title: "Stack profile", kind: .option,
                     isRequired: true, defaultValue: "ts-web",
                     help: "Select the repository's main language stack.", options: ["ts-web", "go", "python", "swift", "unity"]),
+                AutomationScriptVariable(
+                    id: "stack_checks", title: "Stack checks", kind: .boolean,
+                    isRequired: false, defaultValue: "true",
+                    help: "Include the stack gate checks; off when no gate fits the repository (e.g. Rust).",
+                    options: []),
             ],
             files: agentToolkitFiles,
             defaultSeedID: "agent-toolkit"
@@ -92,9 +97,9 @@ extension AutomationScriptSeedProvider {
         ]
     }
 
-    static func agentToolkitManifest(_ profile: String) -> String {
+    static func agentToolkitManifest(_ profile: String, includeStackChecks: Bool = true) -> String {
         let stackChecks: [[String: Any]]
-        switch profile {
+        switch includeStackChecks ? profile : "none" {
         case "go":
             stackChecks = [["id": "go-quality", "type": "go-quality"]]
         case "python":
@@ -107,8 +112,8 @@ extension AutomationScriptSeedProvider {
                 ["id": "swift-quality", "type": "swift-quality", "params": ["run_build": false]],
                 ["id": "swift-compile", "type": "swift-compile", "speed": "full"],
             ]
-        case "unity":
-            stackChecks = []  // no Unity check type in ci-gates yet; the shape gates below still apply
+        case "unity", "none":
+            stackChecks = []  // no stack check type applies (Unity has none in ci-gates yet, or the repo has no matching gate)
         default:
             stackChecks = [
                 ["id": "web-quality", "type": "web-quality"],
