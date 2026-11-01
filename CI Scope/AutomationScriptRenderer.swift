@@ -28,11 +28,18 @@ struct AutomationScriptRenderer {
     func renderedFiles() throws -> [AutomationScriptFile] {
         try script.files.map { file in
             try AutomationScriptValidator.validatePath(render(file.destinationPath))
+            var contents = render(file.contents)
+            if script.id == "agent-toolkit", file.id == "manifest" {
+                contents = contents.replacingOccurrences(
+                    of: "{{profile_manifest}}",
+                    with: AutomationScriptSeedProvider.agentToolkitManifest(
+                        variableValues["stack_profile"] ?? "ts-web"))
+            }
             return AutomationScriptFile(
                 id: file.id,
                 destinationPath: render(file.destinationPath),
                 isExecutable: file.isExecutable,
-                contents: render(file.contents)
+                contents: contents
             )
         }
     }
