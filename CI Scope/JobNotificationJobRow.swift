@@ -40,7 +40,6 @@ struct JobNotificationJobRow: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
-        .background(Color.secondary.opacity(0.075))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .nothingCard(radius: 10)
     }
 }

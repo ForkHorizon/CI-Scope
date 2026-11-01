@@ -71,7 +71,7 @@ struct ProjectLiveWorkSection: View {
         VStack(alignment: .leading, spacing: 7) {
             Label("Running now", systemImage: "waveform.path.ecg")
                 .font(NothingTheme.body.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(NothingTheme.ink)
 
             ForEach(items) { item in
                 LiveWorkCard(item: item, compact: true)

@@ -27,8 +27,8 @@ struct RunnerWorkRow: View {
                             .truncationMode(.tail)
                             .padding(.horizontal, 5)
                             .frame(height: 16)
-                            .background(Color.accentColor.opacity(0.1))
-                            .foregroundStyle(Color.accentColor)
+                            .background(NothingTheme.green.opacity(0.1))
+                            .foregroundStyle(NothingTheme.green)
                             .clipShape(RoundedRectangle(cornerRadius: 5))
                             .help(item.assemblerScope ?? assemblerTitle)
                     }

@@ -27,7 +27,7 @@ private struct JobNotificationBanner: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        GlassEffectContainer {
+        Group {
             VStack(alignment: .leading, spacing: 10) {
                 header
 
@@ -37,22 +37,22 @@ private struct JobNotificationBanner: View {
 
                 if shouldShowWorkList {
                     Divider()
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
+                    do {
+                        VStack(alignment: .leading, spacing: 10) {
                             if !notification.runningJobs.isEmpty {
                                 JobNotificationSection(
-                                    title: "Running Now", jobs: notification.runningJobs, tint: .green)
+                                    title: "Running Now", jobs: Array(notification.runningJobs.prefix(3)), tint: NothingTheme.green)
                             }
 
                             if !notification.queuedJobs.isEmpty {
                                 JobNotificationSection(
                                     title: "Queue",
-                                    jobs: Array(notification.queuedJobs.prefix(5)),
-                                    tint: .orange
+                                    jobs: Array(notification.queuedJobs.prefix(3)),
+                                    tint: NothingTheme.amber
                                 )
 
-                                if notification.queuedJobs.count > 5 {
-                                    Text("+\(notification.queuedJobs.count - 5) more queued")
+                                if notification.queuedJobs.count > 3 {
+                                    Text("+\(notification.queuedJobs.count - 3) more queued")
                                         .font(NothingTheme.tiny)
                                         .foregroundStyle(NothingTheme.inkDim)
                                         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -60,23 +60,19 @@ private struct JobNotificationBanner: View {
                             }
                         }
                     }
-                    .scrollIndicators(.never)
-                    .frame(maxHeight: 188)
                 }
             }
             .padding(13)
-            .frame(width: 372, alignment: .leading)
-            .glassEffect(.regular, in: .rect(cornerRadius: 8))
-            .shadow(color: Color.black.opacity(0.18), radius: 18, y: 10)
+            .frame(width: 340, alignment: .leading)
+            .background(Color(white: 0.04), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(NothingTheme.lineStrong, lineWidth: 1))
+            .shadow(color: Color.black.opacity(0.5), radius: 20, y: 10)
         }
     }
 
     private var header: some View {
         HStack(spacing: 9) {
-            Image(systemName: "tray.full")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.orange)
-                .frame(width: 26, height: 26)
+            Circle().fill(NothingTheme.amber).frame(width: 10, height: 10)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(notification.newJobs.count == 1 ? "New CI Job" : "New CI Jobs")
@@ -92,10 +88,11 @@ private struct JobNotificationBanner: View {
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .frame(width: 24, height: 24)
+                    .font(.system(size: 10))
+                    .frame(width: 26, height: 26)
+                    .overlay(Circle().stroke(NothingTheme.lineStrong, lineWidth: 1))
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.plain)
             .help("Dismiss")
         }
     }

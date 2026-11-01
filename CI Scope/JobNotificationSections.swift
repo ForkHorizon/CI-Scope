@@ -9,7 +9,7 @@ struct JobNotificationPrimaryLine: View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: count == 1 ? "bolt.fill" : "square.stack.3d.up")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(NothingTheme.green)
                 .frame(width: 20, height: 20)
 
             VStack(alignment: .leading, spacing: 2) {

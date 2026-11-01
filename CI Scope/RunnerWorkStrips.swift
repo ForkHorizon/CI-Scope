@@ -105,9 +105,9 @@ struct RunnerErrorStrip: View {
 
 func color(for state: ServiceState) -> Color {
     switch state {
-    case .online: .green
-    case .warning: .orange
-    case .offline: .red
-    case .unknown: .secondary
+    case .online: NothingTheme.green
+    case .warning: NothingTheme.amber
+    case .offline: NothingTheme.red
+    case .unknown: NothingTheme.inkDim
     }
 }

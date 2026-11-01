@@ -4,37 +4,24 @@ struct RunnerSummaryTile: View {
     let title: String
     let value: String
     let detail: String
-    let icon: String
     let state: ServiceState
 
     var body: some View {
-        HStack(spacing: 9) {
-            RunnerIcon(icon: icon, state: state)
-                .frame(width: 32, height: 32)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(NothingTheme.small.weight(.semibold))
-                    .lineLimit(1)
-                Text(value)
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Text(detail)
-                    .font(NothingTheme.tiny)
-                    .foregroundStyle(NothingTheme.inkDim)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).nothingCaption().lineLimit(1)
+            Text(value)
+                .nothingDisplay(34)
+                .foregroundStyle(color(for: state))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(detail)
+                .font(NothingTheme.tiny)
+                .foregroundStyle(NothingTheme.inkDim)
+                .lineLimit(1)
         }
-        .padding(10)
-        .frame(height: 72)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.secondary.opacity(0.13))
-        )
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .nothingCard()
     }
 }
 
@@ -50,7 +37,7 @@ struct RunnerCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 7) {
                         Text(runner.title)
-                            .font(.headline)
+                            .font(NothingTheme.body.weight(.semibold))
                             .lineLimit(1)
                         RunnerStatePill(state: runner.state, text: runnerStateText)
                     }
@@ -96,7 +83,7 @@ struct RunnerCard: View {
             VStack(alignment: .leading, spacing: 7) {
                 Label("Running now", systemImage: "waveform.path.ecg")
                     .font(NothingTheme.body.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(NothingTheme.green)
 
                 if runner.activeJobs.isEmpty {
                     if runner.isBusy {
@@ -130,13 +117,8 @@ struct RunnerCard: View {
             .font(NothingTheme.small.weight(.semibold))
             .foregroundStyle(NothingTheme.inkDim)
         }
-        .padding(12)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(runnerColor.opacity(0.2))
-        )
+        .padding(16)
+        .nothingCard(radius: 18)
     }
 
     private var columns: [GridItem] {
@@ -162,7 +144,4 @@ struct RunnerCard: View {
         return runner.state.rawValue
     }
 
-    private var runnerColor: Color {
-        color(for: runner.state)
-    }
 }

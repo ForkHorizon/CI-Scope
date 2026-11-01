@@ -84,7 +84,7 @@ struct EmptyProjectDashboard: View {
                     .font(NothingTheme.body.weight(.semibold))
                     .padding(.horizontal, 12)
                     .frame(height: 32)
-                    .background(Color.accentColor.opacity(0.16))
+                    .background(NothingTheme.ink.opacity(0.16))
                     .clipShape(RoundedRectangle(cornerRadius: 7))
             }
             .buttonStyle(.plain)

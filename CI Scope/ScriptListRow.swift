@@ -19,7 +19,7 @@ struct ScriptListRow: View {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "curlybraces.square")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(isExpanded ? Color.accentColor : .secondary)
+                        .foregroundStyle(isExpanded ? NothingTheme.ink : .secondary)
                         .frame(width: 24, height: 24)
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -80,14 +80,14 @@ struct ScriptListRow: View {
     }
 
     private var rowBackground: Color {
-        if isExpanded { return Color.accentColor.opacity(0.10) }
-        if isSelected { return Color.accentColor.opacity(0.06) }
+        if isExpanded { return NothingTheme.ink.opacity(0.10) }
+        if isSelected { return NothingTheme.ink.opacity(0.06) }
         return Color.secondary.opacity(0.055)
     }
 
     private var rowBorder: Color {
-        if isExpanded { return Color.accentColor.opacity(0.34) }
-        if isSelected { return Color.accentColor.opacity(0.18) }
+        if isExpanded { return NothingTheme.ink.opacity(0.34) }
+        if isSelected { return NothingTheme.ink.opacity(0.18) }
         return Color.secondary.opacity(0.10)
     }
 }

@@ -9,10 +9,10 @@ struct LiveWorkCard: View {
         VStack(alignment: .leading, spacing: compact ? 8 : 11) {
             HStack(alignment: .top, spacing: 10) {
                 ZStack {
-                    Circle().fill(Color.accentColor.opacity(0.14))
+                    Circle().fill(NothingTheme.green.opacity(0.14))
                     Image(systemName: "waveform.path.ecg")
                         .font(.system(size: compact ? 13 : 15, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(NothingTheme.green)
                 }
                 .frame(width: compact ? 30 : 36, height: compact ? 30 : 36)
 
@@ -51,10 +51,10 @@ struct LiveWorkCard: View {
                 .truncationMode(.middle)
         }
         .padding(compact ? 10 : 13)
-        .background(Color.accentColor.opacity(compact ? 0.055 : 0.075))
+        .background(NothingTheme.green.opacity(compact ? 0.055 : 0.075))
         .clipShape(RoundedRectangle(cornerRadius: compact ? 8 : 10))
         .overlay(
-            RoundedRectangle(cornerRadius: compact ? 8 : 10).stroke(Color.accentColor.opacity(0.22)))
+            RoundedRectangle(cornerRadius: compact ? 8 : 10).stroke(NothingTheme.green.opacity(0.22)))
     }
 
     @ViewBuilder
@@ -64,7 +64,7 @@ struct LiveWorkCard: View {
                 HStack(spacing: 6) {
                     Text(progress.phaseLabel)
                         .font(NothingTheme.small.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(NothingTheme.green)
                     Spacer(minLength: 6)
                     Text(progress.countLabel ?? "In progress")
                         .font(NothingTheme.small.monospacedDigit().weight(.semibold))
@@ -72,7 +72,7 @@ struct LiveWorkCard: View {
                 }
 
                 if let fraction = progress.fraction {
-                    ProgressView(value: fraction).tint(Color.accentColor)
+                    ProgressView(value: fraction).tint(NothingTheme.green)
                 } else {
                     ProgressView().controlSize(.small)
                 }

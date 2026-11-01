@@ -23,12 +23,6 @@ struct RunnersView: View {
                 }
                 .padding(12)
             }
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.secondary.opacity(0.13))
-            )
         }
         .overlay(alignment: .topTrailing) {
             if viewModel.isLoading {
@@ -50,21 +44,18 @@ private struct RunnerFleetSummary: View {
                 title: "Runner",
                 value: isLoading && snapshot.runners.isEmpty ? "..." : "\(min(snapshot.runners.count, 1))",
                 detail: snapshot.runners.isEmpty ? stateText : "MacBook",
-                icon: "desktopcomputer",
                 state: snapshot.state
             )
             RunnerSummaryTile(
                 title: "Running",
                 value: "\(snapshot.activeJobCount)",
                 detail: "serial execution",
-                icon: "play.circle",
                 state: snapshot.activeJobCount > 0 ? .warning : .online
             )
             RunnerSummaryTile(
                 title: "Queue",
                 value: "\(snapshot.queuedJobCount)",
                 detail: "shared queue",
-                icon: "tray.full",
                 state: snapshot.queuedJobCount > 0 ? .warning : .online
             )
             .help(
@@ -74,7 +65,6 @@ private struct RunnerFleetSummary: View {
                 title: "Sub-runners",
                 value: "\(snapshot.subRunnerCount)",
                 detail: "hidden settings",
-                icon: "slider.horizontal.3",
                 state: snapshot.subRunnerCount > 0 ? .online : .unknown
             )
         }

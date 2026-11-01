@@ -22,10 +22,10 @@ struct ProjectCIPanel: View {
                     HStack(spacing: 10) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 7)
-                                .fill(Color.accentColor.opacity(0.14))
+                                .fill(NothingTheme.ink.opacity(0.14))
                             Image(systemName: "folder.badge.gearshape")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(NothingTheme.ink)
                         }
                         .frame(width: 36, height: 36)
 

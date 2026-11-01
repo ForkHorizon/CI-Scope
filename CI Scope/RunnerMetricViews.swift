@@ -43,7 +43,6 @@ struct RunnerMetric: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .nothingCard(radius: 10)
     }
 }
