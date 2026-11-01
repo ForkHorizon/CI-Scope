@@ -55,6 +55,14 @@ struct TestProtectionView: View {
             })
     }
 
+    private static func summary(of item: TestDecision) -> String {
+        let parts: [String?] = [
+            item.decision.capitalized, item.repository, String(item.sha.prefix(7)), "by \(item.decidedBy)",
+            item.path, item.note, item.decidedAt,
+        ]
+        return parts.compactMap { $0 }.joined(separator: " · ")
+    }
+
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label("History", systemImage: "clock.arrow.circlepath").font(.callout.weight(.semibold))
@@ -62,8 +70,8 @@ struct TestProtectionView: View {
                 Text("Decisions you make are recorded here.").font(.caption).foregroundStyle(.secondary)
             }
             ForEach(model.history.prefix(30), id: \.decidedAt) { item in
-                Text("\(item.decision.capitalized) · \(item.repository) · \(item.sha.prefix(7)) · \(item.decidedAt)")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(Self.summary(of: item))
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
         }
         .padding(10)
