@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		ADD25A823A8144A38444AE1A /* V2ClientXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42D670256517441C9CC91511 /* V2ClientXCTest.swift */; };
+		A9E1D0C2B3F44E5A8C7D6B01 /* AgentToolkitXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -22,6 +23,7 @@
 
 /* Begin PBXFileReference section */
 		42D670256517441C9CC91511 /* V2ClientXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V2ClientXCTest.swift; sourceTree = "<group>"; };
+		A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentToolkitXCTest.swift; sourceTree = "<group>"; };
 		8EE0192E2FC70D83008B01AC /* CI Scope.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CI Scope.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4D581C73F9E4F3DA20E1B6C /* CI ScopeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CI ScopeTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -56,6 +58,7 @@
 			isa = PBXGroup;
 			children = (
 				42D670256517441C9CC91511 /* V2ClientXCTest.swift */,
+				A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */,
 			);
 			path = "CI ScopeTests";
 			sourceTree = "<group>";
@@ -183,6 +186,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				ADD25A823A8144A38444AE1A /* V2ClientXCTest.swift in Sources */,
+				A9E1D0C2B3F44E5A8C7D6B01 /* AgentToolkitXCTest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
