@@ -35,9 +35,17 @@
         "go",
         "python",
         "swift",
-        "unity",
-        "generic"
+        "unity"
       ]
+    },
+    {
+      "id": "stack_checks",
+      "title": "Stack checks",
+      "kind": "boolean",
+      "isRequired": false,
+      "defaultValue": "true",
+      "help": "Include the stack gate checks; off when no gate fits the repository (e.g. Rust).",
+      "options": []
     }
   ],
   "files": [

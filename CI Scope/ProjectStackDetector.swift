@@ -36,22 +36,29 @@ struct ProjectStackDetector {
         return ordered(ids)
     }
 
-    /// Profile for the agent toolkit manifest: the stack the repository is mainly built with.
-    func stackProfile(for project: CIProject) async -> String {
+    /// Agent toolkit stack choice: the main stack profile, and whether a stack gate fits at all.
+    /// A Rust workspace (or TypeScript only in sub-packages) has none, so its manifest keeps just
+    /// the universal checks instead of web checks that need a root package.json.
+    func stackChoice(for project: CIProject) async -> (profile: String, hasStackChecks: Bool) {
         let languages = await languages(for: project)
         let isUnity = await hasUnityMarker(project) ? true : await isUnityPackage(project)
-        return Self.profile(
-            languages: languages, isUnity: isUnity, hasRootPackageJSON: await hasRootPackageJSON(project))
+        let hasRootPackage = await hasRootPackageJSON(project)
+        return (
+            Self.profile(languages: languages, isUnity: isUnity),
+            Self.hasStackGate(languages: languages, isUnity: isUnity, hasRootPackageJSON: hasRootPackage)
+        )
     }
 
-    /// `generic` means no stack gate fits (e.g. Rust, or TypeScript only in sub-packages), so the
-    /// manifest keeps just the universal checks instead of web checks that need a root package.json.
-    static func profile(languages: Set<String>, isUnity: Bool, hasRootPackageJSON: Bool) -> String {
+    static func hasStackGate(languages: Set<String>, isUnity: Bool, hasRootPackageJSON: Bool) -> Bool {
+        isUnity || hasRootPackageJSON || !languages.isDisjoint(with: ["swift", "go", "python"])
+    }
+
+    static func profile(languages: Set<String>, isUnity: Bool) -> String {
         if isUnity { return "unity" }
         if languages.contains("swift") { return "swift" }
         if languages.contains("go") { return "go" }
         if languages.contains("python") { return "python" }
-        return hasRootPackageJSON ? "ts-web" : "generic"
+        return "ts-web"
     }
 
     private func languages(for project: CIProject) async -> Set<String> {

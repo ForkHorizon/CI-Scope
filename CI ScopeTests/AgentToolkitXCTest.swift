@@ -16,8 +16,7 @@ final class AgentToolkitXCTest: XCTestCase {
         let sha = String(repeating: "a", count: 40)
         for script in scripts {
             XCTAssertEqual(
-                script.variables.first(where: { $0.id == "stack_profile" })?.options,
-                ["ts-web", "go", "python", "swift", "unity", "generic"])
+                script.variables.first(where: { $0.id == "stack_profile" })?.options, ["ts-web", "go", "python", "swift", "unity"])
             for (profile, expectedType) in [
                 ("ts-web", "web-test"), ("go", "go-quality"), ("python", "python-pytest"),
             ] {
@@ -158,10 +157,7 @@ final class AgentToolkitXCTest: XCTestCase {
         XCTAssertTrue(swift.contains("\"speed\" : \"full\""))
         let unity = AutomationScriptSeedProvider.agentToolkitManifest("unity")
         XCTAssertFalse(unity.contains("web-quality"))
-        let generic = AutomationScriptSeedProvider.agentToolkitManifest("generic")
-        XCTAssertFalse(generic.contains("web-quality"))
-        XCTAssertFalse(generic.contains("web-test"))
-        for manifest in [swift, unity, generic] {
+        for manifest in [swift, unity] {
             XCTAssertTrue(manifest.contains("\"file-roles\""))
             XCTAssertTrue(manifest.contains("\"agent-docs-stable\""))
         }
@@ -169,16 +165,11 @@ final class AgentToolkitXCTest: XCTestCase {
 
     func testStackProfileDetectionPrefersUnityThenSwiftThenGoThenPython() {
         typealias Detector = ProjectStackDetector
-        XCTAssertEqual(Detector.profile(languages: ["swift", "c#"], isUnity: true, hasRootPackageJSON: false), "unity")
-        XCTAssertEqual(Detector.profile(languages: ["swift", "go"], isUnity: false, hasRootPackageJSON: true), "swift")
-        XCTAssertEqual(Detector.profile(languages: ["go", "python"], isUnity: false, hasRootPackageJSON: true), "go")
-        XCTAssertEqual(Detector.profile(languages: ["python"], isUnity: false, hasRootPackageJSON: false), "python")
-        XCTAssertEqual(
-            Detector.profile(languages: ["typescript"], isUnity: false, hasRootPackageJSON: true), "ts-web")
-        // Shardrail_Core: Rust with TypeScript only in packages/*, no root package.json.
-        XCTAssertEqual(
-            Detector.profile(languages: ["rust", "typescript", "shell"], isUnity: false, hasRootPackageJSON: false),
-            "generic")
+        XCTAssertEqual(Detector.profile(languages: ["swift", "c#"], isUnity: true), "unity")
+        XCTAssertEqual(Detector.profile(languages: ["swift", "go"], isUnity: false), "swift")
+        XCTAssertEqual(Detector.profile(languages: ["go", "python"], isUnity: false), "go")
+        XCTAssertEqual(Detector.profile(languages: ["python"], isUnity: false), "python")
+        XCTAssertEqual(Detector.profile(languages: ["typescript"], isUnity: false), "ts-web")
     }
 
     func testToolkitSeedDefaultsToAReviewedFullShaAndFetchesGatesWhenMissing() throws {
@@ -197,7 +188,7 @@ final class AgentToolkitXCTest: XCTestCase {
             .first { $0.id == "claude-hooks" }?.contents ?? ""
         XCTAssertTrue(hooks.contains("\"PreToolUse\""))
         XCTAssertTrue(hooks.contains("scripts/check guard-tests # ci-scope-agent-toolkit"))
-        for profile in ["ts-web", "go", "python", "swift", "unity", "generic"] {
+        for profile in ["ts-web", "go", "python", "swift", "unity"] {
             XCTAssertTrue(
                 AutomationScriptSeedProvider.agentToolkitManifest(profile).contains("\"test-protection\""),
                 profile)
