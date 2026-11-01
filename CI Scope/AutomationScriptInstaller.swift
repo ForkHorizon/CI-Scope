@@ -73,7 +73,7 @@ struct AutomationScriptInstaller {
         let branchExists = await remoteBranchExists(renderer.branchName, cwd: repoURL)
         try await checkoutBranch(renderer.branchName, exists: branchExists, cwd: repoURL)
         let files = try renderer.renderedFiles()
-        try write(files, to: repoURL)
+        try AutomationScriptManagedFiles.install(files, in: repoURL)
         try await stage(files, cwd: repoURL)
         return files
     }
@@ -187,10 +187,11 @@ struct AutomationScriptInstaller {
 
     func remove(_ files: [AutomationScriptFile], cwd: URL) async throws {
         guard !files.isEmpty else { return }
+        try AutomationScriptManagedFiles.remove(files, from: cwd)
         _ = try await run(
-            "git rm -f --ignore-unmatch -- \(gitPaths(files))",
+            "git add -A -- \(gitPaths(files))",
             cwd: cwd,
-            step: "Remove automation files"
+            step: "Stage automation file removal"
         )
     }
 
