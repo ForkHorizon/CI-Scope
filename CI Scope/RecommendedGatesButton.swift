@@ -7,6 +7,8 @@ struct RecommendedGatesButton: View {
     let project: CIProject
     let scripts: [AutomationScript]
     let isInstalled: (AutomationScript) -> Bool
+    /// Check types of the repository's Unified Checks manifest, nil when it has none.
+    let manifestCheckTypes: Set<String>?
     @ObservedObject var installViewModel: AutomationScriptInstallViewModel
 
     @State private var detected: [AutomationScript] = []
@@ -44,6 +46,11 @@ struct RecommendedGatesButton: View {
                 }
             }
 
+            if manifestCheckTypes != nil {
+                Text("This repository uses Unified Checks. Missing checks are added in the Policy tab.")
+                    .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
+            }
+
             AutomationScriptInstallStatusBox(status: installViewModel.bundleSnapshot(for: project))
 
             HStack {
@@ -59,21 +66,30 @@ struct RecommendedGatesButton: View {
         .background(NothingTheme.canvas)
     }
 
+    private func status(of script: AutomationScript) -> RecommendedGateStatus {
+        RecommendedGateStatus.status(
+            seedID: script.defaultSeedID ?? script.id, hasWorkflow: isInstalled(script),
+            manifestTypes: manifestCheckTypes)
+    }
+
     private func gateRow(_ script: AutomationScript) -> some View {
-        Toggle(isOn: binding(for: script.id)) {
+        let status = status(of: script)
+        return Toggle(isOn: binding(for: script.id)) {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(script.title).font(NothingTheme.body.weight(.semibold))
-                    if isInstalled(script) {
-                        Text("installed")
+                    if let label = status.label {
+                        Text(label)
                             .font(NothingTheme.tiny.weight(.semibold))
-                            .foregroundStyle(NothingTheme.inkDim)
+                            .foregroundStyle(status == .addViaPolicy ? NothingTheme.amber : NothingTheme.inkDim)
                     }
                 }
                 Text(script.summary).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
             }
         }
         .toggleStyle(NothingToggleStyle())
+        .disabled(!status.isSelectable)
+        .opacity(status.isSelectable ? 1 : 0.6)
     }
 
     private var installLabel: String {
@@ -100,7 +116,7 @@ struct RecommendedGatesButton: View {
             hasStackChecks = choice.hasStackChecks
             let matched = ids.compactMap { id in scripts.first { $0.defaultSeedID == id || $0.id == id } }
             detected = matched
-            selected = Set(matched.filter { !isInstalled($0) }.map(\.id))
+            selected = Set(matched.filter { status(of: $0).isSelectable }.map(\.id))
             isDetecting = false
             isPresented = true
         }
