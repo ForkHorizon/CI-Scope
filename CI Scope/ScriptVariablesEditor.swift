@@ -10,12 +10,8 @@ struct ScriptVariablesEditor: View {
                     remove(variable)
                 }
             }
-            Button {
-                script.variables.append(.empty())
-            } label: {
-                Label("Add Variable", systemImage: "plus")
-            }
-            .buttonStyle(.bordered)
+            Button("Add variable") { script.variables.append(.empty()) }
+                .buttonStyle(.pill)
         }
     }
 
@@ -52,9 +48,8 @@ struct ScriptVariableCard: View {
             }
             Toggle("Required", isOn: $variable.isRequired)
         }
-        .padding(9)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .padding(12)
+        .nothingCard(radius: 12)
     }
 
     private var optionsBinding: Binding<String> {

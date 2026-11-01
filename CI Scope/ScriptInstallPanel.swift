@@ -28,7 +28,11 @@ struct ScriptInstallVariableInput: View {
         case .multiline:
             TextEditor(text: valueBinding)
                 .font(.system(size: 11, design: .monospaced))
+                .scrollContentBackground(.hidden)
+                .padding(8)
                 .frame(minHeight: 66)
+                .background(NothingTheme.panel, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(NothingTheme.line, lineWidth: 1))
         case .option:
             Picker(variable.title, selection: valueBinding) {
                 ForEach(variable.options, id: \.self) { option in
@@ -38,7 +42,7 @@ struct ScriptInstallVariableInput: View {
             .labelsHidden()
         case .number, .text:
             TextField(variable.title, text: valueBinding)
-                .textFieldStyle(.roundedBorder)
+                .nothingField()
         }
     }
 
@@ -83,8 +87,7 @@ struct AutomationScriptInstallStatusBox: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(9)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .padding(12)
+        .nothingCard(radius: 12)
     }
 }

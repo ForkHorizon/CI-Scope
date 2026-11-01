@@ -20,48 +20,45 @@ struct ScriptsView: View {
     @State private var isConfirmingDelete = false
 
     var body: some View {
-        PanelShell(title: "Scripts Library") {
-            VStack(spacing: 0) {
-                toolbar
+        VStack(spacing: 0) {
+            toolbar
 
-                if let currentErrorMessage {
-                    ErrorBox(text: currentErrorMessage)
-                        .padding(.horizontal, 10)
-                        .padding(.bottom, 10)
-                }
+            if let currentErrorMessage {
+                ErrorBox(text: currentErrorMessage)
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 10)
+            }
 
-                if store.scripts.isEmpty {
-                    EmptyState(icon: "curlybraces.square", text: "No scripts saved")
-                        .frame(maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 8) {
-                            ForEach(store.scripts) { script in
-                                ScriptListRow(
-                                    script: script,
-                                    isSelected: script.id == store.selectedScriptID,
-                                    isExpanded: script.id == expandedScriptID,
-                                    projects: projects,
-                                    selectedProjectID: $selectedProjectID,
-                                    runnerMode: $runnerMode,
-                                    variableValues: $variableValues,
-                                    snapshot: installer.snapshot(for: script),
-                                    onSelect: {
-                                        select(script)
-                                    },
-                                    onOpenEditor: {
-                                        openEditor(for: script)
-                                    },
-                                    onInstall: installDraft
-                                )
-                            }
+            if store.scripts.isEmpty {
+                EmptyState(icon: "curlybraces.square", text: "No scripts saved")
+                    .frame(maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(store.scripts) { script in
+                            ScriptListRow(
+                                script: script,
+                                isExpanded: script.id == expandedScriptID,
+                                projects: projects,
+                                selectedProjectID: $selectedProjectID,
+                                runnerMode: $runnerMode,
+                                variableValues: $variableValues,
+                                snapshot: installer.snapshot(for: script),
+                                onSelect: {
+                                    select(script)
+                                },
+                                onOpenEditor: {
+                                    openEditor(for: script)
+                                },
+                                onInstall: installDraft
+                            )
                         }
-                        .padding(10)
                     }
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 22)
                 }
             }
         }
-        .padding(14)
         .sheet(isPresented: $isEditorPresented) {
             if let script = draftBinding {
                 ScriptEditorPanel(
@@ -71,7 +68,6 @@ struct ScriptsView: View {
                     onSave: saveDraft,
                     onReset: resetDraft
                 )
-                .padding(14)
                 .frame(width: 560, height: 640)
             } else {
                 EmptyState(icon: "curlybraces.square", text: "No script selected")
@@ -118,32 +114,21 @@ struct ScriptsView: View {
     }
 
     private var toolbar: some View {
-        HStack(spacing: 8) {
-            Text(scriptCountText)
-                .font(NothingTheme.small.weight(.semibold))
-                .foregroundStyle(NothingTheme.inkDim)
+        HStack(alignment: .bottom, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Script library").nothingCaption()
+                Text("\(store.scripts.count)").nothingDisplay(56)
+            }
 
             Spacer()
 
-            Button(action: createScript) {
-                Label("New", systemImage: "plus")
-            }
-
-            Button(role: .destructive) {
-                isConfirmingDelete = true
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-            .disabled(store.selectedScript == nil)
+            Button("Delete") { isConfirmingDelete = true }
+                .buttonStyle(.pillDanger)
+                .disabled(store.selectedScript == nil)
+            Button("New script", action: createScript)
+                .buttonStyle(.pillPrimary)
         }
-        .font(NothingTheme.small.weight(.semibold))
-        .buttonStyle(.bordered)
-        .padding(10)
-        .background(Color.secondary.opacity(0.035))
-    }
-
-    private var scriptCountText: String {
-        store.scripts.count == 1 ? "1 script" : "\(store.scripts.count) scripts"
+        .padding(22)
     }
 
     private var deleteButtonTitle: String {
