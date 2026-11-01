@@ -19,7 +19,7 @@
       "title": "Reviewed ci-gates SHA",
       "kind": "text",
       "isRequired": true,
-      "defaultValue": "f3b7ff08924b5e262d0f6df0cdb43d8b18ba1969",
+      "defaultValue": "ba114c69330b79392c911ff9b1a9b4f8879b6894",
       "help": "Full 40-character commit SHA containing the checks.",
       "options": []
     },
