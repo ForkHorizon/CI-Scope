@@ -39,6 +39,7 @@ enum PolicyRecordBuilder {
             record.removeValue(forKey: key)  // the server sets these itself
         }
         record["approved_sha"] = mergeSHA
+        if let pinned = pinnedGatesSHA(in: files) { record["gates_sha"] = pinned }
         record["files"] = files.keys.sorted().map { path in
             ["path": path, "sha256": sha256Hex(files[path] ?? Data())]
         }
@@ -47,6 +48,18 @@ enum PolicyRecordBuilder {
             ["id": id, "required": id != "slop-review"] as [String: Any]
         }
         return record
+    }
+
+    /// The ci-gates commit the workflows pin; the server rejects a record whose `gates_sha` no workflow contains.
+    static func pinnedGatesSHA(in files: [String: Data]) -> String? {
+        let pattern = #"CI_SCOPE_GATES_SHA:\s*([0-9a-f]{40})\b"#
+        for path in files.keys.sorted() where path.hasPrefix(".github/workflows/") {
+            guard let text = files[path].flatMap({ String(data: $0, encoding: .utf8) }),
+                let match = text.range(of: pattern, options: .regularExpression)
+            else { continue }
+            return String(text[match].suffix(40))
+        }
+        return nil
     }
 
     static func approvedSHA(_ record: Record) -> String? {

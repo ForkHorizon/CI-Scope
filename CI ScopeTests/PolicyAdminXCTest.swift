@@ -119,4 +119,16 @@ final class PolicyAdminXCTest: XCTestCase {
         XCTAssertEqual(checks.compactMap { $0["id"] as? String }, ["code-linter", "slop-review"])
         XCTAssertEqual(checks.compactMap { $0["required"] as? Bool }, [true, false])
     }
+
+    func testRecordFollowsTheGatesShaPinnedInWorkflows() throws {
+        let current: PolicyRecordBuilder.Record = ["gates_sha": String(repeating: "a", count: 40), "files": [], "protected_patterns": []]
+        let pin = String(repeating: "c", count: 40)
+        let workflow = Data("env:\n  CI_SCOPE_GATES_SHA: \(pin)\n".utf8)
+        let files = [".ci-scope.json": Data(manifest.utf8), ".github/workflows/ci-scope-checks.yml": workflow]
+        let record = try PolicyRecordBuilder.record(current: current, mergeSHA: String(repeating: "b", count: 40), files: files)
+        XCTAssertEqual(record["gates_sha"] as? String, pin)
+        let unpinned = try PolicyRecordBuilder.record(
+            current: current, mergeSHA: String(repeating: "b", count: 40), files: [".ci-scope.json": Data(manifest.utf8)])
+        XCTAssertEqual(unpinned["gates_sha"] as? String, String(repeating: "a", count: 40))
+    }
 }
