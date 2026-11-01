@@ -117,6 +117,10 @@ struct ProjectCIPanel: View {
                         UnifiedChecksSection(snapshot: unifiedChecks)
                     }
 
+                    if let localCheck = snapshot?.localCheck {
+                        LocalCheckSection(result: localCheck, runs: snapshot?.runs ?? [])
+                    }
+
                     if let error = snapshot?.unifiedChecksError {
                         ErrorBox(text: "Unified checks: \(error)")
                     }

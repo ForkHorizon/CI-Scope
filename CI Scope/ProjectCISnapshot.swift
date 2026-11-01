@@ -42,6 +42,7 @@ struct ProjectCISnapshot {
     var runs: [GitHubRun] = []
     var unifiedChecks: UnifiedChecksSnapshot?
     var unifiedChecksError: String?
+    var localCheck: LocalCheckResult?
     var error: String?
     var refreshedAt = Date()
 }

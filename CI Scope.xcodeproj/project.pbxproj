@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		462A8A7274B7089B5EB1887F /* PolicyAdminXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 405A8EFF2DD793DF7EE4E3A0 /* PolicyAdminXCTest.swift */; };
 		ADD25A823A8144A38444AE1A /* V2ClientXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42D670256517441C9CC91511 /* V2ClientXCTest.swift */; };
+		B7A1D0C2B3F44E5A8C7D6C01 /* LocalCheckResultXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -24,6 +25,7 @@
 /* Begin PBXFileReference section */
 		405A8EFF2DD793DF7EE4E3A0 /* PolicyAdminXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolicyAdminXCTest.swift; sourceTree = "<group>"; };
 		42D670256517441C9CC91511 /* V2ClientXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V2ClientXCTest.swift; sourceTree = "<group>"; };
+		B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCheckResultXCTest.swift; sourceTree = "<group>"; };
 		8EE0192E2FC70D83008B01AC /* CI Scope.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CI Scope.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4D581C73F9E4F3DA20E1B6C /* CI ScopeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CI ScopeTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -59,6 +61,7 @@
 			children = (
 				405A8EFF2DD793DF7EE4E3A0 /* PolicyAdminXCTest.swift */,
 				42D670256517441C9CC91511 /* V2ClientXCTest.swift */,
+				B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */,
 			);
 			path = "CI ScopeTests";
 			sourceTree = "<group>";
@@ -187,6 +190,7 @@
 			files = (
 				462A8A7274B7089B5EB1887F /* PolicyAdminXCTest.swift in Sources */,
 				ADD25A823A8144A38444AE1A /* V2ClientXCTest.swift in Sources */,
+				B7A1D0C2B3F44E5A8C7D6C01 /* LocalCheckResultXCTest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
