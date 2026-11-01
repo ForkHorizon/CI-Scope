@@ -1,26 +1,33 @@
-import AppKit
 import SwiftUI
 
+/// Nothing-style status dot: filled white = online, red = attention, hollow = unknown.
 struct StatusDot: View {
     let state: ServiceState
+    var onLight = false
 
     var body: some View {
         Circle()
-            .fill(color)
+            .fill(fill)
             .frame(width: 8, height: 8)
-            .overlay {
-                Circle()
-                    .stroke(color.opacity(0.35), lineWidth: 3)
-            }
+            .overlay(Circle().stroke(stroke, lineWidth: 1))
             .help(state.rawValue)
     }
 
-    var color: Color {
+    private var ink: Color { onLight ? .black : NothingTheme.ink }
+
+    private var fill: Color {
         switch state {
-        case .online: .green
-        case .warning: .orange
-        case .offline: .red
-        case .unknown: .secondary
+        case .online: ink
+        case .warning, .offline: NothingTheme.red
+        case .unknown: .clear
+        }
+    }
+
+    private var stroke: Color {
+        switch state {
+        case .online: ink
+        case .warning, .offline: NothingTheme.red
+        case .unknown: onLight ? Color.black.opacity(0.4) : NothingTheme.lineStrong
         }
     }
 }

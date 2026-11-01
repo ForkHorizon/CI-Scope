@@ -1,0 +1,2 @@
+Doto (c) The Doto Project Authors, SIL Open Font License 1.1: https://openfontlicense.org
+Source: https://github.com/google/fonts/tree/main/ofl/doto

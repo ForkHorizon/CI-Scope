@@ -5,7 +5,6 @@ extension ContentView {
     var dashboardSurface: some View {
         VStack(spacing: 0) {
             header
-            Divider()
             dashboardContent
         }
         .frame(minWidth: 587, maxWidth: .infinity)
@@ -127,37 +126,26 @@ extension ContentView {
     }
 
     var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 14) {
             Button {
                 isProjectMenuOpen.toggle()
             } label: {
                 Image(systemName: "sidebar.leading")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(isProjectMenuOpen ? Color.accentColor : Color.primary)
-                    .frame(width: 28, height: 28)
-                    .background(isProjectMenuOpen ? Color.accentColor.opacity(0.13) : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .font(.system(size: 13))
+                    .foregroundStyle(isProjectMenuOpen ? NothingTheme.ink : NothingTheme.inkDim)
+                    .frame(width: 30, height: 30)
+                    .overlay(Circle().stroke(NothingTheme.lineStrong, lineWidth: 1))
             }
             .buttonStyle(.plain)
             .help(isProjectMenuOpen ? "Hide projects" : "Show projects")
             .keyboardShortcut("b", modifiers: [.command])
 
-            ZStack {
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(Color.accentColor.opacity(0.16))
-                Image(systemName: headerIcon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-            }
-            .frame(width: 34, height: 34)
-
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(headerTitle)
-                    .font(.system(size: 16, weight: .semibold))
-                Text(headerSubtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .nothingDisplay(26)
+                    .foregroundStyle(NothingTheme.ink)
                     .lineLimit(1)
+                Text(headerSubtitle).nothingCaption().lineLimit(1)
             }
 
             Spacer(minLength: 8)
@@ -165,30 +153,26 @@ extension ContentView {
             StatusDot(state: headerState)
             if let refreshedAt {
                 Text(refreshedAt.formatted(date: .omitted, time: .standard))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(NothingTheme.inkDim)
             }
 
             Button {
                 refreshCurrentTab()
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(width: 28, height: 28)
+                    .font(.system(size: 12))
+                    .frame(width: 30, height: 30)
+                    .overlay(Circle().stroke(NothingTheme.lineStrong, lineWidth: 1))
+                    .overlay { if isRefreshing { ProgressView().controlSize(.small) } }
             }
             .buttonStyle(.plain)
             .disabled(!canRefresh || isRefreshing)
-            .overlay {
-                if isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
             .help("Refresh")
             .keyboardShortcut("r", modifiers: [.command])
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.thinMaterial)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .overlay(alignment: .bottom) { Rectangle().fill(NothingTheme.line).frame(height: 1) }
     }
 }

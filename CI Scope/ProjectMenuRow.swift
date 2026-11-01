@@ -10,46 +10,25 @@ struct ProjectMenuRow: View {
     @State var isHovering = false
 
     var body: some View {
-        HStack(spacing: 5) {
-            Button {
-                onSelect()
-            } label: {
-                HStack(spacing: 9) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(stateColor.opacity(isActive ? 0.15 : 0.08))
-                        Image(systemName: "folder")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(isActive ? stateColor : .secondary)
-                    }
-                    .frame(width: 31, height: 31)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 5) {
-                            Text(project.title)
-                                .font(.callout.weight(.semibold))
-                                .foregroundStyle(isActive ? Color.accentColor : Color.primary)
-                                .lineLimit(1)
-                            Spacer(minLength: 0)
-                            StatusDot(state: state)
-                        }
-
+        HStack(spacing: 4) {
+            Button(action: onSelect) {
+                HStack(spacing: 10) {
+                    StatusDot(state: state, onLight: isActive)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(project.title)
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .lineLimit(1)
                         Text(project.repositorySlug)
-                            .font(.caption)
-                            .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(isActive ? Color.black.opacity(0.55) : NothingTheme.inkDim)
                             .lineLimit(1)
                             .truncationMode(.middle)
-
-                        Text(badge)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                            .lineLimit(1)
                     }
+                    Spacer(minLength: 0)
                 }
-                .padding(.leading, 9)
-                .padding(.vertical, 9)
-                .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
-                .contentShape(RoundedRectangle(cornerRadius: 8))
+                .foregroundStyle(isActive ? Color.black : NothingTheme.ink)
+                .padding(.leading, 12)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
@@ -57,24 +36,20 @@ struct ProjectMenuRow: View {
                 ProjectContextMenu(onRemove: onRemove)
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                    .frame(width: 25, height: 25)
-                    .background(Color.secondary.opacity(isActive || isHovering ? 0.08 : 0.04))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .font(.system(size: 12))
+                    .foregroundStyle(isActive ? Color.black : NothingTheme.inkDim)
+                    .frame(width: 24, height: 24)
             }
-            .buttonStyle(.plain)
-            .opacity(isActive || isHovering ? 1 : 0.58)
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .opacity(isActive || isHovering ? 1 : 0)
             .help("Project actions")
+            .padding(.trailing, 6)
         }
-        .frame(height: 66)
-        .background(isActive ? Color.accentColor.opacity(0.11) : Color(nsColor: .windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(isActive ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12))
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 8))
+        .frame(height: 44)
+        .background(isActive ? NothingTheme.ink : (isHovering ? NothingTheme.panel : Color.clear), in: Capsule())
+        .contentShape(Capsule())
         .contextMenu {
             ProjectContextMenu(onRemove: onRemove)
         }
