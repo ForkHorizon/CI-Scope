@@ -14,16 +14,16 @@ struct RunnerWebhookStrip: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text("Webhook")
-                        .font(.caption.weight(.semibold))
+                        .font(NothingTheme.small.weight(.semibold))
                     Text(statusText)
-                        .font(.caption2.monospacedDigit())
+                        .font(NothingTheme.tiny.monospacedDigit())
                         .foregroundStyle(statusColor)
                         .lineLimit(1)
                 }
 
                 Text(detailText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.tiny)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(2)
                     .textSelection(.enabled)
             }
@@ -87,7 +87,7 @@ struct RunnerErrorStrip: View {
             Image(systemName: "exclamationmark.circle")
                 .foregroundStyle(.red)
             Text(errors.joined(separator: "\n"))
-                .font(.caption.monospaced())
+                .font(NothingTheme.small.monospaced())
                 .foregroundStyle(.red)
                 .textSelection(.enabled)
                 .lineLimit(4)
@@ -105,9 +105,9 @@ struct RunnerErrorStrip: View {
 
 func color(for state: ServiceState) -> Color {
     switch state {
-    case .online: .green
-    case .warning: .orange
-    case .offline: .red
-    case .unknown: .secondary
+    case .online: NothingTheme.green
+    case .warning: NothingTheme.amber
+    case .offline: NothingTheme.red
+    case .unknown: NothingTheme.inkDim
     }
 }

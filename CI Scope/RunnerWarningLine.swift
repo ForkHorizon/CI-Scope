@@ -9,7 +9,7 @@ struct RunnerWarningLine: View {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
             Text(text)
-                .font(.caption)
+                .font(NothingTheme.small)
                 .foregroundStyle(.orange)
                 .lineLimit(2)
             Spacer()

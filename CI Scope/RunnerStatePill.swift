@@ -7,13 +7,12 @@ struct RunnerStatePill: View {
 
     var body: some View {
         Text(text)
-            .font(.caption2.weight(.semibold))
+            .font(NothingTheme.tiny.weight(.semibold))
             .lineLimit(1)
             .padding(.horizontal, 7)
             .frame(height: 19)
-            .background(color(for: state).opacity(0.12))
             .foregroundStyle(color(for: state))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(Capsule().stroke(color(for: state).opacity(0.6), lineWidth: 1))
     }
 }
 
@@ -23,8 +22,7 @@ struct RunnerIcon: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 7)
-                .fill(color(for: state).opacity(0.12))
+            Circle().stroke(color(for: state).opacity(0.5), lineWidth: 1)
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(color(for: state))

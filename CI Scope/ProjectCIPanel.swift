@@ -16,16 +16,16 @@ struct ProjectCIPanel: View {
     @State var codeLinterStatus: CodeLinterWorkflowStatus = .unavailable
 
     var body: some View {
-        PanelShell(title: "GitHub CI", icon: "point.3.connected.trianglepath.dotted") {
+        PanelShell(title: "GitHub CI") {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 10) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 7)
-                                .fill(Color.accentColor.opacity(0.14))
+                                .fill(NothingTheme.ink.opacity(0.14))
                             Image(systemName: "folder.badge.gearshape")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(NothingTheme.ink)
                         }
                         .frame(width: 36, height: 36)
 
@@ -34,8 +34,8 @@ struct ProjectCIPanel: View {
                                 .font(.system(size: 17, weight: .semibold))
                                 .lineLimit(1)
                             Text(project.repositorySlug)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(NothingTheme.small)
+                                .foregroundStyle(NothingTheme.inkDim)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
@@ -47,7 +47,7 @@ struct ProjectCIPanel: View {
                                 copySSHURL()
                             } label: {
                                 Label("Copy SSH", systemImage: "doc.on.doc")
-                                    .font(.caption.weight(.semibold))
+                                    .font(NothingTheme.small.weight(.semibold))
                                     .padding(.horizontal, 8)
                                     .frame(height: 28)
                                     .background(Color.secondary.opacity(0.08))
@@ -60,7 +60,7 @@ struct ProjectCIPanel: View {
                                 openGitHubRepository()
                             } label: {
                                 Label("GitHub", systemImage: "arrow.up.right.square")
-                                    .font(.caption.weight(.semibold))
+                                    .font(NothingTheme.small.weight(.semibold))
                                     .padding(.horizontal, 8)
                                     .frame(height: 28)
                                     .background(Color.secondary.opacity(0.08))

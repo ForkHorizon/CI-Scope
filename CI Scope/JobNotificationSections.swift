@@ -9,18 +9,18 @@ struct JobNotificationPrimaryLine: View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: count == 1 ? "bolt.fill" : "square.stack.3d.up")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(NothingTheme.green)
                 .frame(width: 20, height: 20)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(primaryText)
-                    .font(.caption.weight(.semibold))
+                    .font(NothingTheme.small.weight(.semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 Text("\(job.workflowName) · \(job.jobName)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -40,8 +40,8 @@ struct JobNotificationSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.tiny.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
                 .textCase(.uppercase)
 
             ForEach(jobs) { job in

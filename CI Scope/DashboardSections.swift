@@ -22,16 +22,4 @@ enum WorkspaceTab: String, CaseIterable, Identifiable {
         case .settings: "Settings"
         }
     }
-
-    var icon: String {
-        switch self {
-        case .projects: "square.grid.2x2"
-        case .runners: "server.rack"
-        case .scripts: "curlybraces.square"
-        case .coverage: "tablecells"
-        case .policy: "touchid"
-        case .tests: "checkmark.shield"
-        case .settings: "gearshape"
-        }
-    }
 }

@@ -8,13 +8,13 @@ struct ScriptInstallVariableInput: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(variable.title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
             input
             if !variable.help.isEmpty {
                 Text(variable.help)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.tiny)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -65,11 +65,11 @@ struct AutomationScriptInstallStatusBox: View {
             StatusDot(state: status.state)
             VStack(alignment: .leading, spacing: 2) {
                 Text(status.title)
-                    .font(.caption.weight(.semibold))
+                    .font(NothingTheme.small.weight(.semibold))
                     .lineLimit(1)
                 Text(status.detail)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.tiny)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(3)
                     .textSelection(.enabled)
             }

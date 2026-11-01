@@ -5,7 +5,7 @@ struct ErrorBox: View {
 
     var body: some View {
         Text(text)
-            .font(.caption2.monospaced())
+            .font(NothingTheme.tiny.monospaced())
             .foregroundStyle(.red)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -29,16 +29,16 @@ struct LimitedStatusRow: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(NothingTheme.inkDim)
                 .frame(width: 18)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.callout.weight(.semibold))
+                    .font(NothingTheme.body.weight(.semibold))
                     .lineLimit(1)
                 Text(value)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }

@@ -9,11 +9,11 @@ struct RunRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(run.displayTitle)
-                        .font(.callout.weight(.semibold))
+                        .font(NothingTheme.body.weight(.semibold))
                         .lineLimit(1)
                     Spacer(minLength: 6)
                     Text(run.compactConclusion)
-                        .font(.caption.weight(.semibold))
+                        .font(NothingTheme.small.weight(.semibold))
                         .foregroundStyle(color)
                         .lineLimit(1)
                 }
@@ -24,8 +24,8 @@ struct RunRow: View {
                     Text("·")
                     Text(shortDate(run.createdAt))
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small)
+                .foregroundStyle(NothingTheme.inkDim)
                 .lineLimit(1)
             }
         }

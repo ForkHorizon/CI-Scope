@@ -9,10 +9,10 @@ struct LiveWorkCard: View {
         VStack(alignment: .leading, spacing: compact ? 8 : 11) {
             HStack(alignment: .top, spacing: 10) {
                 ZStack {
-                    Circle().fill(Color.accentColor.opacity(0.14))
+                    Circle().fill(NothingTheme.green.opacity(0.14))
                     Image(systemName: "waveform.path.ecg")
                         .font(.system(size: compact ? 13 : 15, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(NothingTheme.green)
                 }
                 .frame(width: compact ? 30 : 36, height: compact ? 30 : 36)
 
@@ -22,8 +22,8 @@ struct LiveWorkCard: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Text("\(item.workflowName) · \(item.jobName)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.tiny)
+                        .foregroundStyle(NothingTheme.inkDim)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -45,16 +45,16 @@ struct LiveWorkCard: View {
             progressBody
 
             Text("\(item.title) · \(item.headBranch)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.tiny)
+                .foregroundStyle(NothingTheme.inkDim)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
         .padding(compact ? 10 : 13)
-        .background(Color.accentColor.opacity(compact ? 0.055 : 0.075))
+        .background(NothingTheme.green.opacity(compact ? 0.055 : 0.075))
         .clipShape(RoundedRectangle(cornerRadius: compact ? 8 : 10))
         .overlay(
-            RoundedRectangle(cornerRadius: compact ? 8 : 10).stroke(Color.accentColor.opacity(0.22)))
+            RoundedRectangle(cornerRadius: compact ? 8 : 10).stroke(NothingTheme.green.opacity(0.22)))
     }
 
     @ViewBuilder
@@ -63,24 +63,24 @@ struct LiveWorkCard: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(progress.phaseLabel)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
+                        .font(NothingTheme.small.weight(.semibold))
+                        .foregroundStyle(NothingTheme.green)
                     Spacer(minLength: 6)
                     Text(progress.countLabel ?? "In progress")
-                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .font(NothingTheme.small.monospacedDigit().weight(.semibold))
                         .foregroundStyle(progress.countLabel == nil ? .secondary : .primary)
                 }
 
                 if let fraction = progress.fraction {
-                    ProgressView(value: fraction).tint(Color.accentColor)
+                    ProgressView(value: fraction).tint(NothingTheme.green)
                 } else {
                     ProgressView().controlSize(.small)
                 }
 
                 if let detail = progress.detail, !detail.isEmpty {
                     Text(detail)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.small.monospaced())
+                        .foregroundStyle(NothingTheme.inkDim)
                         .lineLimit(compact ? 1 : 2)
                         .truncationMode(.middle)
                 }
@@ -89,8 +89,8 @@ struct LiveWorkCard: View {
             HStack(spacing: 7) {
                 ProgressView().controlSize(.small)
                 Text("Job is starting — waiting for the first live update")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
             }
         }
     }
@@ -101,10 +101,10 @@ struct RunnerBusyWorkCard: View {
         HStack(spacing: 10) {
             ProgressView().controlSize(.small)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Job is starting").font(.callout.weight(.semibold))
+                Text("Job is starting").font(NothingTheme.body.weight(.semibold))
                 Text("Waiting for GitHub to publish the job details.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
             }
             Spacer()
         }

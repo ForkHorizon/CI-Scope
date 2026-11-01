@@ -13,27 +13,27 @@ struct LocalCheckSection: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Label("Local check (this Mac)", systemImage: "laptopcomputer")
-                    .font(.callout.weight(.semibold))
+                    .font(NothingTheme.body.weight(.semibold))
                 Spacer()
                 StatusDot(state: result.passed ? .online : .offline)
             }
             Text(summary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small)
+                .foregroundStyle(NothingTheme.inkDim)
             if let message = verdictMessage {
                 Text(message)
-                    .font(.caption.weight(.semibold))
+                    .font(NothingTheme.small.weight(.semibold))
                     .foregroundStyle(verdict.isDiscrepancy ? Color.orange : Color.secondary)
             }
             ForEach(result.failedChecks) { check in
                 Text("\(check.id): \(check.status)")
-                    .font(.caption)
+                    .font(NothingTheme.small)
                     .foregroundStyle(.red)
             }
             if !result.slow.isEmpty {
                 Text("Slow: " + result.slow.joined(separator: ", "))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
             }
         }
         .padding(10)

@@ -19,7 +19,7 @@ struct RecommendedGatesButton: View {
     var body: some View {
         Button(action: detect) {
             Label(isDetecting ? "Detecting…" : "Install recommended gates", systemImage: "wand.and.stars")
-                .font(.caption.weight(.semibold))
+                .font(NothingTheme.small.weight(.semibold))
         }
         .buttonStyle(.borderedProminent)
         .disabled(isDetecting)
@@ -36,8 +36,8 @@ struct RecommendedGatesButton: View {
 
             if detected.isEmpty {
                 Text("No matching gates were detected for this repository.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.body)
+                    .foregroundStyle(NothingTheme.inkDim)
             } else {
                 ForEach(detected) { script in
                     gateRow(script)
@@ -62,14 +62,14 @@ struct RecommendedGatesButton: View {
         Toggle(isOn: binding(for: script.id)) {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
-                    Text(script.title).font(.callout.weight(.semibold))
+                    Text(script.title).font(NothingTheme.body.weight(.semibold))
                     if isInstalled(script) {
                         Text("installed")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .font(NothingTheme.tiny.weight(.semibold))
+                            .foregroundStyle(NothingTheme.inkDim)
                     }
                 }
-                Text(script.summary).font(.caption).foregroundStyle(.secondary)
+                Text(script.summary).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
             }
         }
         .toggleStyle(.checkbox)

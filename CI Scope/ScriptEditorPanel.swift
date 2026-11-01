@@ -9,7 +9,7 @@ struct ScriptEditorPanel: View {
     let onReset: () -> Void
 
     var body: some View {
-        PanelShell(title: "Script Editor", icon: "slider.horizontal.3") {
+        PanelShell(title: "Script Editor") {
             VStack(spacing: 8) {
                 editorToolbar
                 if let errorMessage {

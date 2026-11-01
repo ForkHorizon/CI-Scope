@@ -22,7 +22,7 @@ struct PolicyAdminView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Label("Pending policy changes", systemImage: "touchid")
-                    .font(.callout.weight(.semibold))
+                    .font(NothingTheme.body.weight(.semibold))
                 Spacer()
                 if admin.isLoading { ProgressView().controlSize(.small) }
                 Button("Approve all") { Task { await admin.approveAll() } }
@@ -30,8 +30,8 @@ struct PolicyAdminView: View {
             }
             if admin.changes.isEmpty && !admin.isLoading {
                 Text("Nothing waiting. Protected-file changes (manifest, workflows) show up here.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
             }
             ForEach(admin.changes) { change in
                 PolicyChangeRow(change: change, status: admin.statuses[change.id], isBusy: admin.isApproving) {
@@ -39,11 +39,11 @@ struct PolicyAdminView: View {
                 }
             }
             if let message = admin.message {
-                Text(message).font(.caption).foregroundStyle(.orange).textSelection(.enabled)
+                Text(message).font(NothingTheme.small).foregroundStyle(.orange).textSelection(.enabled)
             }
             Text("Approving merges the PR with admin bypass, then signs the new policy. Touch ID is asked once per batch.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.tiny)
+                .foregroundStyle(NothingTheme.inkDim)
         }
         .padding(10)
         .background(Color.secondary.opacity(0.055))
@@ -64,14 +64,14 @@ struct PolicyChangeRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let url = URL(string: change.url) {
                     Link("\(change.repository)#\(change.number)", destination: url)
-                        .font(.caption.weight(.semibold))
+                        .font(NothingTheme.small.weight(.semibold))
                 }
                 Text("\(change.title) → \(change.baseRefName)")
-                    .font(.caption)
+                    .font(NothingTheme.small)
                     .lineLimit(1)
                 Text(statusText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.tiny)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .textSelection(.enabled)
             }
             Spacer()

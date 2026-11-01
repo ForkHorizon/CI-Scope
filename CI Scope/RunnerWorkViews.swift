@@ -10,11 +10,11 @@ struct RunnerQueueTimeline: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Text(title)
-                    .font(.callout.weight(.semibold))
+                    .font(NothingTheme.body.weight(.semibold))
                 Spacer()
                 Text("\(items.count)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small.monospacedDigit())
+                    .foregroundStyle(NothingTheme.inkDim)
             }
 
             if items.isEmpty {
@@ -26,8 +26,8 @@ struct RunnerQueueTimeline: View {
 
                 if items.count > 5 {
                     Text("+\(items.count - 5) more")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.small)
+                        .foregroundStyle(NothingTheme.inkDim)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
@@ -43,8 +43,8 @@ struct RunnerWorkEmptyRow: View {
             Image(systemName: icon)
                 .foregroundStyle(text == "Busy, job not visible yet" ? .orange : .secondary)
             Text(text)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small)
+                .foregroundStyle(NothingTheme.inkDim)
             Spacer()
         }
         .padding(.horizontal, 9)

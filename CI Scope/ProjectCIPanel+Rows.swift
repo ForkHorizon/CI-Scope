@@ -5,16 +5,16 @@ extension ProjectCIPanel {
         HStack(spacing: 8) {
             Image(systemName: "point.3.filled.connected.trianglepath.dotted")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(NothingTheme.inkDim)
                 .frame(width: 18)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("MacBook runner")
-                    .font(.callout.weight(.semibold))
+                    .font(NothingTheme.body.weight(.semibold))
                     .lineLimit(1)
                 Text(isV2Managed ? "V2 Managed" : "No MacBook runner access")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(1)
             }
             Spacer()
@@ -24,7 +24,7 @@ extension ProjectCIPanel {
                 Button("Attach") {
                     onAttachToRunner()
                 }
-                .font(.caption.weight(.semibold))
+                .font(NothingTheme.small.weight(.semibold))
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
@@ -70,8 +70,8 @@ struct ProjectLiveWorkSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Label("Running now", systemImage: "waveform.path.ecg")
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
+                .font(NothingTheme.body.weight(.semibold))
+                .foregroundStyle(NothingTheme.ink)
 
             ForEach(items) { item in
                 LiveWorkCard(item: item, compact: true)
@@ -87,11 +87,11 @@ struct UnifiedChecksSection: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Label("CI Scope / Checks", systemImage: "checkmark.seal")
-                    .font(.callout.weight(.semibold))
+                    .font(NothingTheme.body.weight(.semibold))
                 Spacer()
                 if let run = snapshot.run, let url = URL(string: run.url) {
                     Link("Open run", destination: url)
-                        .font(.caption.weight(.semibold))
+                        .font(NothingTheme.small.weight(.semibold))
                 }
             }
 
@@ -104,8 +104,8 @@ struct UnifiedChecksSection: View {
                     Text("checks \(duration(timings.ordinaryMs)) · AI \(duration(timings.aiMs))")
                 }
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(NothingTheme.small)
+            .foregroundStyle(NothingTheme.inkDim)
 
             if let report = snapshot.report {
                 ForEach(report.checks) { check in
@@ -125,16 +125,16 @@ struct UnifiedChecksSection: View {
             StatusDot(state: state(status: row.status, required: row.required))
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.id)
-                    .font(.callout.weight(.semibold))
+                    .font(NothingTheme.body.weight(.semibold))
                 Text([row.type, row.detail].compactMap { $0 }.joined(separator: " · "))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(1)
             }
             Spacer()
             Text(row.durationMs.map(duration) ?? row.status)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small.monospacedDigit())
+                .foregroundStyle(NothingTheme.inkDim)
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 7)

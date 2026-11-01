@@ -6,10 +6,10 @@ struct RunnerEmptyState: View {
         VStack(spacing: 8) {
             Image(systemName: "server.rack")
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(NothingTheme.inkDim)
             Text("No runner loaded")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small)
+                .foregroundStyle(NothingTheme.inkDim)
         }
         .frame(maxWidth: .infinity, minHeight: 180)
     }

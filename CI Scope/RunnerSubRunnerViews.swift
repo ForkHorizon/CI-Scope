@@ -16,13 +16,13 @@ struct RunnerSubRunnerDisclosure: View {
                 HStack(spacing: 8) {
                     Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(NothingTheme.inkDim)
                     Text("Sub-runners")
-                        .font(.callout.weight(.semibold))
+                        .font(NothingTheme.body.weight(.semibold))
                     Spacer()
                     Text("\(subRunners.count)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.small.monospacedDigit())
+                        .foregroundStyle(NothingTheme.inkDim)
                 }
             }
             .padding(9)
@@ -43,11 +43,11 @@ private struct RunnerSubRunnerRow: View {
                     .frame(width: 7, height: 7)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(subRunner.title)
-                        .font(.caption.weight(.semibold))
+                        .font(NothingTheme.small.weight(.semibold))
                         .lineLimit(1)
                     Text(subRunner.scope)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.tiny)
+                        .foregroundStyle(NothingTheme.inkDim)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }

@@ -6,26 +6,26 @@ struct ProjectWorkflowList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text("Workflows")
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.body.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
 
             ForEach(workflows) { workflow in
                 HStack(spacing: 8) {
                     StatusDot(state: workflow.state.lowercased().contains("disabled") ? .warning : .online)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(workflow.name)
-                            .font(.callout.weight(.semibold))
+                            .font(NothingTheme.body.weight(.semibold))
                             .lineLimit(1)
                         Text(workflow.path ?? workflow.state)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(NothingTheme.small)
+                            .foregroundStyle(NothingTheme.inkDim)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
                     Spacer()
                     Text(workflow.state)
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.small.monospacedDigit())
+                        .foregroundStyle(NothingTheme.inkDim)
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 9)
@@ -43,8 +43,8 @@ struct ProjectRunList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text("Recent Runs")
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.body.weight(.semibold))
+                .foregroundStyle(NothingTheme.inkDim)
 
             ForEach(runs.prefix(8)) { run in
                 Link(destination: URL(string: run.url)!) {
