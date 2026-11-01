@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ScriptListRow: View {
     let script: AutomationScript
-    let isSelected: Bool
     let isExpanded: Bool
     let projects: [CIProject]
     @Binding var selectedProjectID: CIProject.ID?
@@ -16,12 +15,7 @@ struct ScriptListRow: View {
     var body: some View {
         VStack(spacing: 0) {
             Button(action: onSelect) {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "curlybraces.square")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(isExpanded ? NothingTheme.ink : .secondary)
-                        .frame(width: 24, height: 24)
-
+                HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
                             Text(script.title)
@@ -47,18 +41,17 @@ struct ScriptListRow: View {
                     }
 
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 11))
                         .foregroundStyle(NothingTheme.inkDim)
                         .frame(width: 16, height: 24)
                 }
-                .padding(10)
+                .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(RoundedRectangle(cornerRadius: 7))
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
             if isExpanded {
-                Divider()
                 ScriptInstallSubmenu(
                     script: script,
                     projects: projects,
@@ -69,25 +62,10 @@ struct ScriptListRow: View {
                     onOpenEditor: onOpenEditor,
                     onInstall: onInstall
                 )
+                .nothingCard(radius: 14, highlighted: true)
+                .padding(.bottom, 12)
             }
         }
-        .background(rowBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(rowBorder)
-        )
-    }
-
-    private var rowBackground: Color {
-        if isExpanded { return NothingTheme.ink.opacity(0.10) }
-        if isSelected { return NothingTheme.ink.opacity(0.06) }
-        return Color.secondary.opacity(0.055)
-    }
-
-    private var rowBorder: Color {
-        if isExpanded { return NothingTheme.ink.opacity(0.34) }
-        if isSelected { return NothingTheme.ink.opacity(0.18) }
-        return Color.secondary.opacity(0.10)
+        .overlay(alignment: .bottom) { Rectangle().fill(NothingTheme.line).frame(height: 1) }
     }
 }
