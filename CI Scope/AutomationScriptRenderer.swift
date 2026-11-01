@@ -7,8 +7,10 @@ struct AutomationScriptRenderer {
     let defaultBranch: String
     var runnerLabelsOverride: [String]? = nil
 
+    /// Protected-only installs go on a `ci-scope/policy/` branch so they can be activated.
     var branchName: String {
-        render(script.branchName)
+        let paths = (try? renderedFiles())?.map(\.destinationPath) ?? []
+        return PolicyProtectedPaths.branch(render(script.branchName), forFiles: paths)
     }
 
     var commitMessage: String {

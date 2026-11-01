@@ -10,6 +10,7 @@ struct ProjectMenuPanel: View {
     let runnerCount: Int
     let scriptState: ServiceState
     let scriptCount: Int
+    let policyPendingCount: Int
     let onSelect: (CIProject) -> Void
     let onRemove: (CIProject) -> Void
     let onAddProject: () -> Void
@@ -52,6 +53,15 @@ struct ProjectMenuPanel: View {
                     isActive: workspaceTab == .coverage
                 ) {
                     workspaceTab = .coverage
+                }
+
+                WorkspaceMenuRow(
+                    tab: .policy,
+                    state: policyPendingCount > 0 ? .warning : .unknown,
+                    count: policyPendingCount,
+                    isActive: workspaceTab == .policy
+                ) {
+                    workspaceTab = .policy
                 }
 
                 WorkspaceMenuRow(
@@ -153,6 +163,8 @@ struct ProjectMenuPanel: View {
             scriptState
         case .coverage:
             .unknown
+        case .policy:
+            policyPendingCount > 0 ? .warning : .unknown
         case .settings:
             .unknown
         }
@@ -168,6 +180,8 @@ struct ProjectMenuPanel: View {
             scriptCount == 0 ? "No scripts" : "\(scriptCount) scripts · \(scriptState.rawValue)"
         case .coverage:
             "Gate coverage"
+        case .policy:
+            policyPendingCount == 0 ? "No pending approvals" : "\(policyPendingCount) waiting for approval"
         case .settings:
             "Server settings"
         }
@@ -233,6 +247,8 @@ struct WorkspaceMenuRow: View {
             count == 1 ? "1 script" : "\(count) scripts"
         case .coverage:
             "Gate coverage"
+        case .policy:
+            count == 0 ? "Touch ID approvals" : "\(count) waiting"
         case .settings:
             "Server queue"
         }

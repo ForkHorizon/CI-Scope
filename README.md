@@ -292,3 +292,7 @@ When modifying it, preserve these product principles:
 - Prefer clear empty states over raw errors when a repository has no Actions.
 - Keep destructive actions local-only unless the UI explicitly says otherwise.
 - Keep script install behavior explicit: generated changes should go through a branch and pull request.
+
+## CI
+
+Pull requests run a single action, `CI Scope / Checks` (`.github/workflows/ci-scope-checks.yml`). What it runs is defined by `.ci-scope.json` and the gate configs in this repo, executed by ForkHorizon/ci-gates.

@@ -25,6 +25,7 @@ struct ProjectCIService {
         snapshot.workflows = workflowResponse.value ?? []
         snapshot.runs = runResponse.value ?? []
         snapshot.unifiedChecksError = manifestResponse.error
+        snapshot.localCheck = LocalCheckStore.load(repositorySlug: project.repositorySlug)
         if let manifest = manifestResponse.value {
             snapshot.unifiedChecks = await loadUnifiedChecks(
                 for: project, manifest: manifest, runs: snapshot.runs)

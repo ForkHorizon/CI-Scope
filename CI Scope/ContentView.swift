@@ -10,6 +10,8 @@ struct ContentView: View {
     @StateObject var scriptInstallViewModel = AutomationScriptInstallViewModel()
     @StateObject var runnerFleetViewModel = RunnerFleetViewModel()
     @StateObject var settingsStore = CIQueueSettingsStore()
+    @StateObject var policyAdmin = PolicyAdminViewModel()
+    @StateObject var policyChecks = PolicyChecksViewModel()
     @StateObject var notificationManager = NotificationManager.shared
     @State var workspaceTab: WorkspaceTab = .projects
     @State var isProjectMenuOpen = true
@@ -27,6 +29,7 @@ struct ContentView: View {
                     runnerCount: runnerFleetViewModel.snapshot.runners.count,
                     scriptState: scriptStore.scripts.isEmpty ? .unknown : .online,
                     scriptCount: scriptStore.scripts.count,
+                    policyPendingCount: policyAdmin.pendingCount,
                     onSelect: selectProject,
                     onRemove: removeProject,
                     onAddProject: {
