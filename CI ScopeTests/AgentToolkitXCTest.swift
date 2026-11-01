@@ -15,7 +15,8 @@ final class AgentToolkitXCTest: XCTestCase {
             remoteURL: "https://github.com/ForkHorizon/Demo.git")
         let sha = String(repeating: "a", count: 40)
         for script in scripts {
-            XCTAssertEqual(script.variables.first(where: { $0.id == "stack_profile" })?.options, ["ts-web", "go", "python"])
+            XCTAssertEqual(
+                script.variables.first(where: { $0.id == "stack_profile" })?.options, ["ts-web", "go", "python", "swift", "unity"])
             for (profile, expectedType) in [
                 ("ts-web", "web-test"), ("go", "go-quality"), ("python", "python-pytest"),
             ] {
@@ -147,5 +148,37 @@ final class AgentToolkitXCTest: XCTestCase {
         try modifiedBlock.write(to: root.appendingPathComponent("AGENTS.md"), atomically: true, encoding: .utf8)
         XCTAssertThrowsError(try AutomationScriptManagedFiles.install([agents], in: root))
         XCTAssertThrowsError(try AutomationScriptManagedFiles.remove([file], from: root))
+    }
+
+    func testStackProfilesAddSwiftAndUnityManifests() throws {
+        let swift = AutomationScriptSeedProvider.agentToolkitManifest("swift")
+        XCTAssertTrue(swift.contains("\"swift-quality\""))
+        XCTAssertTrue(swift.contains("\"swift-compile\""))
+        XCTAssertTrue(swift.contains("\"speed\" : \"full\""))
+        let unity = AutomationScriptSeedProvider.agentToolkitManifest("unity")
+        XCTAssertFalse(unity.contains("web-quality"))
+        for manifest in [swift, unity] {
+            XCTAssertTrue(manifest.contains("\"file-roles\""))
+            XCTAssertTrue(manifest.contains("\"agent-docs-stable\""))
+        }
+    }
+
+    func testStackProfileDetectionPrefersUnityThenSwiftThenGoThenPython() {
+        typealias Detector = ProjectStackDetector
+        XCTAssertEqual(Detector.profile(languages: ["swift", "c#"], isUnity: true), "unity")
+        XCTAssertEqual(Detector.profile(languages: ["swift", "go"], isUnity: false), "swift")
+        XCTAssertEqual(Detector.profile(languages: ["go", "python"], isUnity: false), "go")
+        XCTAssertEqual(Detector.profile(languages: ["python"], isUnity: false), "python")
+        XCTAssertEqual(Detector.profile(languages: ["typescript"], isUnity: false), "ts-web")
+    }
+
+    func testToolkitSeedDefaultsToAReviewedFullShaAndFetchesGatesWhenMissing() throws {
+        let seed = AutomationScriptSeedProvider.fallbackAgentToolkitSeed()
+        let sha = seed.variables.first { $0.id == "gates_sha" }?.defaultValue ?? ""
+        XCTAssertEqual(sha, AutomationScriptSeedProvider.reviewedGatesSHA)
+        XCTAssertNotNil(sha.range(of: "^[0-9a-f]{40}$", options: .regularExpression))
+        let check = seed.files.first { $0.id == "check" }?.contents ?? ""
+        XCTAssertTrue(check.contains("gh repo clone ForkHorizon/ci-gates"))
+        XCTAssertTrue(check.contains("checkout --quiet \"$gates_sha\""))
     }
 }

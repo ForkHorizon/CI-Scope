@@ -7,7 +7,7 @@ import Foundation
 struct ProjectStackDetector {
     let config: DashboardConfig
 
-    static let universalSeedIDs = ["code-linter"]
+    static let universalSeedIDs = ["code-linter", "agent-toolkit"]
 
     func recommendedSeedIDs(for project: CIProject) async -> [String] {
         let languages = await languages(for: project)
@@ -34,6 +34,21 @@ struct ProjectStackDetector {
             ids.insert("go-quality-gate")
         }
         return ordered(ids)
+    }
+
+    /// Profile for the agent toolkit manifest: the stack the repository is mainly built with.
+    func stackProfile(for project: CIProject) async -> String {
+        let languages = await languages(for: project)
+        let isUnity = await hasUnityMarker(project) ? true : await isUnityPackage(project)
+        return Self.profile(languages: languages, isUnity: isUnity)
+    }
+
+    static func profile(languages: Set<String>, isUnity: Bool) -> String {
+        if isUnity { return "unity" }
+        if languages.contains("swift") { return "swift" }
+        if languages.contains("go") { return "go" }
+        if languages.contains("python") { return "python" }
+        return "ts-web"
     }
 
     private func languages(for project: CIProject) async -> Set<String> {
