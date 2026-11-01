@@ -8,250 +8,174 @@ struct SettingsView: View {
     @State private var confirmEmergencyStop = false
 
     var body: some View {
-        PanelShell(title: "Settings") {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    localComputerSection
-                    githubIntakeSection
-                    gateInstallSection
-                    aiReviewSection
-                    if let message {
-                        Text(message)
-                            .font(NothingTheme.small.monospaced())
-                            .foregroundStyle(NothingTheme.inkDim)
-                            .textSelection(.enabled)
-                    }
-                }
-                .padding(12)
-            }
-        }
-        .padding(14)
-    }
-
-    private var localComputerSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Toggle("Server queue mode", isOn: $store.serverModeEnabled)
-                .font(NothingTheme.body.weight(.semibold))
-
-            Toggle("Enable V2 Agent status (read-only)", isOn: $store.v2StatusAdapterEnabled)
-                .font(NothingTheme.body.weight(.semibold))
-
-            Toggle(
-                "Enable V2 authority (explicit)",
-                isOn: Binding(
-                    get: { store.v2AuthorityEnabled },
-                    set: { store.setV2AuthorityEnabled($0) }
-                )
-            )
-            .font(NothingTheme.body.weight(.semibold))
-            .disabled(v2Control.isDisablingAuthority)
-
-            v2ControlSection
-
-            Text(
-                "Legacy broker remains authoritative by default. Enabling V2 only opts in this app; authority starts after a successful control-lease acquisition."
-            )
-            .font(NothingTheme.small)
-            .foregroundStyle(NothingTheme.inkDim)
-
-            LabeledTextField(title: "Server URL", text: $store.serverURL)
-
-            HStack(spacing: 8) {
-                Text("Local token")
-                    .font(NothingTheme.small.weight(.semibold))
-                    .foregroundStyle(NothingTheme.inkDim)
-                    .frame(width: 92, alignment: .leading)
-                SecureField("Bearer token", text: $store.localToken)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            LabeledTextField(title: "Machine ID", text: $store.machineID)
-            LabeledTextField(title: "Machine name", text: $store.machineName)
-            LabeledTextField(title: "Labels", text: $store.labelsText)
-
-            Stepper("Capacity: \(store.capacity)", value: $store.capacity, in: 1...8)
-
-            HStack {
-                Button {
-                    runTest()
-                } label: {
-                    Label("Test", systemImage: "network")
-                }
-                .disabled(isWorking)
-
-                Button {
-                    restartAgent()
-                } label: {
-                    Label("Install / Restart Agent", systemImage: "arrow.clockwise")
-                }
-                .disabled(isWorking)
-            }
-            .buttonStyle(.bordered)
-        }
-        .padding(10)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private var v2ControlSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            LabeledContent("V2 control") {
-                Text(v2Control.authorityState.displayName)
-                    .font(NothingTheme.small.weight(.semibold))
-                    .foregroundStyle(v2Control.authorityState.allowsMutation ? .orange : .secondary)
-            }
-
-            if v2Control.isV2ControlVisible {
-                HStack(spacing: 8) {
-                    Button("Acquire lease") {
-                        runV2 { await store.acquireV2Lease() }
-                    }
-                    .disabled(!v2Control.canAcquire)
-
-                    Button("Renew") {
-                        runV2 { await store.renewV2Lease() }
-                    }
-                    .disabled(
-                        v2Control.isWorking || !v2Control.hasActiveLease || !v2Control.hasLiveAgentSession)
-
-                    Button("Resume") {
-                        runV2 { await store.resumeV2() }
-                    }
-                    .disabled(
-                        v2Control.isWorking || !v2Control.hasActiveLease || !v2Control.hasLiveAgentSession)
-
-                    Button("Drain") {
-                        runV2 { await store.drainV2() }
-                    }
-                    .disabled(
-                        v2Control.isWorking || !v2Control.hasActiveLease || !v2Control.hasLiveAgentSession)
-
-                    Button("Emergency stop", role: .destructive) {
-                        confirmEmergencyStop = true
-                    }
-                    .disabled(v2Control.isWorking || !v2Control.isDraining || !v2Control.hasLiveAgentSession)
-                }
-                .buttonStyle(.bordered)
-
-                if v2Control.isDisablingAuthority {
-                    Text("Waiting for the Agent to finish draining before returning to the legacy broker.")
-                        .font(NothingTheme.small)
-                        .foregroundStyle(.orange)
-                } else if !v2Control.hasLiveAgentSession {
-                    Text(
-                        v2Control.isConfigured
-                            ? "Agent session/socket is offline. Authority controls are locked until a live status response arrives."
-                            : "Agent session is not configured on this Mac."
-                    )
-                    .font(NothingTheme.small)
-                    .foregroundStyle(NothingTheme.inkDim)
-                }
-
-                if let projection = v2Control.statusProjection {
-                    Text(projection.readyToClaim ? "Agent ready to claim." : "Agent is not claim-ready.")
-                        .font(NothingTheme.small)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 30) {
+                runnerSection
+                v2Section
+                githubIntakeSection
+                gateInstallSection
+                aiReviewSection
+                if let message {
+                    Text(message)
+                        .font(NothingTheme.small.monospaced())
                         .foregroundStyle(NothingTheme.inkDim)
+                        .textSelection(.enabled)
                 }
             }
+            .padding(22)
+            .toggleStyle(NothingToggleStyle())
+        }
+    }
 
-            if let error = v2Control.lastError {
-                Text(error)
-                    .font(NothingTheme.small.monospaced())
-                    .foregroundStyle(.red)
-                    .textSelection(.enabled)
+    private var runnerSection: some View {
+        SettingsSection(title: "This Mac") {
+            SettingsRow(title: "Server queue mode", hint: "Take jobs from the shared queue") {
+                Toggle("", isOn: $store.serverModeEnabled).labelsHidden()
             }
+            SettingsRow(title: "Server URL") {
+                TextField("https://", text: $store.serverURL).nothingField()
+            }
+            SettingsRow(title: "Local token") {
+                SecureField("Bearer token", text: $store.localToken).nothingField()
+            }
+            SettingsRow(title: "Machine ID") {
+                TextField("", text: $store.machineID).nothingField()
+            }
+            SettingsRow(title: "Machine name") {
+                TextField("", text: $store.machineName).nothingField()
+            }
+            SettingsRow(title: "Labels") {
+                TextField("comma separated", text: $store.labelsText).nothingField()
+            }
+            SettingsRow(title: "Capacity", hint: "Parallel jobs on this Mac") {
+                Stepper("\(store.capacity)", value: $store.capacity, in: 1...8)
+                    .font(NothingTheme.body.monospacedDigit())
+            }
+            SettingsRow(title: "Agent") {
+                HStack(spacing: 8) {
+                    Button("Test", action: runTest).buttonStyle(.pill)
+                    Button("Install / Restart", action: restartAgent).buttonStyle(.pillPrimary)
+                }
+                .disabled(isWorking)
+            }
+        }
+    }
+
+    private var v2Section: some View {
+        SettingsSection(title: "V2 control") {
+            SettingsRow(title: "Agent status", hint: "Read-only view of the V2 Agent") {
+                Toggle("", isOn: $store.v2StatusAdapterEnabled).labelsHidden()
+            }
+            SettingsRow(
+                title: "V2 authority",
+                hint: "Legacy broker stays authoritative until a control lease is acquired"
+            ) {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { store.v2AuthorityEnabled },
+                        set: { store.setV2AuthorityEnabled($0) }
+                    )
+                )
+                .labelsHidden()
+                .disabled(v2Control.isDisablingAuthority)
+            }
+            SettingsRow(title: "State") {
+                Text(v2Control.authorityState.displayName)
+                    .font(NothingTheme.body)
+                    .foregroundStyle(v2Control.authorityState.allowsMutation ? NothingTheme.amber : NothingTheme.inkDim)
+            }
+            v2ControlSection
+        }
+    }
+
+    @ViewBuilder private var v2ControlSection: some View {
+        if v2Control.isV2ControlVisible {
+            SettingsRow(title: "Controls") { v2Buttons }
+            v2Notes
+        }
+        if let error = v2Control.lastError {
+            Text(error).font(NothingTheme.small.monospaced()).foregroundStyle(NothingTheme.red)
+                .textSelection(.enabled).padding(.vertical, 10)
+        }
+    }
+
+    private var v2Buttons: some View {
+        let locked = v2Control.isWorking || !v2Control.hasActiveLease || !v2Control.hasLiveAgentSession
+        return HStack(spacing: 8) {
+            Button("Acquire") { runV2 { await store.acquireV2Lease() } }
+                .buttonStyle(.pillPrimary).disabled(!v2Control.canAcquire)
+            Button("Renew") { runV2 { await store.renewV2Lease() } }.buttonStyle(.pill).disabled(locked)
+            Button("Resume") { runV2 { await store.resumeV2() } }.buttonStyle(.pill).disabled(locked)
+            Button("Drain") { runV2 { await store.drainV2() } }.buttonStyle(.pill).disabled(locked)
+            Button("Stop") { confirmEmergencyStop = true }
+                .buttonStyle(.pillDanger)
+                .disabled(v2Control.isWorking || !v2Control.isDraining || !v2Control.hasLiveAgentSession)
         }
         .confirmationDialog(
             "Stop the V2 runner now?",
             isPresented: $confirmEmergencyStop,
             titleVisibility: .visible
         ) {
-            Button("Emergency stop", role: .destructive) {
-                runV2 { await store.emergencyStopV2() }
-            }
+            Button("Emergency stop", role: .destructive) { runV2 { await store.emergencyStopV2() } }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This sends the Agent emergency-stop command. Use it only after draining.")
         }
     }
 
-    private var githubIntakeSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("GitHub Intake", systemImage: "arrow.down.forward.circle")
-                .font(NothingTheme.body.weight(.semibold))
-
+    @ViewBuilder private var v2Notes: some View {
+        if v2Control.isDisablingAuthority {
+            Text("Waiting for the Agent to finish draining before returning to the legacy broker.")
+                .font(NothingTheme.small).foregroundStyle(NothingTheme.amber).padding(.vertical, 8)
+        } else if !v2Control.hasLiveAgentSession {
             Text(
-                store.snapshot.webhookURL.isEmpty
-                    ? "Set a server URL to get the webhook endpoint." : store.snapshot.webhookURL
+                v2Control.isConfigured
+                    ? "Agent session/socket is offline. Controls are locked until a live status response arrives."
+                    : "Agent session is not configured on this Mac."
             )
-            .font(NothingTheme.small.monospaced())
-            .textSelection(.enabled)
-
-            Text("Events: workflow_job")
-                .font(NothingTheme.small)
-                .foregroundStyle(NothingTheme.inkDim)
-
-            HStack(spacing: 8) {
-                Text("Webhook secret")
-                    .font(NothingTheme.small.weight(.semibold))
-                    .foregroundStyle(NothingTheme.inkDim)
-                    .frame(width: 92, alignment: .leading)
-                SecureField(
-                    "Must match CI_SCOPE_GITHUB_WEBHOOK_SECRET on the Worker", text: $store.webhookSecret
-                )
-                .textFieldStyle(.roundedBorder)
-            }
-
-            Text("Attaching a project auto-creates its repo webhook (if missing) using this secret.")
-                .font(NothingTheme.small)
-                .foregroundStyle(NothingTheme.inkDim)
+            .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).padding(.vertical, 8)
         }
-        .padding(10)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        if let projection = v2Control.statusProjection {
+            Text(projection.readyToClaim ? "Agent ready to claim." : "Agent is not claim-ready.")
+                .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).padding(.bottom, 8)
+        }
+    }
+
+    private var githubIntakeSection: some View {
+        SettingsSection(title: "GitHub intake") {
+            SettingsRow(title: "Webhook endpoint", hint: "Events: workflow_job") {
+                Text(store.snapshot.webhookURL.isEmpty ? "Set a server URL first" : store.snapshot.webhookURL)
+                    .font(NothingTheme.small.monospaced()).textSelection(.enabled)
+                    .foregroundStyle(NothingTheme.ink).multilineTextAlignment(.trailing)
+            }
+            SettingsRow(title: "Webhook secret", hint: "Attaching a project creates its repo webhook with this secret") {
+                SecureField("CI_SCOPE_GITHUB_WEBHOOK_SECRET", text: $store.webhookSecret)
+                    .nothingField()
+            }
+        }
     }
 
     private var gateInstallSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Gate installs", systemImage: "checklist")
-                .font(NothingTheme.body.weight(.semibold))
-
-            Toggle("Auto-merge gate PRs when checks pass", isOn: $store.autoMergeGatePRs)
-
-            Text(
-                "Enables GitHub auto-merge on PRs this app opens, so gate installs land once their checks pass. Best effort — needs auto-merge allowed on the repo; otherwise the PR stays open for you to merge."
-            )
-            .font(NothingTheme.small)
-            .foregroundStyle(NothingTheme.inkDim)
+        SettingsSection(title: "Gate installs") {
+            SettingsRow(
+                title: "Auto-merge gate PRs",
+                hint: "Best effort: needs auto-merge allowed on the repo, otherwise the PR stays open"
+            ) {
+                Toggle("", isOn: $store.autoMergeGatePRs).labelsHidden()
+            }
         }
-        .padding(10)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private var aiReviewSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("AI slop review", systemImage: "sparkles")
-                .font(NothingTheme.body.weight(.semibold))
-
-            HStack(spacing: 8) {
-                Text("DeepSeek key")
-                    .font(NothingTheme.small.weight(.semibold))
-                    .foregroundStyle(NothingTheme.inkDim)
-                    .frame(width: 92, alignment: .leading)
-                SecureField("sk-...", text: $store.deepSeekAPIKey)
-                    .textFieldStyle(.roundedBorder)
+        SettingsSection(title: "AI slop review") {
+            SettingsRow(
+                title: "DeepSeek key",
+                hint: "Passed to the agent as DEEPSEEK_API_KEY. Empty skips the advisory step. Restart the agent after changing."
+            ) {
+                SecureField("sk-...", text: $store.deepSeekAPIKey).nothingField()
             }
-
-            Text(
-                "Passed to the agent as DEEPSEEK_API_KEY, so JIT runners can call it for ci-gates' advisory slop-review step. Empty means that step just skips itself — it never blocks a merge either way. Restart the agent after changing this."
-            )
-            .font(NothingTheme.small)
-            .foregroundStyle(NothingTheme.inkDim)
         }
-        .padding(10)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private func runTest() {
