@@ -6,32 +6,21 @@ struct ErrorBox: View {
     var body: some View {
         Text(text)
             .font(NothingTheme.tiny.monospaced())
-            .foregroundStyle(.red)
+            .foregroundStyle(NothingTheme.red)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(9)
-            .background(Color.red.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 7))
-            .overlay(
-                RoundedRectangle(cornerRadius: 7)
-                    .stroke(Color.red.opacity(0.18))
-            )
+            .padding(12)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(NothingTheme.red.opacity(0.5), lineWidth: 1))
     }
 }
 
 struct LimitedStatusRow: View {
     let title: String
     let value: String
-    let icon: String
     let state: ServiceState
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(NothingTheme.inkDim)
-                .frame(width: 18)
-
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(NothingTheme.body.weight(.semibold))
@@ -46,10 +35,6 @@ struct LimitedStatusRow: View {
             Spacer()
             StatusDot(state: state)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .nothingRow()
     }
 }
