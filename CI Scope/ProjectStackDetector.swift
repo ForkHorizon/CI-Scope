@@ -36,21 +36,51 @@ struct ProjectStackDetector {
         return ordered(ids)
     }
 
-    /// Agent toolkit stack choice: the main stack profile, and whether a stack gate fits at all.
-    /// A Rust workspace (or TypeScript only in sub-packages) has none, so its manifest keeps just
+    /// Agent toolkit choice: the dominant stack profile, whether a stack gate fits at all, and
+    /// whether the toolkit is already in the repository (`scripts/check`).
+    /// A Rust workspace (or TypeScript only in sub-packages) has no gate, so its manifest keeps just
     /// the universal checks instead of web checks that need a root package.json.
-    func stackChoice(for project: CIProject) async -> (profile: String, hasStackChecks: Bool) {
-        let languages = await languages(for: project)
+    func stackChoice(for project: CIProject) async -> StackChoice {
+        let bytes = await languageBytes(for: project)
         let isUnity = await hasUnityMarker(project) ? true : await isUnityPackage(project)
-        let hasRootPackage = await hasRootPackageJSON(project)
-        return (
-            Self.profile(languages: languages, isUnity: isUnity),
-            Self.hasStackGate(languages: languages, isUnity: isUnity, hasRootPackageJSON: hasRootPackage)
+        let dominant = Self.dominantLanguage(bytes)
+        let languages: Set<String> = dominant.map { [$0] } ?? []
+        return StackChoice(
+            profile: Self.profile(languages: languages, isUnity: isUnity),
+            hasStackChecks: Self.hasStackGate(
+                languages: languages, isUnity: isUnity, hasRootPackageJSON: await hasRootPackageJSON(project)),
+            toolkitInstalled: await hasToolkit(project))
+    }
+
+    struct StackChoice {
+        let profile: String
+        let hasStackChecks: Bool
+        let toolkitInstalled: Bool
+    }
+
+    /// The stack the repository is mainly written in, by bytes (JavaScript counts as TypeScript).
+    /// A few Python bench scripts in a TypeScript repo must not decide the profile.
+    static func dominantLanguage(_ bytes: [String: Int]) -> String? {
+        let groups = ["swift": "swift", "go": "go", "python": "python", "typescript": "typescript", "javascript": "typescript"]
+        var totals: [String: Int] = [:]
+        for (language, count) in bytes {
+            if let group = groups[language] { totals[group, default: 0] += count }
+        }
+        return totals.max { $0.value < $1.value }?.key
+    }
+
+    private func hasToolkit(_ project: CIProject) async -> Bool {
+        let result = await ShellClient.run(
+            "gh api repos/\(quoted(project.repositorySlug))/contents/scripts/check --jq '.name'",
+            timeout: 30,
+            config: config
         )
+        return result.exitCode == 0 && !result.output.trimmed.isEmpty
     }
 
     static func hasStackGate(languages: Set<String>, isUnity: Bool, hasRootPackageJSON: Bool) -> Bool {
-        isUnity || hasRootPackageJSON || !languages.isDisjoint(with: ["swift", "go", "python"])
+        isUnity || !languages.isDisjoint(with: ["swift", "go", "python"])
+            || (hasRootPackageJSON && languages.contains("typescript"))
     }
 
     static func profile(languages: Set<String>, isUnity: Bool) -> String {
@@ -62,16 +92,23 @@ struct ProjectStackDetector {
     }
 
     private func languages(for project: CIProject) async -> Set<String> {
+        Set(await languageBytes(for: project).keys)
+    }
+
+    /// GitHub language statistics (bytes per lowercased language name).
+    private func languageBytes(for project: CIProject) async -> [String: Int] {
         let result = await ShellClient.run(
-            "gh api repos/\(quoted(project.repositorySlug))/languages --jq 'keys[]'",
+            "gh api repos/\(quoted(project.repositorySlug))/languages --jq 'to_entries[] | \"\\(.key)\\t\\(.value)\"'",
             timeout: 30,
             config: config
         )
-        guard result.exitCode == 0 else { return [] }
-        return Set(
-            result.output.split(separator: "\n").map { String($0).trimmed.lowercased() }.filter {
-                !$0.isEmpty
-            })
+        guard result.exitCode == 0 else { return [:] }
+        var bytes: [String: Int] = [:]
+        for line in result.output.split(separator: "\n") {
+            let parts = line.split(separator: "\t")
+            if parts.count == 2, let count = Int(parts[1]) { bytes[String(parts[0]).trimmed.lowercased()] = count }
+        }
+        return bytes
     }
 
     private func hasUnityMarker(_ project: CIProject) async -> Bool {
