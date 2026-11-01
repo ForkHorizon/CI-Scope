@@ -54,8 +54,7 @@ extension AutomationScriptSeedProvider {
             {"id": "python-quality", "type": "python-quality"},
             {"id": "go-quality", "type": "go-quality", "workdir": "Soma/go_scanner"},
             {"id": "swift-quality", "type": "swift-quality", "config": ".swift-quality-gate.json", "params": {"run_build": false}, "resources": ["xcode"]},
-            {"id": "swift-compile", "type": "swift-compile", "config": ".swift-compile-gate.json", "resources": ["xcode"]},
-            {"id": "slop-review", "type": "slop-review", "events": ["pull_request", "workflow_dispatch"], "resources": ["ollama"]}
+            {"id": "swift-compile", "type": "swift-compile", "config": ".swift-compile-gate.json", "resources": ["xcode"]}
           ]
         }
 
