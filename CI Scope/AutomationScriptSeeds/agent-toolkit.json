@@ -19,7 +19,7 @@
       "title": "Reviewed ci-gates SHA",
       "kind": "text",
       "isRequired": true,
-      "defaultValue": "1e599f0b7451ffc334a823e5a4a78af122bef49e",
+      "defaultValue": "f3b7ff08924b5e262d0f6df0cdb43d8b18ba1969",
       "help": "Full 40-character commit SHA containing the checks.",
       "options": []
     },
@@ -56,7 +56,7 @@
       "id": "claude-hooks",
       "destinationPath": ".claude/settings.json",
       "isExecutable": false,
-      "contents": "{\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Write|Edit|MultiEdit\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"output=$(scripts/check 2>&1); status=$?; if [ \\\"$status\\\" -ne 0 ]; then printf '%s\\\\n' \\\"$output\\\" >&2; exit 2; fi # ci-scope-agent-toolkit\"\n          }\n        ]\n      }\n    ],\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"if cat | grep -Eq '\\\"stop_hook_active\\\": *true'; then exit 0; fi; output=$(scripts/check 2>&1); status=$?; if [ \\\"$status\\\" -ne 0 ]; then printf '%s\\\\n' \\\"$output\\\" >&2; exit 2; fi # ci-scope-agent-toolkit\"\n          }\n        ]\n      }\n    ]\n  }\n}\n"
+      "contents": "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Write|Edit|MultiEdit\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"scripts/check guard-tests # ci-scope-agent-toolkit\"\n          }\n        ]\n      }\n    ],\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Write|Edit|MultiEdit\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"output=$(scripts/check 2>&1); status=$?; if [ \\\"$status\\\" -ne 0 ]; then printf '%s\\\\n' \\\"$output\\\" >&2; exit 2; fi # ci-scope-agent-toolkit\"\n          }\n        ]\n      }\n    ],\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"if cat | grep -Eq '\\\"stop_hook_active\\\": *true'; then exit 0; fi; output=$(scripts/check 2>&1); status=$?; if [ \\\"$status\\\" -ne 0 ]; then printf '%s\\\\n' \\\"$output\\\" >&2; exit 2; fi # ci-scope-agent-toolkit\"\n          }\n        ]\n      }\n    ]\n  }\n}\n"
     },
     {
       "id": "agents",
