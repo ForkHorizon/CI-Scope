@@ -9,7 +9,8 @@ struct ScriptEditorPanel: View {
     let onReset: () -> Void
 
     var body: some View {
-        PanelShell(title: "Script Editor") {
+        VStack(spacing: 0) {
+            Text("Script editor").nothingCaption().frame(maxWidth: .infinity, alignment: .leading).padding([.horizontal, .top], 14)
             VStack(spacing: 8) {
                 editorToolbar
                 if let errorMessage {
@@ -35,8 +36,10 @@ struct ScriptEditorPanel: View {
             .labelsHidden()
 
             Button("Save", action: onSave)
+                .buttonStyle(.pillPrimary)
                 .keyboardShortcut("s", modifiers: [.command])
             Button("Reset", action: onReset)
+                .buttonStyle(.pill)
                 .disabled(script.defaultSeedID == nil)
         }
         .padding(10)

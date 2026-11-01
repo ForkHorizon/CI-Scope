@@ -28,13 +28,10 @@ struct LabeledTextEditor: View {
             TextEditor(text: $text)
                 .font(.system(size: 12, design: .monospaced))
                 .frame(minHeight: minHeight)
-                .padding(4)
-                .background(Color(nsColor: .textBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.secondary.opacity(0.12))
-                )
+                .scrollContentBackground(.hidden)
+                .padding(8)
+                .background(NothingTheme.panel, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(NothingTheme.line, lineWidth: 1))
         }
     }
 }

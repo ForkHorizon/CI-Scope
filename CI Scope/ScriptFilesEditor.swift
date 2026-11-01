@@ -10,12 +10,8 @@ struct ScriptFilesEditor: View {
                     remove(file)
                 }
             }
-            Button {
-                script.files.append(.empty())
-            } label: {
-                Label("Add File", systemImage: "plus")
-            }
-            .buttonStyle(.bordered)
+            Button("Add file") { script.files.append(.empty()) }
+                .buttonStyle(.pill)
         }
     }
 
@@ -33,26 +29,20 @@ struct ScriptFileCard: View {
             HStack {
                 TextField("destination/path", text: $file.destinationPath)
                     .font(.system(size: 12, design: .monospaced))
-                    .textFieldStyle(.roundedBorder)
+                    .nothingField()
                 Toggle("Executable", isOn: $file.isExecutable)
-                Button(role: .destructive, action: onRemove) {
-                    Image(systemName: "trash")
-                }
+                Button("Remove", action: onRemove).buttonStyle(.pillDanger)
             }
 
             TextEditor(text: $file.contents)
                 .font(.system(size: 11, design: .monospaced))
                 .frame(minHeight: 220)
-                .padding(4)
-                .background(Color(nsColor: .textBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.secondary.opacity(0.12))
-                )
+                .scrollContentBackground(.hidden)
+                .padding(8)
+                .background(NothingTheme.panel, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(NothingTheme.line, lineWidth: 1))
         }
-        .padding(9)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .padding(12)
+        .nothingCard(radius: 12)
     }
 }

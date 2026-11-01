@@ -27,23 +27,14 @@ struct ScriptInstallSubmenu: View {
                 AutomationScriptInstallStatusBox(status: snapshot)
                     .frame(maxWidth: .infinity)
 
-                Button(action: onOpenEditor) {
-                    Label("Open Editor", systemImage: "slider.horizontal.3")
-                }
+                Button("Open editor", action: onOpenEditor).buttonStyle(.pill)
 
-                Button(action: onInstall) {
-                    Label(
-                        snapshot.isInstalling ? "Installing" : "Create Pull Request",
-                        systemImage: "arrow.up.right.square")
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(selectedProjectID == nil || snapshot.isInstalling)
+                Button(snapshot.isInstalling ? "Installing" : "Create PR", action: onInstall)
+                    .buttonStyle(.pillPrimary)
+                    .disabled(selectedProjectID == nil || snapshot.isInstalling)
             }
-            .font(NothingTheme.small.weight(.semibold))
-            .buttonStyle(.bordered)
         }
-        .padding(10)
-        .background(Color(nsColor: .windowBackgroundColor).opacity(0.66))
+        .padding(14)
     }
 
     private var projectPicker: some View {
