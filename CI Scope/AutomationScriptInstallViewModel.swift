@@ -58,6 +58,7 @@ final class AutomationScriptInstallViewModel: ObservableObject {
         scripts: [AutomationScript],
         project: CIProject?,
         mode: AutomationScriptInstallMode,
+        variableOverrides: [String: [String: String]] = [:],
         onSuccess: @escaping () -> Void = {}
     ) {
         guard !snapshots.values.contains(where: \.isInstalling) else { return }
@@ -72,7 +73,8 @@ final class AutomationScriptInstallViewModel: ObservableObject {
         Task {
             do {
                 let result = try await installer.installBundle(
-                    scripts: scripts, project: project, mode: mode)
+                    scripts: scripts, project: project, mode: mode,
+                    variableOverrides: variableOverrides)
                 ProjectCIService.invalidateWorkflowsCache(forRepositorySlug: project.repositorySlug)
                 snapshots[snapshotKey] = .succeeded(result)
                 onSuccess()

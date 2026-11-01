@@ -8,7 +8,8 @@ extension AutomationScriptInstaller {
     func installBundle(
         scripts: [AutomationScript],
         project: CIProject,
-        mode: AutomationScriptInstallMode
+        mode: AutomationScriptInstallMode,
+        variableOverrides: [String: [String: String]] = [:]
     ) async throws -> AutomationScriptInstallResult {
         _ = try await run(
             "NO_COLOR=1 gh auth status -h github.com", step: "Check GitHub CLI authentication")
@@ -25,7 +26,11 @@ extension AutomationScriptInstaller {
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
         try await clone(project: project, defaultBranch: defaultBranch, into: repoURL)
-        let renderers = scripts.map { renderer(for: $0, project: project, defaultBranch: defaultBranch, mode: mode) }
+        let renderers = scripts.map {
+            renderer(
+                for: $0, project: project, defaultBranch: defaultBranch, mode: mode,
+                overrides: variableOverrides[$0.id] ?? [:])
+        }
         let paths = try renderers.flatMap { try $0.renderedFiles().map(\.destinationPath) }
         let branch = PolicyProtectedPaths.branch(Self.bundleBranchName, forFiles: paths)
         let branchExists = await remoteBranchExists(branch, cwd: repoURL)
@@ -51,12 +56,13 @@ extension AutomationScriptInstaller {
         for script: AutomationScript,
         project: CIProject,
         defaultBranch: String,
-        mode: AutomationScriptInstallMode
+        mode: AutomationScriptInstallMode,
+        overrides: [String: String]
     ) -> AutomationScriptRenderer {
         AutomationScriptRenderer(
             script: script,
             project: project,
-            variableValues: defaultVariableValues(for: script),
+            variableValues: defaultVariableValues(for: script).merging(overrides) { _, new in new },
             defaultBranch: defaultBranch,
             runnerLabelsOverride: runnerLabels(for: mode, script: script, project: project)
         )
