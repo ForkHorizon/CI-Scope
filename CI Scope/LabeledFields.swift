@@ -10,7 +10,7 @@ struct LabeledTextField: View {
                 .font(NothingTheme.small.weight(.semibold))
                 .foregroundStyle(NothingTheme.inkDim)
             TextField(title, text: $text)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(NothingFieldStyle())
         }
     }
 }
