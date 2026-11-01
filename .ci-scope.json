@@ -23,6 +23,9 @@
       "type": "swift-compile",
       "config": ".swift-compile-gate.json",
       "resources": ["xcode"]
-    }
+    },
+    {"id": "file-roles", "type": "file-roles", "params": {"mode": "new"}},
+    {"id": "agent-docs-stable", "type": "agent-docs-stable", "params": {"mode": "new"}},
+    {"id": "test-protection", "type": "test-protection"}
   ]
 }
