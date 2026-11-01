@@ -181,4 +181,17 @@ final class AgentToolkitXCTest: XCTestCase {
         XCTAssertTrue(check.contains("gh repo clone ForkHorizon/ci-gates"))
         XCTAssertTrue(check.contains("checkout --quiet \"$gates_sha\""))
     }
+
+    func testToolkitBlocksEditsToExistingTestsAndDetectsTestWeakening() throws {
+        let hooks =
+            AutomationScriptSeedProvider.fallbackAgentToolkitSeed().files
+            .first { $0.id == "claude-hooks" }?.contents ?? ""
+        XCTAssertTrue(hooks.contains("\"PreToolUse\""))
+        XCTAssertTrue(hooks.contains("scripts/check guard-tests # ci-scope-agent-toolkit"))
+        for profile in ["ts-web", "go", "python", "swift", "unity"] {
+            XCTAssertTrue(
+                AutomationScriptSeedProvider.agentToolkitManifest(profile).contains("\"test-protection\""),
+                profile)
+        }
+    }
 }

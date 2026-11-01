@@ -2,7 +2,7 @@ import Foundation
 
 extension AutomationScriptSeedProvider {
     /// ci-gates commit reviewed by the release owner (main after file-roles and agent-docs-stable).
-    static let reviewedGatesSHA = "1e599f0b7451ffc334a823e5a4a78af122bef49e"
+    static let reviewedGatesSHA = "f3b7ff08924b5e262d0f6df0cdb43d8b18ba1969"
 
     static func fallbackAgentToolkitSeed() -> AutomationScript {
         AutomationScript(
@@ -74,6 +74,7 @@ extension AutomationScriptSeedProvider {
                 contents: """
                     {
                       "hooks": {
+                        "PreToolUse": [{"matcher": "Write|Edit|MultiEdit", "hooks": [{"type": "command", "command": "scripts/check guard-tests # ci-scope-agent-toolkit"}]}],
                         "PostToolUse": [{"matcher": "Write|Edit|MultiEdit", "hooks": [{"type": "command", "command": "output=$(scripts/check 2>&1); status=$?; if [ \\"$status\\" -ne 0 ]; then printf '%s\\n' \\"$output\\" >&2; exit 2; fi # ci-scope-agent-toolkit"}]}],
                         "Stop": [{"hooks": [{"type": "command", "command": "if cat | grep -Eq '\\"stop_hook_active\\": *true'; then exit 0; fi; output=$(scripts/check 2>&1); status=$?; if [ \\"$status\\" -ne 0 ]; then printf '%s\\n' \\"$output\\" >&2; exit 2; fi # ci-scope-agent-toolkit"}]}]
                       }
@@ -122,6 +123,7 @@ extension AutomationScriptSeedProvider {
                 ["id": "duplicate-blocks", "type": "duplicate-blocks", "params": ["mode": "new"]],
                 ["id": "file-roles", "type": "file-roles", "params": ["mode": "new"]],
                 ["id": "agent-docs-stable", "type": "agent-docs-stable", "params": ["mode": "new"]],
+                ["id": "test-protection", "type": "test-protection"],
             ]
         let object: [String: Any] = ["version": 1, "checks": checks]
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
