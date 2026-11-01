@@ -41,6 +41,7 @@ extension View {
     /// Outlined field look for plain text and secure fields.
     func nothingField() -> some View {
         textFieldStyle(.plain)
+            .focusEffectDisabled()
             .font(NothingTheme.small)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
