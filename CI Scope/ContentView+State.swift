@@ -14,6 +14,8 @@ extension ContentView {
             return projectCIViewModel.loadingProjectID == selectedProject.id
         case .runners:
             return runnerFleetViewModel.isLoading
+        case .policy:
+            return policyAdmin.isLoading
         case .scripts, .coverage:
             return false
         case .settings:
@@ -28,7 +30,7 @@ extension ContentView {
             return projectCIViewModel.snapshot(for: selectedProject.id)?.refreshedAt
         case .runners:
             return runnerFleetViewModel.snapshot.refreshedAt
-        case .scripts, .coverage:
+        case .scripts, .coverage, .policy:
             return nil
         case .settings:
             return nil
@@ -39,7 +41,7 @@ extension ContentView {
         switch workspaceTab {
         case .projects:
             selectedProject != nil
-        case .runners:
+        case .runners, .policy:
             true
         case .scripts, .coverage:
             false
@@ -58,6 +60,8 @@ extension ContentView {
             "\(scriptStore.scripts.count) installable scripts"
         case .coverage:
             "\(projectStore.projects.count) repositories"
+        case .policy:
+            "\(policyAdmin.pendingCount) waiting for Touch ID approval"
         case .settings:
             settingsStore.serverModeEnabled ? "Server queue enabled" : "Server queue off"
         }
@@ -73,6 +77,8 @@ extension ContentView {
             "Scripts"
         case .coverage:
             "Coverage"
+        case .policy:
+            "Policy"
         case .settings:
             "Settings"
         }
@@ -88,6 +94,8 @@ extension ContentView {
             "curlybraces.square"
         case .coverage:
             "tablecells"
+        case .policy:
+            "touchid"
         case .settings:
             "gearshape"
         }
@@ -104,6 +112,8 @@ extension ContentView {
             return scriptStore.scripts.isEmpty ? .unknown : .online
         case .coverage:
             return .unknown
+        case .policy:
+            return policyAdmin.pendingCount > 0 ? .warning : .online
         case .settings:
             return settingsStore.serverModeEnabled ? .online : .unknown
         }
@@ -160,6 +170,10 @@ extension ContentView {
         case .runners:
             Task {
                 await runnerFleetViewModel.load(projects: projectStore.projects)
+            }
+        case .policy:
+            Task {
+                await policyAdmin.load(projects: projectStore.projects)
             }
         case .scripts, .coverage:
             break

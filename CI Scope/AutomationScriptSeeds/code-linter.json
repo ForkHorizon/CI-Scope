@@ -30,7 +30,7 @@
   "title": "Code Linter",
   "variables": [
     {
-      "defaultValue": "300",
+      "defaultValue": "600",
       "help": "Largest allowed source file length.",
       "id": "max_file_lines",
       "isRequired": true,
@@ -39,7 +39,7 @@
       "title": "Max file lines"
     },
     {
-      "defaultValue": "50",
+      "defaultValue": "80",
       "help": "Largest allowed function or method length.",
       "id": "max_function_lines",
       "isRequired": true,
@@ -75,7 +75,7 @@
       "title": "Max comment block lines"
     },
     {
-      "defaultValue": "2",
+      "defaultValue": "5",
       "help": "Largest allowed number of top-level types in one file. Nested types are not counted.",
       "id": "max_types_per_file",
       "isRequired": true,

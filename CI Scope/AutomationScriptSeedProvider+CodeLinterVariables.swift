@@ -10,7 +10,7 @@ extension AutomationScriptSeedProvider {
                 title: "Max file lines",
                 kind: .number,
                 isRequired: true,
-                defaultValue: "300",
+                defaultValue: "600",
                 help: "Largest allowed source file length.",
                 options: []
             ),
@@ -19,7 +19,7 @@ extension AutomationScriptSeedProvider {
                 title: "Max function lines",
                 kind: .number,
                 isRequired: true,
-                defaultValue: "50",
+                defaultValue: "80",
                 help: "Largest allowed function or method length.",
                 options: []
             ),
@@ -56,7 +56,7 @@ extension AutomationScriptSeedProvider {
                 title: "Max types per file",
                 kind: .number,
                 isRequired: true,
-                defaultValue: "2",
+                defaultValue: "5",
                 help:
                     "Largest allowed number of top-level types in one file. Nested types are not counted.",
                 options: []

@@ -25,12 +25,13 @@ extension AutomationScriptInstaller {
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
         try await clone(project: project, defaultBranch: defaultBranch, into: repoURL)
-        let branch = Self.bundleBranchName
+        let renderers = scripts.map { renderer(for: $0, project: project, defaultBranch: defaultBranch, mode: mode) }
+        let paths = try renderers.flatMap { try $0.renderedFiles().map(\.destinationPath) }
+        let branch = PolicyProtectedPaths.branch(Self.bundleBranchName, forFiles: paths)
         let branchExists = await remoteBranchExists(branch, cwd: repoURL)
         try await checkoutBranch(branch, exists: branchExists, cwd: repoURL)
 
-        let touched = try await stageAll(
-            scripts, project: project, defaultBranch: defaultBranch, mode: mode, repoURL: repoURL)
+        let touched = try await stageAll(renderers, repoURL: repoURL)
 
         if try await hasStagedChanges(files: touched, cwd: repoURL) {
             try await commitAndPushBundle(branch: branch, cwd: repoURL)
@@ -46,22 +47,26 @@ extension AutomationScriptInstaller {
             count: scripts.count, pullRequestURL: pullRequestURL, alreadyInstalled: false)
     }
 
-    private func stageAll(
-        _ scripts: [AutomationScript],
+    private func renderer(
+        for script: AutomationScript,
         project: CIProject,
         defaultBranch: String,
-        mode: AutomationScriptInstallMode,
-        repoURL: URL
-    ) async throws -> [AutomationScriptFile] {
+        mode: AutomationScriptInstallMode
+    ) -> AutomationScriptRenderer {
+        AutomationScriptRenderer(
+            script: script,
+            project: project,
+            variableValues: defaultVariableValues(for: script),
+            defaultBranch: defaultBranch,
+            runnerLabelsOverride: runnerLabels(for: mode, script: script, project: project)
+        )
+    }
+
+    private func stageAll(_ renderers: [AutomationScriptRenderer], repoURL: URL) async throws
+        -> [AutomationScriptFile]
+    {
         var touched: [AutomationScriptFile] = []
-        for script in scripts {
-            let renderer = AutomationScriptRenderer(
-                script: script,
-                project: project,
-                variableValues: defaultVariableValues(for: script),
-                defaultBranch: defaultBranch,
-                runnerLabelsOverride: runnerLabels(for: mode, script: script, project: project)
-            )
+        for renderer in renderers {
             try renderer.validate()
             let files = try renderer.renderedFiles()
             try write(files, to: repoURL)
