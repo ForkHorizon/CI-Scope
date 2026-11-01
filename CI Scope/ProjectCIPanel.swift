@@ -52,6 +52,7 @@ struct ProjectCIPanel: View {
                         project: project,
                         scripts: scripts,
                         isInstalled: { $0.matchingWorkflow(in: snapshot) != nil },
+                        manifestCheckTypes: snapshot?.unifiedChecks.map { Set($0.manifest.checks.map(\.type)) },
                         installViewModel: installViewModel
                     )
                     Spacer()
