@@ -2,7 +2,7 @@ import Foundation
 
 extension AutomationScriptSeedProvider {
     /// ci-gates commit reviewed by the release owner (main after file-roles and agent-docs-stable).
-    static let reviewedGatesSHA = "f3b7ff08924b5e262d0f6df0cdb43d8b18ba1969"
+    static let reviewedGatesSHA = "ba114c69330b79392c911ff9b1a9b4f8879b6894"
 
     static func fallbackAgentToolkitSeed() -> AutomationScript {
         AutomationScript(
