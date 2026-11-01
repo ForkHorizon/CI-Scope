@@ -9,23 +9,28 @@ struct PolicyAdminView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 30) {
                 pendingSection
                 PolicyChecksView(viewModel: checks, admin: admin, projects: projects)
             }
-            .padding(14)
+            .padding(22)
         }
         .task { await admin.load(projects: projects) }
     }
 
     private var pendingSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Pending policy changes", systemImage: "touchid")
-                    .font(NothingTheme.body.weight(.semibold))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Waiting for Touch ID").nothingCaption()
+                    Text("\(admin.pendingCount)")
+                        .nothingDisplay(56)
+                        .foregroundStyle(admin.pendingCount > 0 ? NothingTheme.amber : NothingTheme.inkDim)
+                }
                 Spacer()
                 if admin.isLoading { ProgressView().controlSize(.small) }
                 Button("Approve all") { Task { await admin.approveAll() } }
+                    .buttonStyle(.pillPrimary)
                     .disabled(admin.isApproving || admin.pendingCount == 0)
             }
             if admin.changes.isEmpty && !admin.isLoading {
@@ -33,21 +38,20 @@ struct PolicyAdminView: View {
                     .font(NothingTheme.small)
                     .foregroundStyle(NothingTheme.inkDim)
             }
-            ForEach(admin.changes) { change in
-                PolicyChangeRow(change: change, status: admin.statuses[change.id], isBusy: admin.isApproving) {
-                    Task { await admin.approve(change) }
+            VStack(spacing: 0) {
+                ForEach(admin.changes) { change in
+                    PolicyChangeRow(change: change, status: admin.statuses[change.id], isBusy: admin.isApproving) {
+                        Task { await admin.approve(change) }
+                    }
                 }
             }
             if let message = admin.message {
-                Text(message).font(NothingTheme.small).foregroundStyle(.orange).textSelection(.enabled)
+                Text(message).font(NothingTheme.small).foregroundStyle(NothingTheme.amber).textSelection(.enabled)
             }
             Text("Approving merges the PR with admin bypass, then signs the new policy. Touch ID is asked once per batch.")
                 .font(NothingTheme.tiny)
                 .foregroundStyle(NothingTheme.inkDim)
         }
-        .padding(10)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -58,9 +62,9 @@ struct PolicyChangeRow: View {
     let onApprove: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 12) {
             StatusDot(state: dotState)
-                .padding(.top, 4)
+                .padding(.top, 5)
             VStack(alignment: .leading, spacing: 2) {
                 if let url = URL(string: change.url) {
                     Link("\(change.repository)#\(change.number)", destination: url)
@@ -77,9 +81,12 @@ struct PolicyChangeRow: View {
             Spacer()
             if status?.needsApproval ?? false || isFailed {
                 Button(isFailed ? "Retry" : "Approve", action: onApprove)
+                    .buttonStyle(isFailed ? .pillDanger : .pillPrimary)
                     .disabled(isBusy)
             }
         }
+        .padding(.vertical, 12)
+        .overlay(alignment: .bottom) { Rectangle().fill(NothingTheme.line).frame(height: 1) }
     }
 
     private var isFailed: Bool {

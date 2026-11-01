@@ -13,24 +13,24 @@ struct PolicyChecksView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Checks", systemImage: "checklist")
-                .font(NothingTheme.body.weight(.semibold))
-            HStack {
+        SettingsSection(title: "Checks") {
+            SettingsRow(title: "Project") {
                 Picker("Project", selection: $projectID) {
                     ForEach(projects) { Text($0.repositorySlug).tag(Optional($0.id)) }
                 }
+                .labelsHidden()
+            }
+            SettingsRow(title: "Branch") {
                 Picker("Branch", selection: $viewModel.branch) {
                     ForEach(PolicyChecksViewModel.branches, id: \.self) { Text($0).tag($0) }
                 }
+                .labelsHidden()
                 .frame(maxWidth: 180)
             }
             content
-            footer
+            footer.padding(.top, 14)
         }
-        .padding(10)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .toggleStyle(NothingToggleStyle())
         .onAppear { projectID = projectID ?? projects.first?.id }
         .task(id: "\(project?.id ?? "")|\(viewModel.branch)") {
             if let project { await viewModel.load(project) }
@@ -45,15 +45,17 @@ struct PolicyChecksView: View {
             ProgressView().controlSize(.small)
         } else {
             ForEach(viewModel.rows, id: \.self) { id in
-                Toggle(
-                    id,
-                    isOn: Binding(
-                        get: { viewModel.checkIDs.contains(id) },
-                        set: { viewModel.toggle(id, on: $0) }
+                SettingsRow(title: id) {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { viewModel.checkIDs.contains(id) },
+                            set: { viewModel.toggle(id, on: $0) }
+                        )
                     )
-                )
-                .font(NothingTheme.small.monospaced())
-                .disabled(viewModel.isBusy)
+                    .labelsHidden()
+                    .disabled(viewModel.isBusy)
+                }
             }
         }
     }
@@ -69,8 +71,10 @@ struct PolicyChecksView: View {
                     guard let project else { return }
                     Task { await viewModel.apply(to: project, admin: admin) }
                 }
+                .buttonStyle(.pillPrimary)
                 .disabled(!viewModel.hasChanges || viewModel.isBusy || admin.isApproving)
                 Button("Discard") { viewModel.discard() }
+                    .buttonStyle(.pill)
                     .disabled(!viewModel.hasChanges || viewModel.isBusy)
                 if viewModel.isBusy { ProgressView().controlSize(.small) }
             }
