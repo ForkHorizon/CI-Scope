@@ -5,6 +5,25 @@ struct ShellResult {
     let output: String
 }
 
+/// Reads a pipe to its end on a background thread so the writer never blocks on a full buffer.
+private final class OutputCollector: @unchecked Sendable {
+    private let group = DispatchGroup()
+    private var data = Data()
+
+    func start(reading handle: FileHandle) {
+        group.enter()
+        DispatchQueue.global(qos: .utility).async { [self] in
+            data = handle.readDataToEndOfFile()
+            group.leave()
+        }
+    }
+
+    func finish() -> Data {
+        group.wait()
+        return data
+    }
+}
+
 enum ShellClient {
     static func run(
         _ command: String,
@@ -35,8 +54,12 @@ enum ShellClient {
                     return
                 }
 
+                // Drain the pipe while the process runs: a child that writes more than the pipe
+                // buffer (64 KB) blocks until someone reads, so waiting first would stall it.
+                let collected = OutputCollector()
+                collected.start(reading: pipe.fileHandleForReading)
                 terminate(process, after: timeout)
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let data = collected.finish()
                 let output = String(data: data, encoding: .utf8) ?? ""
                 let sanitizedOutput = sanitizeOutput(output)
                 continuation.resume(

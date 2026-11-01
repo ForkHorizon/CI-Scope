@@ -85,4 +85,10 @@ final class TestProtectionDetectorXCTest: XCTestCase {
             decidedBy: "me", decidedAt: "t")
         XCTAssertFalse(alert.isOpen())
     }
+
+    func testDefaultBranchLookupUsesTheRestApiBecauseRepoViewHasNoRepoFlag() {
+        let arguments = TestProtectionService.defaultBranchArguments("ForkHorizon/CI-Scope")
+        XCTAssertEqual(arguments, "api 'repos/ForkHorizon/CI-Scope' --jq .default_branch")
+        XCTAssertFalse(arguments.contains("repo view"))
+    }
 }

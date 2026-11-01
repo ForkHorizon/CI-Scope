@@ -29,27 +29,21 @@ final class TestProtectionViewModel: ObservableObject {
     var selected: TestAlert? { openAlerts.first { $0.id == selectedID } ?? openAlerts.first }
 
     func load(projects: [CIProject]) async {
+        guard !isLoading else { return }  // views re-trigger load; one scan at a time
         isLoading = true
         defer { isLoading = false }
         let readToken = try? await PolicyAuthorizer.readToken()
         var found: [TestAlert] = []
         var recorded: [TestDecision] = []
         var failures = 0
-        for project in projects {
-            let slug = project.repositorySlug
-            do {
-                var repositoryAlerts = try await scanner.alerts(repository: slug, cache: cache)
-                if let readToken {
-                    let decisions = try await consent.decisions(repository: slug, readToken: readToken)
-                    recorded += decisions
-                    for index in repositoryAlerts.indices {
-                        repositoryAlerts[index].decision = decisions.first { $0.sha == repositoryAlerts[index].sha }
-                    }
-                }
-                found += repositoryAlerts
-            } catch {
+        for await outcome in scanAll(projects.map(\.repositorySlug), readToken: readToken) {
+            switch outcome.result {
+            case .success(let scanned):
+                found += scanned.alerts
+                recorded += scanned.decisions
+            case .failure:
                 failures += 1
-                found += alerts.filter { $0.repository == slug }
+                found += alerts.filter { $0.repository == outcome.repository }
             }
         }
         alerts = found
@@ -57,6 +51,55 @@ final class TestProtectionViewModel: ObservableObject {
         message = failures == 0 ? nil : "Couldn't check \(failures) repo(s); showing the last known alerts."
         if readToken == nil { message = "Couldn't read the policy token from the server, so decisions aren't shown." }
         notifyNewHighAlerts()
+    }
+
+    private struct RepositoryScan {
+        let alerts: [TestAlert]
+        let decisions: [TestDecision]
+    }
+
+    private struct ScanOutcome {
+        let repository: String
+        let result: Result<RepositoryScan, Error>
+    }
+
+    /// Repositories are scanned a few at a time; one slow or failing repository doesn't hold up the rest.
+    private func scanAll(_ repositories: [String], readToken: String?) -> AsyncStream<ScanOutcome> {
+        let scanner = scanner
+        let consent = consent
+        let cache = cache
+        return AsyncStream { continuation in
+            Task {
+                await withTaskGroup(of: ScanOutcome.self) { group in
+                    var pending = repositories[...]
+                    func startNext() {
+                        guard let slug = pending.popFirst() else { return }
+                        group.addTask {
+                            do {
+                                var scanned = try await scanner.alerts(repository: slug, cache: cache)
+                                var decisions: [TestDecision] = []
+                                if let readToken {
+                                    decisions = try await consent.decisions(repository: slug, readToken: readToken)
+                                    for index in scanned.indices {
+                                        scanned[index].decision = decisions.first { $0.sha == scanned[index].sha }
+                                    }
+                                }
+                                return ScanOutcome(
+                                    repository: slug, result: .success(RepositoryScan(alerts: scanned, decisions: decisions)))
+                            } catch {
+                                return ScanOutcome(repository: slug, result: .failure(error))
+                            }
+                        }
+                    }
+                    for _ in 0..<min(4, repositories.count) { startNext() }
+                    for await outcome in group {
+                        continuation.yield(outcome)
+                        startNext()
+                    }
+                }
+                continuation.finish()
+            }
+        }
     }
 
     func approve(_ alert: TestAlert) async {
