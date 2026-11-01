@@ -101,6 +101,17 @@ final class NotificationManager: ObservableObject {
         fetchedRunnerSnapshots = true
     }
 
+    /// High-severity test-protection alert: a protected test was weakened in an accepted commit.
+    func notifyTestAlert(_ alert: TestAlert) {
+        let content = UNMutableNotificationContent()
+        content.title = "Test protection: \(alert.title)"
+        content.subtitle = alert.repository
+        content.body = "\(alert.shortSHA) \(alert.message)"
+        content.sound = UNNotificationSound.default
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "test-alert-\(alert.id)", content: content, trigger: nil))
+    }
+
     private func sendRunNotification(projectSlug: String, run: GitHubRun) {
         let content = UNMutableNotificationContent()
 

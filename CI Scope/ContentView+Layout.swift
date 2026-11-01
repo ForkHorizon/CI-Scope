@@ -45,6 +45,8 @@ extension ContentView {
             .padding(14)
         case .policy:
             PolicyAdminView(admin: policyAdmin, checks: policyChecks, projects: projectStore.projects)
+        case .tests:
+            TestProtectionView(model: testProtection, projects: projectStore.projects)
         case .settings:
             SettingsView(store: settingsStore, v2Control: settingsStore.v2Control)
         }

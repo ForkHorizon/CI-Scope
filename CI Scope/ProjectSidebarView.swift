@@ -11,6 +11,7 @@ struct ProjectMenuPanel: View {
     let scriptState: ServiceState
     let scriptCount: Int
     let policyPendingCount: Int
+    let testAlertCount: Int
     let onSelect: (CIProject) -> Void
     let onRemove: (CIProject) -> Void
     let onAddProject: () -> Void
@@ -62,6 +63,15 @@ struct ProjectMenuPanel: View {
                     isActive: workspaceTab == .policy
                 ) {
                     workspaceTab = .policy
+                }
+
+                WorkspaceMenuRow(
+                    tab: .tests,
+                    state: testAlertCount > 0 ? .warning : .unknown,
+                    count: testAlertCount,
+                    isActive: workspaceTab == .tests
+                ) {
+                    workspaceTab = .tests
                 }
 
                 WorkspaceMenuRow(
@@ -165,6 +175,8 @@ struct ProjectMenuPanel: View {
             .unknown
         case .policy:
             policyPendingCount > 0 ? .warning : .unknown
+        case .tests:
+            testAlertCount > 0 ? .warning : .unknown
         case .settings:
             .unknown
         }
@@ -182,6 +194,8 @@ struct ProjectMenuPanel: View {
             "Gate coverage"
         case .policy:
             policyPendingCount == 0 ? "No pending approvals" : "\(policyPendingCount) waiting for approval"
+        case .tests:
+            testAlertCount == 0 ? "No open alerts" : "\(testAlertCount) open alerts"
         case .settings:
             "Server settings"
         }
@@ -249,6 +263,8 @@ struct WorkspaceMenuRow: View {
             "Gate coverage"
         case .policy:
             count == 0 ? "Touch ID approvals" : "\(count) waiting"
+        case .tests:
+            count == 0 ? "Weakened tests" : "\(count) open"
         case .settings:
             "Server queue"
         }
