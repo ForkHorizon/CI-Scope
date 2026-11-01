@@ -13,20 +13,20 @@ struct StatusDot: View {
             .help(state.rawValue)
     }
 
-    private var ink: Color { onLight ? .black : NothingTheme.ink }
-
     private var fill: Color {
         switch state {
-        case .online: ink
-        case .warning, .offline: NothingTheme.red
+        case .online: NothingTheme.green
+        case .warning: NothingTheme.amber
+        case .offline: NothingTheme.red
         case .unknown: .clear
         }
     }
 
     private var stroke: Color {
         switch state {
-        case .online: ink
-        case .warning, .offline: NothingTheme.red
+        case .online: NothingTheme.green
+        case .warning: NothingTheme.amber
+        case .offline: NothingTheme.red
         case .unknown: onLight ? Color.black.opacity(0.4) : NothingTheme.lineStrong
         }
     }

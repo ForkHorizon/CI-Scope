@@ -10,8 +10,16 @@ enum NothingTheme {
     static let line = Color(white: 0.16)
     static let lineStrong = Color(white: 0.32)
     static let ink = Color(white: 0.95)
-    static let inkDim = Color(white: 0.55)
+    static let inkDim = Color(white: 0.68)
     static let red = Color(red: 0.84, green: 0.10, blue: 0.13)
+    /// Signal colors: green = healthy/installed, amber = needs a look. Red stays reserved for alarms.
+    static let green = Color(red: 0.30, green: 0.85, blue: 0.52)
+    static let amber = Color(red: 1.0, green: 0.69, blue: 0.13)
+
+    /// Readable type sizes (the app's old caption sizes were too small on black).
+    static let body = Font.system(size: 13)
+    static let small = Font.system(size: 12)
+    static let tiny = Font.system(size: 11)
 
     /// Dot-matrix display face (bundled Doto, OFL). Falls back to bold monospaced when unavailable.
     static func display(_ size: CGFloat) -> Font {

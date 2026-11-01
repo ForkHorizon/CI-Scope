@@ -3,7 +3,6 @@ import SwiftUI
 
 struct PanelShell<Content: View>: View {
     let title: String
-    let icon: String
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -18,8 +17,6 @@ struct PanelShell<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .nothingCard()
     }
 }
 
@@ -31,10 +28,10 @@ struct EmptyState: View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(NothingTheme.inkDim)
             Text(text)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small)
+                .foregroundStyle(NothingTheme.inkDim)
         }
         .frame(maxWidth: .infinity, minHeight: 120)
     }

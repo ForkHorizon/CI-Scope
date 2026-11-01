@@ -19,7 +19,7 @@ struct ProjectMenuRow: View {
                             .font(.system(size: 12, weight: .medium, design: .monospaced))
                             .lineLimit(1)
                         Text(project.repositorySlug)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(isActive ? Color.black.opacity(0.55) : NothingTheme.inkDim)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -56,19 +56,6 @@ struct ProjectMenuRow: View {
         .onHover { isHovering = $0 }
     }
 
-    var badge: String {
-        if isActive { return "Active" }
-        return "Saved"
-    }
-
-    var stateColor: Color {
-        switch state {
-        case .online: .green
-        case .warning: .orange
-        case .offline: .red
-        case .unknown: .secondary
-        }
-    }
 }
 
 struct ProjectContextMenu: View {

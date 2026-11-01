@@ -53,8 +53,8 @@ private struct JobNotificationBanner: View {
 
                                 if notification.queuedJobs.count > 5 {
                                     Text("+\(notification.queuedJobs.count - 5) more queued")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                                        .font(NothingTheme.tiny)
+                                        .foregroundStyle(NothingTheme.inkDim)
                                         .frame(maxWidth: .infinity, alignment: .trailing)
                                 }
                             }
@@ -80,11 +80,11 @@ private struct JobNotificationBanner: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(notification.newJobs.count == 1 ? "New CI Job" : "New CI Jobs")
-                    .font(.callout.weight(.semibold))
+                    .font(NothingTheme.body.weight(.semibold))
                     .lineLimit(1)
                 Text(notification.createdAt.formatted(date: .omitted, time: .shortened))
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.tiny.monospacedDigit())
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(1)
             }
 

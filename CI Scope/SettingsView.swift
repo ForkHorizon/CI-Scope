@@ -8,7 +8,7 @@ struct SettingsView: View {
     @State private var confirmEmergencyStop = false
 
     var body: some View {
-        PanelShell(title: "Settings", icon: "gearshape") {
+        PanelShell(title: "Settings") {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     localComputerSection
@@ -17,8 +17,8 @@ struct SettingsView: View {
                     aiReviewSection
                     if let message {
                         Text(message)
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
+                            .font(NothingTheme.small.monospaced())
+                            .foregroundStyle(NothingTheme.inkDim)
                             .textSelection(.enabled)
                     }
                 }
@@ -31,10 +31,10 @@ struct SettingsView: View {
     private var localComputerSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Toggle("Server queue mode", isOn: $store.serverModeEnabled)
-                .font(.callout.weight(.semibold))
+                .font(NothingTheme.body.weight(.semibold))
 
             Toggle("Enable V2 Agent status (read-only)", isOn: $store.v2StatusAdapterEnabled)
-                .font(.callout.weight(.semibold))
+                .font(NothingTheme.body.weight(.semibold))
 
             Toggle(
                 "Enable V2 authority (explicit)",
@@ -43,7 +43,7 @@ struct SettingsView: View {
                     set: { store.setV2AuthorityEnabled($0) }
                 )
             )
-            .font(.callout.weight(.semibold))
+            .font(NothingTheme.body.weight(.semibold))
             .disabled(v2Control.isDisablingAuthority)
 
             v2ControlSection
@@ -51,15 +51,15 @@ struct SettingsView: View {
             Text(
                 "Legacy broker remains authoritative by default. Enabling V2 only opts in this app; authority starts after a successful control-lease acquisition."
             )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(NothingTheme.small)
+            .foregroundStyle(NothingTheme.inkDim)
 
             LabeledTextField(title: "Server URL", text: $store.serverURL)
 
             HStack(spacing: 8) {
                 Text("Local token")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small.weight(.semibold))
+                    .foregroundStyle(NothingTheme.inkDim)
                     .frame(width: 92, alignment: .leading)
                 SecureField("Bearer token", text: $store.localToken)
                     .textFieldStyle(.roundedBorder)
@@ -97,7 +97,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             LabeledContent("V2 control") {
                 Text(v2Control.authorityState.displayName)
-                    .font(.caption.weight(.semibold))
+                    .font(NothingTheme.small.weight(.semibold))
                     .foregroundStyle(v2Control.authorityState.allowsMutation ? .orange : .secondary)
             }
 
@@ -135,7 +135,7 @@ struct SettingsView: View {
 
                 if v2Control.isDisablingAuthority {
                     Text("Waiting for the Agent to finish draining before returning to the legacy broker.")
-                        .font(.caption)
+                        .font(NothingTheme.small)
                         .foregroundStyle(.orange)
                 } else if !v2Control.hasLiveAgentSession {
                     Text(
@@ -143,20 +143,20 @@ struct SettingsView: View {
                             ? "Agent session/socket is offline. Authority controls are locked until a live status response arrives."
                             : "Agent session is not configured on this Mac."
                     )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
                 }
 
                 if let projection = v2Control.statusProjection {
                     Text(projection.readyToClaim ? "Agent ready to claim." : "Agent is not claim-ready.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.small)
+                        .foregroundStyle(NothingTheme.inkDim)
                 }
             }
 
             if let error = v2Control.lastError {
                 Text(error)
-                    .font(.caption.monospaced())
+                    .font(NothingTheme.small.monospaced())
                     .foregroundStyle(.red)
                     .textSelection(.enabled)
             }
@@ -178,23 +178,23 @@ struct SettingsView: View {
     private var githubIntakeSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("GitHub Intake", systemImage: "arrow.down.forward.circle")
-                .font(.callout.weight(.semibold))
+                .font(NothingTheme.body.weight(.semibold))
 
             Text(
                 store.snapshot.webhookURL.isEmpty
                     ? "Set a server URL to get the webhook endpoint." : store.snapshot.webhookURL
             )
-            .font(.caption.monospaced())
+            .font(NothingTheme.small.monospaced())
             .textSelection(.enabled)
 
             Text("Events: workflow_job")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small)
+                .foregroundStyle(NothingTheme.inkDim)
 
             HStack(spacing: 8) {
                 Text("Webhook secret")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small.weight(.semibold))
+                    .foregroundStyle(NothingTheme.inkDim)
                     .frame(width: 92, alignment: .leading)
                 SecureField(
                     "Must match CI_SCOPE_GITHUB_WEBHOOK_SECRET on the Worker", text: $store.webhookSecret
@@ -203,8 +203,8 @@ struct SettingsView: View {
             }
 
             Text("Attaching a project auto-creates its repo webhook (if missing) using this secret.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NothingTheme.small)
+                .foregroundStyle(NothingTheme.inkDim)
         }
         .padding(10)
         .background(Color.secondary.opacity(0.055))
@@ -214,15 +214,15 @@ struct SettingsView: View {
     private var gateInstallSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Gate installs", systemImage: "checklist")
-                .font(.callout.weight(.semibold))
+                .font(NothingTheme.body.weight(.semibold))
 
             Toggle("Auto-merge gate PRs when checks pass", isOn: $store.autoMergeGatePRs)
 
             Text(
                 "Enables GitHub auto-merge on PRs this app opens, so gate installs land once their checks pass. Best effort — needs auto-merge allowed on the repo; otherwise the PR stays open for you to merge."
             )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(NothingTheme.small)
+            .foregroundStyle(NothingTheme.inkDim)
         }
         .padding(10)
         .background(Color.secondary.opacity(0.055))
@@ -232,12 +232,12 @@ struct SettingsView: View {
     private var aiReviewSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("AI slop review", systemImage: "sparkles")
-                .font(.callout.weight(.semibold))
+                .font(NothingTheme.body.weight(.semibold))
 
             HStack(spacing: 8) {
                 Text("DeepSeek key")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small.weight(.semibold))
+                    .foregroundStyle(NothingTheme.inkDim)
                     .frame(width: 92, alignment: .leading)
                 SecureField("sk-...", text: $store.deepSeekAPIKey)
                     .textFieldStyle(.roundedBorder)
@@ -246,8 +246,8 @@ struct SettingsView: View {
             Text(
                 "Passed to the agent as DEEPSEEK_API_KEY, so JIT runners can call it for ci-gates' advisory slop-review step. Empty means that step just skips itself — it never blocks a merge either way. Restart the agent after changing this."
             )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(NothingTheme.small)
+            .foregroundStyle(NothingTheme.inkDim)
         }
         .padding(10)
         .background(Color.secondary.opacity(0.055))

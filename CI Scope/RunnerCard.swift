@@ -14,15 +14,15 @@ struct RunnerSummaryTile: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(NothingTheme.small.weight(.semibold))
                     .lineLimit(1)
                 Text(value)
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                 Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.tiny)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -55,8 +55,8 @@ struct RunnerCard: View {
                         RunnerStatePill(state: runner.state, text: runnerStateText)
                     }
                     Text(runner.scope)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.small)
+                        .foregroundStyle(NothingTheme.inkDim)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -65,12 +65,12 @@ struct RunnerCard: View {
 
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(runner.remoteName)
-                        .font(.caption.weight(.semibold))
+                        .font(NothingTheme.small.weight(.semibold))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Text(runner.registeredTo)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.tiny)
+                        .foregroundStyle(NothingTheme.inkDim)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -95,7 +95,7 @@ struct RunnerCard: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 Label("Running now", systemImage: "waveform.path.ecg")
-                    .font(.callout.weight(.semibold))
+                    .font(NothingTheme.body.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
 
                 if runner.activeJobs.isEmpty {
@@ -127,8 +127,8 @@ struct RunnerCard: View {
                 }
                 .padding(.top, 8)
             }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .font(NothingTheme.small.weight(.semibold))
+            .foregroundStyle(NothingTheme.inkDim)
         }
         .padding(12)
         .background(Color(nsColor: .windowBackgroundColor))

@@ -44,7 +44,7 @@ struct ProjectMenuPanel: View {
             ScrollView {
                 LazyVStack(spacing: 2) {
                     if projects.isEmpty {
-                        Text("No projects saved").font(.caption).foregroundStyle(NothingTheme.inkDim).padding(8)
+                        Text("No projects saved").font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).padding(8)
                     }
                     ForEach(projects) { project in
                         ProjectMenuRow(
@@ -72,7 +72,7 @@ struct ProjectMenuPanel: View {
 
             HStack(spacing: 8) {
                 StatusDot(state: footerState)
-                Text(footerText).font(.system(size: 10, design: .monospaced)).foregroundStyle(NothingTheme.inkDim).lineLimit(1)
+                Text(footerText).font(.system(size: 11, design: .monospaced)).foregroundStyle(NothingTheme.inkDim).lineLimit(1)
             }
             .padding(18)
         }

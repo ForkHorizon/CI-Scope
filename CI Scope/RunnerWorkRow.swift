@@ -13,16 +13,16 @@ struct RunnerWorkRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(item.repositorySlug)
-                        .font(.caption.weight(.semibold))
+                        .font(NothingTheme.small.weight(.semibold))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Text(item.status)
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.tiny.monospacedDigit())
+                        .foregroundStyle(NothingTheme.inkDim)
                         .lineLimit(1)
                     if let assemblerTitle = item.assemblerTitle {
                         Text(assemblerTitle)
-                            .font(.caption2.weight(.semibold))
+                            .font(NothingTheme.tiny.weight(.semibold))
                             .lineLimit(1)
                             .truncationMode(.tail)
                             .padding(.horizontal, 5)
@@ -35,21 +35,21 @@ struct RunnerWorkRow: View {
                 }
 
                 Text("\(item.workflowName) · \(item.jobName)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 Text("\(item.title) · \(item.headBranch)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.tiny)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 if let progress = item.progress {
                     Text(progress.caption)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(NothingTheme.tiny)
+                        .foregroundStyle(NothingTheme.inkDim)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -84,7 +84,7 @@ struct RunnerLabelStrip: View {
             HStack(spacing: 5) {
                 ForEach(labels.prefix(8), id: \.self) { label in
                     Text(label)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .lineLimit(1)
                         .padding(.horizontal, 6)
                         .frame(height: 18)
@@ -94,8 +94,8 @@ struct RunnerLabelStrip: View {
 
                 if labels.count > 8 {
                     Text("+\(labels.count - 8)")
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(NothingTheme.inkDim)
                 }
             }
         }

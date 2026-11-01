@@ -13,13 +13,13 @@ struct JobNotificationJobRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(job.repositorySlug)
-                    .font(.caption.weight(.semibold))
+                    .font(NothingTheme.small.weight(.semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 Text("\(job.workflowName) · \(job.jobName)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.tiny)
+                    .foregroundStyle(NothingTheme.inkDim)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }

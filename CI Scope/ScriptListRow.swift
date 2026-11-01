@@ -25,30 +25,30 @@ struct ScriptListRow: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
                             Text(script.title)
-                                .font(.callout.weight(.semibold))
+                                .font(NothingTheme.body.weight(.semibold))
                                 .lineLimit(1)
                             Spacer(minLength: 8)
                             Text(script.files.count == 1 ? "1 file" : "\(script.files.count) files")
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                                .font(NothingTheme.tiny.monospacedDigit())
+                                .foregroundStyle(NothingTheme.inkDim)
                         }
 
                         Text(script.summary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(NothingTheme.small)
+                            .foregroundStyle(NothingTheme.inkDim)
                             .lineLimit(2)
 
                         if !script.detail.trimmed.isEmpty {
                             Text(script.detail)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .font(NothingTheme.tiny)
+                                .foregroundStyle(NothingTheme.inkDim)
                                 .lineLimit(2)
                         }
                     }
 
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(NothingTheme.inkDim)
                         .frame(width: 16, height: 24)
                 }
                 .padding(10)

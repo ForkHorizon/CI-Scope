@@ -17,8 +17,8 @@ struct AddProjectSheet: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Git repository URL")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.small.weight(.semibold))
+                    .foregroundStyle(NothingTheme.inkDim)
                 TextField("git@github.com:owner/repo.git", text: $input)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(submit)
@@ -26,7 +26,7 @@ struct AddProjectSheet: View {
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.caption)
+                    .font(NothingTheme.small)
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -67,21 +67,21 @@ struct EmptyProjectDashboard: View {
 
             Image(systemName: "folder.badge.plus")
                 .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(NothingTheme.inkDim)
 
             VStack(spacing: 4) {
                 Text("No project selected")
                     .font(.headline)
                 Text("Add a repository to monitor its CI.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .font(NothingTheme.body)
+                    .foregroundStyle(NothingTheme.inkDim)
             }
 
             Button {
                 onAddProject()
             } label: {
                 Label("Add Project", systemImage: "plus")
-                    .font(.callout.weight(.semibold))
+                    .font(NothingTheme.body.weight(.semibold))
                     .padding(.horizontal, 12)
                     .frame(height: 32)
                     .background(Color.accentColor.opacity(0.16))

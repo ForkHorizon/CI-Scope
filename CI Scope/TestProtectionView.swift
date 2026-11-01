@@ -15,7 +15,7 @@ struct TestProtectionView: View {
                     detail
                 }
                 if let message = model.message {
-                    Text(message).font(.caption).foregroundStyle(.orange).textSelection(.enabled)
+                    Text(message).font(NothingTheme.small).foregroundStyle(.orange).textSelection(.enabled)
                 }
                 historySection
             }
@@ -50,7 +50,7 @@ struct TestProtectionView: View {
             Text("Alerts").nothingCaption().padding(.bottom, 2)
             if model.openAlerts.isEmpty && !model.isLoading {
                 Text("No open alerts. Weakened tests in accepted commits show up here.")
-                    .font(.caption).foregroundStyle(NothingTheme.inkDim)
+                    .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
             }
             ForEach(model.openAlerts) { alert in
                 TestAlertRow(alert: alert, isSelected: alert.id == model.selected?.id)
@@ -89,11 +89,11 @@ struct TestProtectionView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("History").nothingCaption()
             if model.history.isEmpty {
-                Text("Decisions you make are recorded here.").font(.caption).foregroundStyle(.secondary)
+                Text("Decisions you make are recorded here.").font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
             }
             ForEach(model.history.prefix(30), id: \.decidedAt) { item in
                 Text(Self.summary(of: item))
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).lineLimit(1).truncationMode(.middle)
             }
         }
         .padding(14)
@@ -125,7 +125,7 @@ struct TestAlertRow: View {
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                 Text(alert.title).font(.system(size: 11, design: .monospaced)).foregroundStyle(NothingTheme.inkDim)
                 Text("\(alert.findings.first?.path ?? "") · \(alert.shortSHA)")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(NothingTheme.inkDim.opacity(0.7))
+                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(NothingTheme.inkDim.opacity(0.7))
                     .lineLimit(1).truncationMode(.middle)
             }
             Spacer(minLength: 0)
@@ -158,7 +158,7 @@ struct TestAlertCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(white: 0.04), in: RoundedRectangle(cornerRadius: 10))
             Text("Approving applies to this commit only; a new push raises the alert again.")
-                .font(.system(size: 10, design: .monospaced)).foregroundStyle(NothingTheme.inkDim)
+                .font(.system(size: 11, design: .monospaced)).foregroundStyle(NothingTheme.inkDim)
             HStack(spacing: 8) {
                 Button("Approve", systemImage: "touchid", action: actions.approve).buttonStyle(.pillPrimary)
                 Button("Revert", systemImage: "arrow.uturn.backward", action: actions.revert).buttonStyle(.pillDanger)

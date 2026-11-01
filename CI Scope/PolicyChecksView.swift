@@ -15,7 +15,7 @@ struct PolicyChecksView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Checks", systemImage: "checklist")
-                .font(.callout.weight(.semibold))
+                .font(NothingTheme.body.weight(.semibold))
             HStack {
                 Picker("Project", selection: $projectID) {
                     ForEach(projects) { Text($0.repositorySlug).tag(Optional($0.id)) }
@@ -40,7 +40,7 @@ struct PolicyChecksView: View {
     @ViewBuilder
     private var content: some View {
         if let error = viewModel.loadError {
-            Text(error).font(.caption).foregroundStyle(.secondary)
+            Text(error).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
         } else if viewModel.original == nil {
             ProgressView().controlSize(.small)
         } else {
@@ -52,7 +52,7 @@ struct PolicyChecksView: View {
                         set: { viewModel.toggle(id, on: $0) }
                     )
                 )
-                .font(.caption.monospaced())
+                .font(NothingTheme.small.monospaced())
                 .disabled(viewModel.isBusy)
             }
         }
@@ -62,7 +62,7 @@ struct PolicyChecksView: View {
         VStack(alignment: .leading, spacing: 6) {
             if viewModel.hasChanges {
                 Text("Pending: \(viewModel.summary)")
-                    .font(.caption.weight(.semibold))
+                    .font(NothingTheme.small.weight(.semibold))
             }
             HStack {
                 Button("Apply with Touch ID") {
@@ -75,7 +75,7 @@ struct PolicyChecksView: View {
                 if viewModel.isBusy { ProgressView().controlSize(.small) }
             }
             if let message = viewModel.message {
-                Text(message).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                Text(message).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).textSelection(.enabled)
             }
         }
     }

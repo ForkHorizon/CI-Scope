@@ -41,7 +41,7 @@ extension ContentView {
                     }
                 }
             )
-            .padding(14)
+
         case .policy:
             PolicyAdminView(admin: policyAdmin, checks: policyChecks, projects: projectStore.projects)
         case .tests:
@@ -153,7 +153,7 @@ extension ContentView {
             StatusDot(state: headerState)
             if let refreshedAt {
                 Text(refreshedAt.formatted(date: .omitted, time: .standard))
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(NothingTheme.inkDim)
             }
 
