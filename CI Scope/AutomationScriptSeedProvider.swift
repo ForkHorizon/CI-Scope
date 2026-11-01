@@ -6,6 +6,7 @@ enum AutomationScriptSeedProvider {
         "code-linter", "swift-quality-gate", "swift-compile-gate",
         "web-quality-gate", "python-quality-gate", "go-quality-gate",
         "unity-quality-gate",
+        "agent-toolkit",
     ]
 
     static func loadSeed(_ id: String) throws -> AutomationScript {
@@ -29,6 +30,8 @@ enum AutomationScriptSeedProvider {
             return fallbackGoQualityGateSeed()
         case "unity-quality-gate":
             return fallbackUnityQualityGateSeed()
+        case "agent-toolkit":
+            return fallbackAgentToolkitSeed()
         default:
             throw AutomationScriptError.missingSeed(id)
         }
