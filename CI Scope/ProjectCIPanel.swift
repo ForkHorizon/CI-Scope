@@ -16,147 +16,94 @@ struct ProjectCIPanel: View {
     @State var codeLinterStatus: CodeLinterWorkflowStatus = .unavailable
 
     var body: some View {
-        PanelShell(title: "GitHub CI") {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 10) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 7)
-                                .fill(NothingTheme.ink.opacity(0.14))
-                            Image(systemName: "folder.badge.gearshape")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(NothingTheme.ink)
-                        }
-                        .frame(width: 36, height: 36)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                HStack(spacing: 8) {
+                    Button("Copy SSH", action: copySSHURL).buttonStyle(.pill).help("Copy SSH URL")
+                    Button("GitHub", action: openGitHubRepository).buttonStyle(.pill)
+                        .help("Open GitHub repository")
+                    Spacer()
+                    if isLoading { ProgressView().controlSize(.small) }
+                }
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(project.title)
-                                .font(.system(size: 17, weight: .semibold))
-                                .lineLimit(1)
-                            Text(project.repositorySlug)
-                                .font(NothingTheme.small)
-                                .foregroundStyle(NothingTheme.inkDim)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-
-                        Spacer()
-
-                        HStack(spacing: 6) {
-                            Button {
-                                copySSHURL()
-                            } label: {
-                                Label("Copy SSH", systemImage: "doc.on.doc")
-                                    .font(NothingTheme.small.weight(.semibold))
-                                    .padding(.horizontal, 8)
-                                    .frame(height: 28)
-                                    .background(Color.secondary.opacity(0.08))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                            }
-                            .buttonStyle(.plain)
-                            .help("Copy SSH URL")
-
-                            Button {
-                                openGitHubRepository()
-                            } label: {
-                                Label("GitHub", systemImage: "arrow.up.right.square")
-                                    .font(NothingTheme.small.weight(.semibold))
-                                    .padding(.horizontal, 8)
-                                    .frame(height: 28)
-                                    .background(Color.secondary.opacity(0.08))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                            }
-                            .buttonStyle(.plain)
-                            .help("Open GitHub repository")
-                        }
-
-                        if isLoading {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            StatusDot(state: snapshot?.state ?? .unknown)
-                        }
+                LazyVGrid(columns: projectInfoColumns, spacing: 0) {
+                    LimitedStatusRow(
+                        title: "Repository", value: project.remoteURL, state: .online)
+                    LimitedStatusRow(
+                        title: "GitHub Actions", value: ciSummary,
+                        state: snapshot?.state ?? .unknown)
+                    LimitedStatusRow(
+                        title: "CI mode", value: ciModeSummary,
+                        state: ciModeState)
+                    LimitedStatusRow(
+                        title: "MacBook runner", value: localRunnerSummary,
+                        state: snapshot?.localRunner.state ?? .unknown)
+                    runnerAccessRow
+                    if V2ClientFeature.statusAdapterEnabled() {
+                        v2StatusRow
                     }
-
-                    LazyVGrid(columns: projectInfoColumns, spacing: 8) {
-                        LimitedStatusRow(
-                            title: "Repository", value: project.remoteURL, icon: "link", state: .online)
-                        LimitedStatusRow(
-                            title: "GitHub Actions", value: ciSummary, icon: "checkmark.seal",
-                            state: snapshot?.state ?? .unknown)
-                        LimitedStatusRow(
-                            title: "CI mode", value: ciModeSummary, icon: "square.stack.3d.up",
-                            state: ciModeState)
-                        LimitedStatusRow(
-                            title: "MacBook runner", value: localRunnerSummary, icon: "desktopcomputer",
-                            state: snapshot?.localRunner.state ?? .unknown)
-                        runnerAccessRow
-                        if V2ClientFeature.statusAdapterEnabled() {
-                            v2StatusRow
-                        }
-                        if v2Control.isV2ControlVisible {
-                            v2ControlRow
-                        }
-                    }
-
-                    HStack {
-                        RecommendedGatesButton(
-                            project: project,
-                            scripts: scripts,
-                            isInstalled: { $0.matchingWorkflow(in: snapshot) != nil },
-                            installViewModel: installViewModel
-                        )
-                        Spacer()
-                    }
-
-                    if let script = codeLinterScript, let workflow = script.matchingWorkflow(in: snapshot) {
-                        codeLinterStatusRow(script: script, workflow: workflow)
-                    }
-
-                    if let unifiedChecks = snapshot?.unifiedChecks {
-                        UnifiedChecksSection(snapshot: unifiedChecks)
-                    }
-
-                    if let localCheck = snapshot?.localCheck {
-                        LocalCheckSection(result: localCheck, runs: snapshot?.runs ?? [])
-                    }
-
-                    if let error = snapshot?.unifiedChecksError {
-                        ErrorBox(text: "Unified checks: \(error)")
-                    }
-
-                    if let error = snapshot?.error {
-                        ErrorBox(text: error)
-                    }
-
-                    if !liveJobs.isEmpty {
-                        ProjectLiveWorkSection(items: liveJobs)
-                    }
-
-                    if !installedScripts.isEmpty {
-                        ProjectScriptRemovalList(
-                            installedScripts: installedScripts,
-                            snapshot: removalSnapshot,
-                            onRemove: onRemoveScript
-                        )
-                    }
-
-                    if !unmanagedWorkflows.isEmpty {
-                        ProjectWorkflowList(workflows: unmanagedWorkflows)
-                    }
-
-                    if let snapshot, !snapshot.runs.isEmpty {
-                        ProjectRunList(runs: snapshot.runs)
-                    }
-
-                    if snapshot?.error == nil, snapshot?.workflows.isEmpty != false,
-                        snapshot?.runs.isEmpty != false, !isLoading
-                    {
-                        EmptyState(icon: "icloud.slash", text: "No actions available")
+                    if v2Control.isV2ControlVisible {
+                        v2ControlRow
                     }
                 }
-                .padding(12)
+
+                HStack {
+                    RecommendedGatesButton(
+                        project: project,
+                        scripts: scripts,
+                        isInstalled: { $0.matchingWorkflow(in: snapshot) != nil },
+                        installViewModel: installViewModel
+                    )
+                    Spacer()
+                }
+
+                if let script = codeLinterScript, let workflow = script.matchingWorkflow(in: snapshot) {
+                    codeLinterStatusRow(script: script, workflow: workflow)
+                }
+
+                if let unifiedChecks = snapshot?.unifiedChecks {
+                    UnifiedChecksSection(snapshot: unifiedChecks)
+                }
+
+                if let localCheck = snapshot?.localCheck {
+                    LocalCheckSection(result: localCheck, runs: snapshot?.runs ?? [])
+                }
+
+                if let error = snapshot?.unifiedChecksError {
+                    ErrorBox(text: "Unified checks: \(error)")
+                }
+
+                if let error = snapshot?.error {
+                    ErrorBox(text: error)
+                }
+
+                if !liveJobs.isEmpty {
+                    ProjectLiveWorkSection(items: liveJobs)
+                }
+
+                if !installedScripts.isEmpty {
+                    ProjectScriptRemovalList(
+                        installedScripts: installedScripts,
+                        snapshot: removalSnapshot,
+                        onRemove: onRemoveScript
+                    )
+                }
+
+                if !unmanagedWorkflows.isEmpty {
+                    ProjectWorkflowList(workflows: unmanagedWorkflows)
+                }
+
+                if let snapshot, !snapshot.runs.isEmpty {
+                    ProjectRunList(runs: snapshot.runs)
+                }
+
+                if snapshot?.error == nil, snapshot?.workflows.isEmpty != false,
+                    snapshot?.runs.isEmpty != false, !isLoading
+                {
+                    EmptyState(icon: "icloud.slash", text: "No actions available")
+                }
             }
+            .padding(22)
         }
         .task(id: codeLinterWorkflowPath) { await refreshCodeLinterStatus() }
     }
@@ -227,8 +174,8 @@ struct ProjectCIPanel: View {
 
     var projectInfoColumns: [GridItem] {
         [
-            GridItem(.flexible(), spacing: 8),
-            GridItem(.flexible(), spacing: 8),
+            GridItem(.flexible(), spacing: 24),
+            GridItem(.flexible(), spacing: 24),
         ]
     }
 

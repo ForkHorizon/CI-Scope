@@ -29,10 +29,7 @@ struct RunRow: View {
                 .lineLimit(1)
             }
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .nothingRow()
     }
 
     var state: ServiceState {
@@ -43,10 +40,10 @@ struct RunRow: View {
 
     var color: Color {
         switch state {
-        case .online: .green
-        case .warning: .orange
-        case .offline: .red
-        case .unknown: .secondary
+        case .online: NothingTheme.green
+        case .warning: NothingTheme.amber
+        case .offline: NothingTheme.red
+        case .unknown: NothingTheme.inkDim
         }
     }
 

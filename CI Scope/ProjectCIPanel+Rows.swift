@@ -3,11 +3,6 @@ import SwiftUI
 extension ProjectCIPanel {
     var runnerAccessRow: some View {
         HStack(spacing: 8) {
-            Image(systemName: "point.3.filled.connected.trianglepath.dotted")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(NothingTheme.inkDim)
-                .frame(width: 18)
-
             VStack(alignment: .leading, spacing: 2) {
                 Text("MacBook runner")
                     .font(NothingTheme.body.weight(.semibold))
@@ -24,16 +19,10 @@ extension ProjectCIPanel {
                 Button("Attach") {
                     onAttachToRunner()
                 }
-                .font(NothingTheme.small.weight(.semibold))
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(.pill)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .nothingRow()
     }
 
     var v2StatusRow: some View {
@@ -47,7 +36,7 @@ extension ProjectCIPanel {
             value = snapshot?.v2StatusError ?? "Not configured"
         }
         return LimitedStatusRow(
-            title: "V2 Agent", value: value, icon: "arrow.triangle.2.circlepath", state: state)
+            title: "V2 Agent", value: value, state: state)
     }
 
     var v2ControlRow: some View {
@@ -57,7 +46,6 @@ extension ProjectCIPanel {
                 ? "Draining before fallback"
                 : (v2Control.hasLiveAgentSession
                     ? v2Control.authorityState.displayName : "Agent session offline"),
-            icon: "lock.shield",
             state: v2Control.authorityState.allowsMutation && v2Control.hasLiveAgentSession
                 ? .online : .warning
         )
@@ -69,9 +57,7 @@ struct ProjectLiveWorkSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Label("Running now", systemImage: "waveform.path.ecg")
-                .font(NothingTheme.body.weight(.semibold))
-                .foregroundStyle(NothingTheme.ink)
+            Text("Running now").nothingCaption()
 
             ForEach(items) { item in
                 LiveWorkCard(item: item, compact: true)
@@ -86,12 +72,13 @@ struct UnifiedChecksSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Label("CI Scope / Checks", systemImage: "checkmark.seal")
-                    .font(NothingTheme.body.weight(.semibold))
+                Text("CI Scope / Checks").nothingCaption()
                 Spacer()
                 if let run = snapshot.run, let url = URL(string: run.url) {
                     Link("Open run", destination: url)
                         .font(NothingTheme.small.weight(.semibold))
+                        .foregroundStyle(NothingTheme.ink)
+                        .underline()
                 }
             }
 
@@ -136,10 +123,7 @@ struct UnifiedChecksSection: View {
                 .font(NothingTheme.small.monospacedDigit())
                 .foregroundStyle(NothingTheme.inkDim)
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .nothingRow()
     }
 
     private func state(status: String, required: Bool?) -> ServiceState {

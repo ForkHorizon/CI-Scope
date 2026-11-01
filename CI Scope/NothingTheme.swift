@@ -123,6 +123,14 @@ struct NothingCard: ViewModifier {
     }
 }
 
+/// Flat list row: vertical padding and a hairline below instead of a tinted card.
+extension View {
+    func nothingRow() -> some View {
+        padding(.vertical, 9)
+            .overlay(alignment: .bottom) { Rectangle().fill(NothingTheme.line).frame(height: 1) }
+    }
+}
+
 extension View {
     func nothingCard(radius: CGFloat = 14, highlighted: Bool = false) -> some View {
         modifier(NothingCard(radius: radius, highlighted: highlighted))

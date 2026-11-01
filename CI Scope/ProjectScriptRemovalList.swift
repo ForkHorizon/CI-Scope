@@ -7,9 +7,7 @@ struct ProjectScriptRemovalList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("Installed Scripts")
-                .font(NothingTheme.body.weight(.semibold))
-                .foregroundStyle(NothingTheme.inkDim)
+            Text("Installed Scripts").nothingCaption()
 
             ForEach(installedScripts) { installedScript in
                 ProjectScriptRemovalRow(
@@ -45,22 +43,16 @@ struct ProjectScriptRemovalRow: View {
 
                 Spacer()
 
-                Button(role: .destructive, action: onRemove) {
-                    Label(snapshot.isInstalling ? "Removing" : "Remove", systemImage: "trash")
-                        .font(NothingTheme.small.weight(.semibold))
-                }
-                .buttonStyle(.bordered)
-                .disabled(snapshot.isInstalling)
+                Button(snapshot.isInstalling ? "Removing" : "Remove", action: onRemove)
+                    .buttonStyle(.pillDanger)
+                    .disabled(snapshot.isInstalling)
             }
 
             if snapshot != .idle {
                 AutomationScriptInstallStatusBox(status: snapshot)
             }
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 8)
-        .background(Color.secondary.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .nothingRow()
     }
 
     private var rowState: ServiceState {
