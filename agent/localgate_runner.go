@@ -9,7 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -24,9 +26,30 @@ const (
 // commandRunner runs one command and returns its combined output; swapped out in tests.
 type commandRunner func(ctx context.Context, dir, name string, args ...string) ([]byte, error)
 
+// gateEnvironment is everything a checked command gets: it runs code from a pull request, so it never inherits
+// the agent's own environment (control plane settings, credential IDs and the like).
+func gateEnvironment() []string {
+	return []string{
+		"PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+		"HOME=" + os.Getenv("HOME"),
+		"LANG=en_US.UTF-8",
+		"GIT_TERMINAL_PROMPT=0",
+		// A checked-out pull request must not get to run its own git hooks inside the agent.
+		"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=core.hooksPath", "GIT_CONFIG_VALUE_0=/dev/null",
+	}
+}
+
+// gateKillGrace is how long a cancelled command gets before its output pipes are abandoned.
+const gateKillGrace = 5 * time.Second
+
 func execCommand(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, name, args...)
 	command.Dir = dir
+	command.Env = gateEnvironment()
+	// Its own process group, so cancelling stops the children too (a test runner, a build, a stray sleep).
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	command.Cancel = func() error { return syscall.Kill(-command.Process.Pid, syscall.SIGKILL) }
+	command.WaitDelay = gateKillGrace
 	var output bytes.Buffer
 	command.Stdout, command.Stderr = &output, &output
 	err := command.Run()
@@ -55,8 +78,13 @@ func (r *GateScriptRunner) Run(ctx context.Context, job LocalGateJob) (LocalGate
 		return LocalGateReport{}, err
 	}
 	script := filepath.Join(r.GatesRoot, "scripts", "ci_scope_cli.py")
-	output, runErr := r.run(ctx, dir, "python3", script, "--event", "pull_request", "--tier", localGateTier,
-		"--base", job.BaseSHA, "--head", job.HeadSHA, "--repository", job.Repository, "--root", dir, "--json")
+	arguments := []string{script, "--event", "pull_request", "--tier", localGateTier,
+		"--base", job.BaseSHA, "--head", job.HeadSHA, "--repository", job.Repository, "--root", dir, "--json"}
+	if job.ConfigVersion > 0 {
+		// Judge the pull request by the config version fixed when it was queued, not by whatever it is now.
+		arguments = append(arguments, "--config-version", strconv.Itoa(job.ConfigVersion))
+	}
+	output, runErr := r.run(ctx, dir, "python3", arguments...)
 	return r.report(output, runErr), nil
 }
 
