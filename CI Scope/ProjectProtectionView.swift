@@ -23,7 +23,12 @@ struct ProjectProtectionView: View {
             }
         }
         .task {
-            await events.refresh()
+            while !Task.isCancelled {
+                await events.refresh()
+                try? await Task.sleep(for: .seconds(60))
+            }
+        }
+        .task {
             await model.refreshHooks()
             if selected.isEmpty, let first = projects.first { selected = first.repositorySlug }
         }

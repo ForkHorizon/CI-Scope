@@ -12,7 +12,8 @@ final class ProjectProtectionViewModel: ObservableObject {
 
     var client = ProjectConfigClient()
     var installer = GitHooksInstaller(
-        gatesRoot: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ci-scope/gates"))
+        gatesRoot: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ci-scope/gates"),
+        requireCleanCheckout: true)
     var readToken: () async throws -> String = { try await PolicyAuthorizer.configReadToken() }
     var adminLogin: (String) async throws -> (user: String, password: String) = { reason in
         let password = try await PolicyAuthorizer.adminPassword(reason: reason)
