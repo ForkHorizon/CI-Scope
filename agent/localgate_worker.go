@@ -4,6 +4,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync/atomic"
 	"time"
 )
@@ -107,7 +108,7 @@ func (w *LocalGateWorker) finalReport(report LocalGateReport, runErr error, canc
 	case cancelled:
 		return LocalGateReport{Status: "cancelled", Summary: "CI Scope: CANCELLED — the run was stopped before it finished", Checks: []LocalGateCheck{}, CompletedAt: w.now().UnixMilli()}
 	case runErr != nil:
-		return LocalGateReport{Status: "failed", Summary: fmt.Sprintf("CI Scope: FAILED — %s", clip(runErr.Error(), 300)), Checks: []LocalGateCheck{}, CompletedAt: w.now().UnixMilli()}
+		return LocalGateReport{Status: "failed", Summary: fmt.Sprintf("CI Scope: FAILED — %s", clip(runErr.Error(), localGateMaxSummary-len("CI Scope: FAILED — "))), Checks: []LocalGateCheck{}, CompletedAt: w.now().UnixMilli()}
 	}
 	return report
 }
@@ -126,9 +127,12 @@ func (w *LocalGateWorker) Loop(ctx context.Context) {
 		wait := time.Duration(0)
 		switch {
 		case err != nil:
+			log.Printf("local gate worker: %v", err)
 			wait = localGateRetryWait
 		case !found:
 			wait = localGateIdleWait
+		default:
+			log.Printf("local gate worker: finished a job")
 		}
 		select {
 		case <-ctx.Done():
