@@ -29,9 +29,11 @@ type commandRunner func(ctx context.Context, dir, name string, args ...string) (
 // gateEnvironment is everything a checked command gets: it runs code from a pull request, so it never inherits
 // the agent's own environment (control plane settings, credential IDs and the like).
 func gateEnvironment() []string {
+	home := os.Getenv("HOME")
 	return []string{
-		"PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
-		"HOME=" + os.Getenv("HOME"),
+		// Where the toolchains the gates need live: Homebrew, user-level node and rustup/cargo, then the system.
+		"PATH=" + strings.Join([]string{home + "/.cargo/bin", home + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"}, ":"),
+		"HOME=" + home,
 		"LANG=en_US.UTF-8",
 		"GIT_TERMINAL_PROMPT=0",
 		// A checked-out pull request must not get to run its own git hooks inside the agent.
