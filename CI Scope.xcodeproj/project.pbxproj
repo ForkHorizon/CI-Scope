@@ -16,6 +16,8 @@
 		B7A1D0C2B3F44E5A8C7D6C01 /* LocalCheckResultXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */; };
 		C1A1D0C2B3F44E5A8C7D6D01 /* TestProtectionDetectorXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A1D0C2B3F44E5A8C7D6D02 /* TestProtectionDetectorXCTest.swift */; };
 		D1A1D0C2B3F44E5A8C7D6E01 /* ShellClientOutputXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A1D0C2B3F44E5A8C7D6E02 /* ShellClientOutputXCTest.swift */; };
+		A1B2C3D4E5F60718293A4B02 /* ProjectConfigXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B01 /* ProjectConfigXCTest.swift */; };
+		A1B2C3D4E5F60718293A4B04 /* GitHooksInstallerXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B03 /* GitHooksInstallerXCTest.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,6 +42,8 @@
 		B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCheckResultXCTest.swift; sourceTree = "<group>"; };
 		C1A1D0C2B3F44E5A8C7D6D02 /* TestProtectionDetectorXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestProtectionDetectorXCTest.swift; sourceTree = "<group>"; };
 		D1A1D0C2B3F44E5A8C7D6E02 /* ShellClientOutputXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellClientOutputXCTest.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B01 /* ProjectConfigXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectConfigXCTest.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B03 /* GitHooksInstallerXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHooksInstallerXCTest.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -72,6 +76,8 @@
 			isa = PBXGroup;
 			children = (
 				405A8EFF2DD793DF7EE4E3A0 /* PolicyAdminXCTest.swift */,
+				A1B2C3D4E5F60718293A4B03 /* GitHooksInstallerXCTest.swift */,
+				A1B2C3D4E5F60718293A4B01 /* ProjectConfigXCTest.swift */,
 				42D670256517441C9CC91511 /* V2ClientXCTest.swift */,
 				D1A1D0C2B3F44E5A8C7D6E02 /* ShellClientOutputXCTest.swift */,
 				C1A1D0C2B3F44E5A8C7D6D02 /* TestProtectionDetectorXCTest.swift */,
@@ -207,6 +213,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				462A8A7274B7089B5EB1887F /* PolicyAdminXCTest.swift in Sources */,
+				A1B2C3D4E5F60718293A4B04 /* GitHooksInstallerXCTest.swift in Sources */,
+				A1B2C3D4E5F60718293A4B02 /* ProjectConfigXCTest.swift in Sources */,
 				ADD25A823A8144A38444AE1A /* V2ClientXCTest.swift in Sources */,
 				D1A1D0C2B3F44E5A8C7D6E01 /* ShellClientOutputXCTest.swift in Sources */,
 				C1A1D0C2B3F44E5A8C7D6D01 /* TestProtectionDetectorXCTest.swift in Sources */,
