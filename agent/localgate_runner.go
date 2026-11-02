@@ -32,7 +32,7 @@ func gateEnvironment() []string {
 	home := os.Getenv("HOME")
 	return []string{
 		// Where the toolchains the gates need live: Homebrew, user-level node and rustup/cargo, then the system.
-		"PATH=" + strings.Join([]string{home + "/.cargo/bin", home + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"}, ":"),
+		"PATH=" + strings.Join([]string{home + "/.cargo/bin", home + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"}, ":"),
 		"HOME=" + home,
 		"LANG=en_US.UTF-8",
 		"GIT_TERMINAL_PROMPT=0",
