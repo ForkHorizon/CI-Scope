@@ -22,7 +22,9 @@ final class ProjectApprovalXCTest: XCTestCase {
         nonisolated(unsafe) var statuses = ["pending", "approved"]
         StubURLProtocol.handler = { request in
             let path = request.url?.path ?? ""
-            if path.hasSuffix("/approvals/request") { return (200, Data("{\"id\":\"abc\",\"path\":\"/api/ci/v2/approvals/page?id=abc\"}".utf8)) }
+            if path.hasSuffix("/approvals/request") {
+                return (200, Data("{\"id\":\"abc\",\"path\":\"/api/ci/v2/approvals/page?id=abc\"}".utf8))
+            }
             if path.hasSuffix("/approvals/status") { return (200, Data("{\"state\":\"\(statuses.removeFirst())\"}".utf8)) }
             let body = (try? JSONSerialization.jsonObject(with: StubURLProtocol.lastBody ?? Data()) as? [String: Any]) ?? [:]
             putBodies.append(body)
