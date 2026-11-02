@@ -27,6 +27,11 @@ enum PolicyAuthorizer {
         try await serverValue("CI_SCOPE_POLICY_READ_TOKEN")
     }
 
+    /// Read-only token for the project config and security event routes; needs no Touch ID.
+    static func configReadToken() async throws -> String {
+        try await serverValue("CI_SCOPE_CONFIG_READ_TOKEN")
+    }
+
     /// Prompts for Touch ID, then returns the admin password.
     static func adminPassword(reason: String) async throws -> String {
         let context = LAContext()
