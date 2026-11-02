@@ -6,7 +6,7 @@ This workspace spans three repositories:
 - Web: `/Users/daliys/Daliys/Web/CI-Scope-Web`
 - Gates: `/Users/daliys/Daliys/ci-gates`
 
-> **Current state (2026-11):** Cloudflare Worker/D1 was decommissioned on 2026-09-14. The only live runtime is the
+> **Cloudflare is decommissioned.** The only live runtime is the
 > VPS (`https://ci.forkhorizon.com`). The Cloudflare sections below are history; do not deploy to Cloudflare and do
 > not treat it as a rollback path. GitHub App side effects are on in production; do not start the macOS Agent against
 > the VPS or change App side effects outside an explicitly requested canary window.
@@ -45,7 +45,7 @@ are provisioned in macOS Keychain by
 The Web repository deploy helper streams those Keychain values to Wrangler;
 no production secret file is used.
 The latest retained production Worker deployment is
-`9e313f68-5056-43e5-8353-2d7b4b91887f`; it was the rollback path until the 2026-09-14
+`9e313f68-5056-43e5-8353-2d7b4b91887f`; it was the rollback path until the
 decommission. The VPS is the live runtime.
 
 The helper validates the local file and required key names without printing
@@ -70,7 +70,7 @@ Read `CI_SCOPE_V2_FULL_LAUNCH_REPORT.md` and the Web handoff before changing
 cross-repository ownership or deployment behavior.
 
 The active migration plan for replacing Cloudflare with the purchased VPS is
-`CI_SCOPE_V2_VPS_MIGRATION_PLAN.md`. Cloudflare is decommissioned (2026-09-14); the
+`CI_SCOPE_V2_VPS_MIGRATION_PLAN.md`. Cloudflare is decommissioned; the
 plan is kept as history.
 
 The first VPS control-plane slice is now deployed at `https://ci.forkhorizon.com`:
@@ -81,7 +81,7 @@ The first VPS control-plane slice is now deployed at `https://ci.forkhorizon.com
 - local V2 state database: `/opt/ci-scope-web/data/ci-scope-v2.db`;
 - authenticated `/api/ci/v2/health` returns `200` with
   `x-ci-scope-runtime-mode: vps`;
-- GitHub App side effects: see the current-state note at the top of this file.
+- GitHub App side effects: see the note at the top of this file.
 - VPS SQLite state is backed up to `/opt/ci-scope-web/backups` by the enabled
   `ci-scope-web-backup.timer`; backup files are mode `600` and pass
   `PRAGMA integrity_check`.
