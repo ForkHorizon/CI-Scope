@@ -53,19 +53,27 @@ struct ProjectConfigClient {
     }
 
     /// The server decides whether a change weakens protection; if it does, the owner signs it on the website first.
+    /// The plain Touch ID claim is still sent for servers that run in the legacy admin-auth approval mode.
     func update(_ config: ProjectConfig, admin: (user: String, password: String)) async throws -> ProjectConfig {
         do {
             return try await put(config, admin: admin, approvalID: nil)
-        } catch ProjectConfigError.server(_, "owner_approval_required") {
-            return try await put(config, admin: admin, approvalID: try await approve(config, admin: admin))
+        } catch let refusal as ProjectConfigError {
+            guard case .server(_, "owner_approval_required") = refusal else { throw refusal }
+            do {
+                return try await put(config, admin: admin, approvalID: try await approve(config, admin: admin))
+            } catch ProjectConfigError.malformedResponse {
+                throw refusal  // the server offers no approval page; report the refusal itself
+            }
         }
     }
 
     private func put(_ config: ProjectConfig, admin: (user: String, password: String), approvalID: String?) async throws -> ProjectConfig {
         var request = jsonRequest(url: configURL(query: []), method: "PUT", admin: admin)
-        var body: [String: Any] = ["config": try JSONSerialization.jsonObject(with: try JSONEncoder().encode(config))]
-        if let approvalID { body["approval"] = ["id": approvalID] }
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        var approval: [String: Any] = ["method": "touch-id", "approvedAt": Int(now().timeIntervalSince1970 * 1000)]
+        if let approvalID { approval["id"] = approvalID }
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "config": try JSONSerialization.jsonObject(with: try JSONEncoder().encode(config)), "approval": approval,
+        ])
         return try decodeConfig(try await send(request))
     }
 

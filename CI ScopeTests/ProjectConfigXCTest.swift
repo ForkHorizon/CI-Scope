@@ -92,7 +92,7 @@ final class ProjectConfigXCTest: XCTestCase {
         XCTAssertEqual(request.httpMethod ?? "GET", "GET")
     }
 
-    func testUpdateSendsAdminLoginAndTheConfigWithoutAnApprovalClaim() async throws {
+    func testUpdateSendsAdminLoginTheConfigAndATouchIDClaim() async throws {
         StubURLProtocol.handler = { [self] _ in (200, reply(serverConfig)) }
         let config = try JSONDecoder().decode(ProjectConfig.self, from: Data(serverConfig.utf8))
         _ = try await client().update(config, admin: (user: "owner", password: "pw"))
@@ -100,7 +100,9 @@ final class ProjectConfigXCTest: XCTestCase {
         XCTAssertEqual(request.httpMethod, "PUT")
         XCTAssertEqual(request.value(forHTTPHeaderField: "authorization"), "Basic " + Data("owner:pw".utf8).base64EncodedString())
         let body = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(StubURLProtocol.lastBody)) as? [String: Any])
-        XCTAssertNil(body["approval"])
+        let approval = try XCTUnwrap(body["approval"] as? [String: Any])
+        XCTAssertEqual(approval["method"] as? String, "touch-id")
+        XCTAssertEqual(approval["approvedAt"] as? Int, 1_700_000_000_000)
         XCTAssertEqual((body["config"] as? [String: Any])?["repository"] as? String, "ForkHorizon/Example")
     }
 

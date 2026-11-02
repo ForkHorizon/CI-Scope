@@ -28,7 +28,7 @@ final class ProjectApprovalXCTest: XCTestCase {
             if path.hasSuffix("/approvals/status") { return (200, Data("{\"state\":\"\(statuses.removeFirst())\"}".utf8)) }
             let body = (try? JSONSerialization.jsonObject(with: StubURLProtocol.lastBody ?? Data()) as? [String: Any]) ?? [:]
             putBodies.append(body)
-            if body["approval"] == nil { return (403, Data("{\"error\":\"owner_approval_required\"}".utf8)) }
+            if (body["approval"] as? [String: Any])?["id"] == nil { return (403, Data("{\"error\":\"owner_approval_required\"}".utf8)) }
             return (200, Data("{\"config\":\(self.config),\"digest\":\"x\"}".utf8))
         }
         nonisolated(unsafe) var opened: URL?
@@ -36,7 +36,7 @@ final class ProjectApprovalXCTest: XCTestCase {
         _ = try await client { opened = $0 }.update(decoded, admin: (user: "owner", password: "pw"))
         XCTAssertEqual(opened?.absoluteString, "https://ci.forkhorizon.com/api/ci/v2/approvals/page?id=abc")
         XCTAssertEqual(putBodies.count, 2)
-        XCTAssertEqual((putBodies.last?["approval"] as? [String: String])?["id"], "abc")
+        XCTAssertEqual((putBodies.last?["approval"] as? [String: Any])?["id"] as? String, "abc")
     }
 
     func testNoTouchIDInTimeLeavesTheConfigUnchanged() async throws {
