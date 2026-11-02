@@ -26,4 +26,6 @@ type LocalGateReport struct {
 	Summary     string           `json:"summary"`
 	Checks      []LocalGateCheck `json:"checks"`
 	CompletedAt int64            `json:"completedAt"`
+	// ConfigVersion is the server config version the run used; zero when unknown.
+	ConfigVersion int `json:"configVersion,omitempty"`
 }

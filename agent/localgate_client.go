@@ -27,9 +27,17 @@ func NewLocalGateClient(server *SchedulerServerClient) (*LocalGateClient, error)
 // Claim asks for the next queued job. The lease ID is chosen by the caller and doubles as the request ID,
 // so a retried claim is idempotent on the server. A nil job means the queue is empty or busy.
 func (c *LocalGateClient) Claim(ctx context.Context, leaseID string) (*LocalGateJob, error) {
-	response, err := c.server.request(ctx, "local-gate-claim."+leaseID, LocalGateClaimPath, map[string]any{
-		"type": "local-gates.claim", "leaseId": leaseID,
-	})
+	return c.ClaimWith(ctx, leaseID, nil)
+}
+
+// ClaimWith is Claim for a device that declares the tools it has (for example xcode), so the server
+// only hands it jobs it can run.
+func (c *LocalGateClient) ClaimWith(ctx context.Context, leaseID string, capabilities []string) (*LocalGateJob, error) {
+	payload := map[string]any{"type": "local-gates.claim", "leaseId": leaseID}
+	if len(capabilities) > 0 {
+		payload["capabilities"] = capabilities
+	}
+	response, err := c.server.request(ctx, "local-gate-claim."+leaseID, LocalGateClaimPath, payload)
 	if err != nil {
 		return nil, err
 	}
