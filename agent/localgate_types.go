@@ -10,6 +10,8 @@ type LocalGateJob struct {
 	BaseSHA     string `json:"baseSha"`
 	HeadBranch  string `json:"headBranch"`
 	BaseBranch  string `json:"baseBranch"`
+	// ConfigVersion is the project config version fixed when the pull request was queued; zero when not set.
+	ConfigVersion int `json:"configVersion,omitempty"`
 }
 
 // LocalGateCheck is the outcome of a single check inside a report.
