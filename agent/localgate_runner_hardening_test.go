@@ -44,3 +44,13 @@ func TestRunnerPassesTheQueuedConfigVersion(t *testing.T) {
 		t.Fatalf("config version not passed: %+v", commands.calls)
 	}
 }
+
+func TestGateEnvironmentFindsUserLevelToolchains(t *testing.T) {
+	t.Setenv("HOME", "/Users/someone")
+	joined := strings.Join(gateEnvironment(), "\n")
+	for _, want := range []string{"/Users/someone/.cargo/bin", "/Users/someone/.local/bin", "/opt/homebrew/bin"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("PATH is missing %s:\n%s", want, joined)
+		}
+	}
+}
