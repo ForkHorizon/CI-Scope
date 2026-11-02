@@ -6,10 +6,13 @@ struct PolicyAdminView: View {
     @ObservedObject var admin: PolicyAdminViewModel
     @ObservedObject var checks: PolicyChecksViewModel
     let projects: [CIProject]
+    @StateObject private var protection = ProjectProtectionViewModel()
+    @StateObject private var securityEvents = SecurityEventMonitor()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
+                ProjectProtectionView(model: protection, events: securityEvents, projects: projects)
                 pendingSection
                 PolicyChecksView(viewModel: checks, admin: admin, projects: projects)
             }

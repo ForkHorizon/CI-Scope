@@ -30,6 +30,7 @@ func startLocalGateWorker(ctx context.Context, server *agent.SchedulerServerClie
 		return nil, err
 	}
 	worker := agent.NewLocalGateWorker(client, agent.NewGateScriptRunner(workspace, root, sha))
+	worker.Capabilities = detectCapabilities(lookPathOnSystem)
 	loopContext, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	go func() {

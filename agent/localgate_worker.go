@@ -31,8 +31,10 @@ type LocalGateWorker struct {
 	Server         localGateServer
 	Runner         LocalGateRunner
 	HeartbeatEvery time.Duration
-	newID          func(prefix string) (string, error)
-	now            func() time.Time
+	// Capabilities are the tools this device has; sent with every claim when set.
+	Capabilities []string
+	newID        func(prefix string) (string, error)
+	now          func() time.Time
 }
 
 func NewLocalGateWorker(server localGateServer, runner LocalGateRunner) *LocalGateWorker {
@@ -45,7 +47,7 @@ func (w *LocalGateWorker) RunOnce(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	job, err := w.Server.Claim(ctx, leaseID)
+	job, err := w.claim(ctx, leaseID)
 	if err != nil || job == nil {
 		return false, err
 	}
@@ -65,6 +67,17 @@ func (w *LocalGateWorker) RunOnce(ctx context.Context) (bool, error) {
 		return true, ctx.Err()
 	}
 	return true, w.complete(ctx, job.ID, leaseID, w.finalReport(report, runErr, cancelled.Load()))
+}
+
+type capabilityClaimer interface {
+	ClaimWith(ctx context.Context, leaseID string, capabilities []string) (*LocalGateJob, error)
+}
+
+func (w *LocalGateWorker) claim(ctx context.Context, leaseID string) (*LocalGateJob, error) {
+	if claimer, ok := w.Server.(capabilityClaimer); ok && len(w.Capabilities) > 0 {
+		return claimer.ClaimWith(ctx, leaseID, w.Capabilities)
+	}
+	return w.Server.Claim(ctx, leaseID)
 }
 
 func (w *LocalGateWorker) heartbeat(ctx context.Context, stop context.CancelFunc, jobID, leaseID string, cancelled *atomic.Bool) {

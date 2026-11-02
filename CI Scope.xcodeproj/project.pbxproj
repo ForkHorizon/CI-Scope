@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		462A8A7274B7089B5EB1887F /* PolicyAdminXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 405A8EFF2DD793DF7EE4E3A0 /* PolicyAdminXCTest.swift */; };
+		A1B2C3D4E5F60718293A4B02 /* ProjectConfigXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B01 /* ProjectConfigXCTest.swift */; };
+		A1B2C3D4E5F60718293A4B04 /* GitHooksInstallerXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B03 /* GitHooksInstallerXCTest.swift */; };
 		A9E1D0C2B3F44E5A8C7D6B01 /* AgentToolkitXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */; };
 		A9E1D0C2B3F44E5A8C7D6B31 /* StackChoiceXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B32 /* StackChoiceXCTest.swift */; };
 		A9E1D0C2B3F44E5A8C7D6B33 /* RecommendedGateStatusXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B34 /* RecommendedGateStatusXCTest.swift */; };
@@ -16,8 +18,8 @@
 		B7A1D0C2B3F44E5A8C7D6C01 /* LocalCheckResultXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */; };
 		C1A1D0C2B3F44E5A8C7D6D01 /* TestProtectionDetectorXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A1D0C2B3F44E5A8C7D6D02 /* TestProtectionDetectorXCTest.swift */; };
 		D1A1D0C2B3F44E5A8C7D6E01 /* ShellClientOutputXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A1D0C2B3F44E5A8C7D6E02 /* ShellClientOutputXCTest.swift */; };
-		A1B2C3D4E5F60718293A4B02 /* ProjectConfigXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B01 /* ProjectConfigXCTest.swift */; };
-		A1B2C3D4E5F60718293A4B04 /* GitHooksInstallerXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B03 /* GitHooksInstallerXCTest.swift */; };
+		A1B2C3D4E5F60718293A4B06 /* SecurityEventsXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B05 /* SecurityEventsXCTest.swift */; };
+		A1B2C3D4E5F60718293A4B08 /* ProjectProtectionXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B07 /* ProjectProtectionXCTest.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,6 +36,8 @@
 		405A8EFF2DD793DF7EE4E3A0 /* PolicyAdminXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolicyAdminXCTest.swift; sourceTree = "<group>"; };
 		42D670256517441C9CC91511 /* V2ClientXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V2ClientXCTest.swift; sourceTree = "<group>"; };
 		8EE0192E2FC70D83008B01AC /* CI Scope.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CI Scope.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D4E5F60718293A4B01 /* ProjectConfigXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectConfigXCTest.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B03 /* GitHooksInstallerXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHooksInstallerXCTest.swift; sourceTree = "<group>"; };
 		A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentToolkitXCTest.swift; sourceTree = "<group>"; };
 		A9E1D0C2B3F44E5A8C7D6B32 /* StackChoiceXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackChoiceXCTest.swift; sourceTree = "<group>"; };
 		A9E1D0C2B3F44E5A8C7D6B34 /* RecommendedGateStatusXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendedGateStatusXCTest.swift; sourceTree = "<group>"; };
@@ -42,8 +46,8 @@
 		B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCheckResultXCTest.swift; sourceTree = "<group>"; };
 		C1A1D0C2B3F44E5A8C7D6D02 /* TestProtectionDetectorXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestProtectionDetectorXCTest.swift; sourceTree = "<group>"; };
 		D1A1D0C2B3F44E5A8C7D6E02 /* ShellClientOutputXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellClientOutputXCTest.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60718293A4B01 /* ProjectConfigXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectConfigXCTest.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60718293A4B03 /* GitHooksInstallerXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHooksInstallerXCTest.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B05 /* SecurityEventsXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityEventsXCTest.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B07 /* ProjectProtectionXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectProtectionXCTest.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -76,6 +80,8 @@
 			isa = PBXGroup;
 			children = (
 				405A8EFF2DD793DF7EE4E3A0 /* PolicyAdminXCTest.swift */,
+				A1B2C3D4E5F60718293A4B07 /* ProjectProtectionXCTest.swift */,
+				A1B2C3D4E5F60718293A4B05 /* SecurityEventsXCTest.swift */,
 				A1B2C3D4E5F60718293A4B03 /* GitHooksInstallerXCTest.swift */,
 				A1B2C3D4E5F60718293A4B01 /* ProjectConfigXCTest.swift */,
 				42D670256517441C9CC91511 /* V2ClientXCTest.swift */,
@@ -213,6 +219,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				462A8A7274B7089B5EB1887F /* PolicyAdminXCTest.swift in Sources */,
+				A1B2C3D4E5F60718293A4B08 /* ProjectProtectionXCTest.swift in Sources */,
+				A1B2C3D4E5F60718293A4B06 /* SecurityEventsXCTest.swift in Sources */,
 				A1B2C3D4E5F60718293A4B04 /* GitHooksInstallerXCTest.swift in Sources */,
 				A1B2C3D4E5F60718293A4B02 /* ProjectConfigXCTest.swift in Sources */,
 				ADD25A823A8144A38444AE1A /* V2ClientXCTest.swift in Sources */,

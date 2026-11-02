@@ -102,7 +102,8 @@ func (r *GateScriptRunner) report(output []byte, runErr error) LocalGateReport {
 	summary := clip(lines[0], localGateMaxSummary)
 	report := LocalGateReport{Status: "failed", Summary: summary, Checks: []LocalGateCheck{}, CompletedAt: r.now().UnixMilli()}
 	var parsed struct {
-		Results []struct {
+		ConfigVersion int `json:"configVersion"`
+		Results       []struct {
 			ID     string `json:"id"`
 			Status string `json:"status"`
 			Detail string `json:"detail"`
@@ -114,6 +115,7 @@ func (r *GateScriptRunner) report(output []byte, runErr error) LocalGateReport {
 		}
 		return report
 	}
+	report.ConfigVersion = parsed.ConfigVersion
 	allPassed := true
 	for _, item := range parsed.Results {
 		report.Checks = append(report.Checks, LocalGateCheck{ID: item.ID, Status: item.Status, Required: true, Detail: clip(item.Detail, localGateMaxDetail)})
