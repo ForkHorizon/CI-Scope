@@ -6,8 +6,26 @@ struct SecurityEventsClient {
     var baseURL = URL(string: "https://ci.forkhorizon.com/api/ci/v2/events")!
     var session: URLSession = .shared
 
+    private static let pageSize = 50
+    private static let maxPages = 20
+
+    /// Every open event, oldest first; follows the server's paging so old unacknowledged events cannot hide new ones.
     func fetchOpen(readToken: String) async throws -> [SecurityEvent] {
-        var request = URLRequest(url: baseURL)
+        var all: [SecurityEvent] = []
+        for _ in 0..<Self.maxPages {
+            let page = try await fetchPage(after: all.last?.id ?? 0, readToken: readToken)
+            all += page
+            if page.count < Self.pageSize { break }
+        }
+        return all
+    }
+
+    private func fetchPage(after: Int, readToken: String) async throws -> [SecurityEvent] {
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "limit", value: String(Self.pageSize)), URLQueryItem(name: "after", value: String(after)),
+        ]
+        var request = URLRequest(url: components.url!)
         request.setValue(readToken, forHTTPHeaderField: "x-ci-scope-config-token")
         let body = try await send(request)
         guard let events = body["events"], JSONSerialization.isValidJSONObject(events) else {
