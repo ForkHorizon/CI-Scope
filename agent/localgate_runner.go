@@ -14,9 +14,11 @@ import (
 )
 
 const (
-	localGateTier       = "push"
-	localGateMaxDetail  = 3900
-	localGateMaxSummary = 3900
+	localGateTier = "push"
+	// The server's request protocol rejects any string longer than 256 characters, so every text in a
+	// report stays well below that; a longer one would make the whole report fail with invalid_request.
+	localGateMaxDetail  = 240
+	localGateMaxSummary = 240
 )
 
 // commandRunner runs one command and returns its combined output; swapped out in tests.
