@@ -75,7 +75,7 @@ final class ProjectProtectionXCTest: XCTestCase {
 
     func testAWeakeningTheServerRefusesIsExplained() async {
         StubURLProtocol.handler = { [reply] request in
-            request.httpMethod == "PUT" ? (403, Data(#"{"error":"owner_approval_required"}"#.utf8)) : (200, Data(reply.utf8))
+            request.httpMethod != "GET" ? (403, Data(#"{"error":"owner_approval_required"}"#.utf8)) : (200, Data(reply.utf8))
         }
         let model = model()
         await model.load(repository: "ForkHorizon/Example")

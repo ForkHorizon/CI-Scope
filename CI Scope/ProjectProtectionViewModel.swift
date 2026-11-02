@@ -1,4 +1,5 @@
 // State and actions for the per-project protection settings stored on the CI Scope server.
+import AppKit
 import Combine
 import Foundation
 
@@ -47,8 +48,13 @@ final class ProjectProtectionViewModel: ObservableObject {
     /// Saves the edited config. Every save asks for Touch ID; the server decides whether it needs more.
     func save() async {
         guard let edited = config else { return }
+        var client = self.client
+        client.open = { page in
+            Task { @MainActor in self.message = "Approve the change with Touch ID on the website that just opened." }
+            NSWorkspace.shared.open(page)
+        }
         await guarded("change the CI protection of \(repository)") { admin in
-            self.config = try await self.client.update(edited, admin: admin)
+            self.config = try await client.update(edited, admin: admin)
         }
     }
 
