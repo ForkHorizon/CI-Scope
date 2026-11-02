@@ -54,3 +54,9 @@ func TestGateEnvironmentFindsUserLevelToolchains(t *testing.T) {
 		}
 	}
 }
+
+func TestGateEnvironmentKeepsSystemAdminToolsLikeLsof(t *testing.T) {
+	if !strings.Contains(strings.Join(gateEnvironment(), "\n"), "/usr/sbin") {
+		t.Fatal("PATH must include /usr/sbin (lsof lives there)")
+	}
+}
