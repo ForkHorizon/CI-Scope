@@ -1,3 +1,4 @@
+// Checks a pull request in a clean checkout with the pinned ci-gates CLI.
 package agent
 
 import (

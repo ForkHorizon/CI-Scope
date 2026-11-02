@@ -1,3 +1,4 @@
+// Wire types for local gate jobs and reports.
 package agent
 
 // LocalGateJob is one pull request the server wants checked on this device.

@@ -1,3 +1,4 @@
+// Client for the server's local gate queue: claim, heartbeat and complete.
 package agent
 
 import (

@@ -1,3 +1,4 @@
+// Tests for the local gate worker with a fake server and runner.
 package agent
 
 import (

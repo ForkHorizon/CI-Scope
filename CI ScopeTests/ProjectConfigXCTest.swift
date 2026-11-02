@@ -1,3 +1,4 @@
+// Tests for the project config model and client against canned server replies.
 import Foundation
 import XCTest
 @testable import CI_Scope
@@ -12,18 +13,20 @@ final class StubURLProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         Self.lastRequest = request
-        Self.lastBody = request.httpBody ?? request.httpBodyStream.map { stream in
-            stream.open()
-            defer { stream.close() }
-            var data = Data()
-            var buffer = [UInt8](repeating: 0, count: 4096)
-            while stream.hasBytesAvailable {
-                let count = stream.read(&buffer, maxLength: buffer.count)
-                if count <= 0 { break }
-                data.append(buffer, count: count)
+        Self.lastBody =
+            request.httpBody
+            ?? request.httpBodyStream.map { stream in
+                stream.open()
+                defer { stream.close() }
+                var data = Data()
+                var buffer = [UInt8](repeating: 0, count: 4096)
+                while stream.hasBytesAvailable {
+                    let count = stream.read(&buffer, maxLength: buffer.count)
+                    if count <= 0 { break }
+                    data.append(buffer, count: count)
+                }
+                return data
             }
-            return data
-        }
         let (status, body) = Self.handler?(request) ?? (500, Data())
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
@@ -35,7 +38,8 @@ final class StubURLProtocol: URLProtocol {
 
 final class ProjectConfigXCTest: XCTestCase {
     // Produced by CI-Scope-Web defaultProjectConfig, so a server-side format change breaks this test.
-    private let serverConfig = ###"{"schema":1,"repository":"ForkHorizon/Example","version":1,"observeOnly":false,"lanes":{"code-rules":{"enabled":true,"params":{"maxFileLines":600,"maxFunctionLines":80,"maxNestingDepth":4,"maxParameters":5,"ignore":[],"forbidSuppressions":true}},"agent-guard":{"enabled":true},"language":{"enabled":false,"adapters":[]},"tests":{"enabled":false,"command":""}},"protectedFiles":["Cargo.toml","**/Cargo.toml","clippy.toml","rustfmt.toml","deny.toml","rust-toolchain.toml","tsconfig.json",".eslintrc*","eslint.config.*","package.json","ruff.toml",".ruff.toml","pyproject.toml",".swiftlint.yml",".swift-format",".golangci.yml",".github/**"],"mergeGate":{"requireGreen":true,"deleteBranchAfterMerge":false},"updatedBy":"owner","updatedAt":1700000000000}"###
+    private let serverConfig =
+        "{\"schema\":1,\"repository\":\"ForkHorizon/Example\",\"version\":1,\"observeOnly\":false,\"lanes\":{\"code-rules\":{\"enabled\":true,\"params\":{\"maxFileLines\":600,\"maxFunctionLines\":80,\"maxNestingDepth\":4,\"maxParameters\":5,\"ignore\":[],\"forbidSuppressions\":true}},\"agent-guard\":{\"enabled\":true},\"language\":{\"enabled\":false,\"adapters\":[]},\"tests\":{\"enabled\":false,\"command\":\"\"}},\"protectedFiles\":[\"Cargo.toml\",\"**/Cargo.toml\",\"clippy.toml\",\"rustfmt.toml\",\"deny.toml\",\"rust-toolchain.toml\",\"tsconfig.json\",\".eslintrc*\",\"eslint.config.*\",\"package.json\",\"ruff.toml\",\".ruff.toml\",\"pyproject.toml\",\".swiftlint.yml\",\".swift-format\",\".golangci.yml\",\".github/**\"],\"mergeGate\":{\"requireGreen\":true,\"deleteBranchAfterMerge\":false},\"updatedBy\":\"owner\",\"updatedAt\":1700000000000}"
 
     private func client() -> ProjectConfigClient {
         let configuration = URLSessionConfiguration.ephemeral
@@ -43,7 +47,7 @@ final class ProjectConfigXCTest: XCTestCase {
         return ProjectConfigClient(session: URLSession(configuration: configuration), now: { Date(timeIntervalSince1970: 1_700_000_000) })
     }
 
-    private func reply(_ config: String) -> Data { Data(#"{"config":\#(config),"digest":"x"}"#.utf8) }
+    private func reply(_ config: String) -> Data { Data("{\"config\":\(config),\"digest\":\"x\"}".utf8) }
 
     func testDecodesTheServerDefaultConfig() throws {
         let config = try JSONDecoder().decode(ProjectConfig.self, from: Data(serverConfig.utf8))
@@ -102,8 +106,20 @@ final class ProjectConfigXCTest: XCTestCase {
         XCTAssertEqual((body["config"] as? [String: Any])?["repository"] as? String, "ForkHorizon/Example")
     }
 
+    func testRegisterPostsTheRepositoryWithTheAdminLogin() async throws {
+        StubURLProtocol.handler = { [self] _ in (200, reply(serverConfig)) }
+        let config = try await client().register(repository: "ForkHorizon/Example", admin: (user: "owner", password: "pw"))
+        XCTAssertEqual(config.repository, "ForkHorizon/Example")
+        let request = try XCTUnwrap(StubURLProtocol.lastRequest)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/ci/v2/projects/config/register")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "authorization"), "Basic " + Data("owner:pw".utf8).base64EncodedString())
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(StubURLProtocol.lastBody)) as? [String: String])
+        XCTAssertEqual(body, ["repository": "ForkHorizon/Example"])
+    }
+
     func testServerRefusalsBecomeReadableErrors() async throws {
-        StubURLProtocol.handler = { _ in (403, Data(#"{"error":"owner_approval_required"}"#.utf8)) }
+        StubURLProtocol.handler = { _ in (403, Data("{\"error\":\"owner_approval_required\"}".utf8)) }
         let config = try JSONDecoder().decode(ProjectConfig.self, from: Data(serverConfig.utf8))
         do {
             _ = try await client().update(config, admin: (user: "owner", password: "pw"))
@@ -115,7 +131,7 @@ final class ProjectConfigXCTest: XCTestCase {
     }
 
     func testAMalformedReplyIsReported() async throws {
-        StubURLProtocol.handler = { _ in (200, Data(#"{"config":{"schema":1}}"#.utf8)) }
+        StubURLProtocol.handler = { _ in (200, Data("{\"config\":{\"schema\":1}}".utf8)) }
         do {
             _ = try await client().read(repository: "ForkHorizon/Example", readToken: "t")
             XCTFail("expected a decoding failure")

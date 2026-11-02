@@ -1,3 +1,4 @@
+// Swift model of a project's server-held checks (mirrors CI-Scope-Web project-config-contract).
 import Foundation
 
 /// A project's checks as the CI Scope server holds them (CI-Scope-Web project-config-contract.ts).
@@ -52,8 +53,6 @@ struct ProjectConfig: Codable, Equatable {
     var mergeGate: MergeGate
     var updatedBy: String
     var updatedAt: Int
-
-    static let languageAdapters = ["swift", "python", "go", "web", "unity", "rust"]
 
     /// One line for the project list: which lanes guard this project.
     var summary: String {

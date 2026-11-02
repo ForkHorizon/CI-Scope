@@ -1,3 +1,4 @@
+// Tests for GitHooksInstaller state detection and install refusals.
 import Foundation
 import XCTest
 @testable import CI_Scope
@@ -7,10 +8,13 @@ final class GitHooksInstallerXCTest: XCTestCase {
     private let hooks = URL(fileURLWithPath: "/tmp/ci-hooks")
 
     private func installer(hooksPath: String, exit: Int32 = 0, record: @escaping (String) -> Void = { _ in }) -> GitHooksInstaller {
-        GitHooksInstaller(gatesRoot: gates, hooksDirectory: hooks, run: { command in
-            record(command)
-            return command.hasPrefix("git config") ? ShellResult(exitCode: 0, output: hooksPath + "\n") : ShellResult(exitCode: exit, output: "log")
-        })
+        GitHooksInstaller(
+            gatesRoot: gates, hooksDirectory: hooks,
+            run: { command in
+                record(command)
+                return command.hasPrefix("git config")
+                    ? ShellResult(exitCode: 0, output: hooksPath + "\n") : ShellResult(exitCode: exit, output: "log")
+            })
     }
 
     func testStateReflectsTheGlobalHooksPath() async {

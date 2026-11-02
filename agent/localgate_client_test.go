@@ -1,3 +1,4 @@
+// Tests for the local gate client payloads and request IDs.
 package agent
 
 import (

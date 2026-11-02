@@ -1,3 +1,4 @@
+// Tests that the local gate worker stays off without complete settings.
 package main
 
 import (

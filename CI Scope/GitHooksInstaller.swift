@@ -1,3 +1,4 @@
+// Installs the global ci-scope git hooks once per device without replacing another hooks path.
 import Foundation
 
 /// Installs the CI Scope git hooks once per device (one global core.hooksPath) using the pinned

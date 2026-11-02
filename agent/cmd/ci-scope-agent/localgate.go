@@ -1,3 +1,4 @@
+// Starts the local gate worker when its settings are present.
 package main
 
 import (

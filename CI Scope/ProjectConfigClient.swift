@@ -1,3 +1,4 @@
+// Reads and updates a project's server-held checks over the CI Scope config API.
 import Foundation
 
 enum ProjectConfigError: LocalizedError {

@@ -1,3 +1,4 @@
+// Tests for the gate script runner with scripted git and python commands.
 package agent
 
 import (

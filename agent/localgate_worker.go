@@ -1,3 +1,4 @@
+// Worker loop that claims queued pull requests, keeps the lease and reports the result.
 package agent
 
 import (
