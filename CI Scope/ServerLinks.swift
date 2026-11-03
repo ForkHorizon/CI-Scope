@@ -9,5 +9,4 @@ enum ServerLinks {
     }
 
     static let alerts = URL(string: "#/alerts", relativeTo: site)!.absoluteURL
-    static let projects = URL(string: "#/projects", relativeTo: site)!.absoluteURL
 }

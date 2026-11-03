@@ -108,31 +108,10 @@ extension ButtonStyle where Self == NothingPillStyle {
     static var pillDanger: NothingPillStyle { NothingPillStyle(kind: .danger) }
 }
 
-/// Hairline outlined container used instead of tinted cards.
-struct NothingCard: ViewModifier {
-    var radius: CGFloat = 14
-    var highlighted = false
-
-    func body(content: Content) -> some View {
-        content
-            .background(highlighted ? NothingTheme.panel : Color.clear, in: RoundedRectangle(cornerRadius: radius))
-            .overlay(
-                RoundedRectangle(cornerRadius: radius)
-                    .stroke(highlighted ? NothingTheme.lineStrong : NothingTheme.line, lineWidth: 1)
-            )
-    }
-}
-
 /// Flat list row: vertical padding and a hairline below instead of a tinted card.
 extension View {
     func nothingRow() -> some View {
         padding(.vertical, 9)
             .overlay(alignment: .bottom) { Rectangle().fill(NothingTheme.line).frame(height: 1) }
-    }
-}
-
-extension View {
-    func nothingCard(radius: CGFloat = 14, highlighted: Bool = false) -> some View {
-        modifier(NothingCard(radius: radius, highlighted: highlighted))
     }
 }
