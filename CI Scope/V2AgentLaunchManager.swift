@@ -83,32 +83,6 @@ struct V2AgentLaunchManager {
             config: config)
     }
 
-    func launchStatus() async -> RunnerLaunchStatus {
-        let uid = geteuid()
-        let result = await ShellClient.run(
-            "launchctl print gui/\(uid)/\(Self.serviceLabel)",
-            timeout: 5,
-            config: config
-        )
-        guard result.exitCode == 0 else {
-            return RunnerLaunchStatus(
-                state: .offline,
-                launchctlState: "not running",
-                pid: nil,
-                uptime: "-"
-            )
-        }
-
-        let launchState = firstMatch(in: result.output, pattern: #"state = ([a-zA-Z]+)"#) ?? "running"
-        let pid = intMatch(in: result.output, pattern: #"pid = ([0-9]+)"#)
-        return RunnerLaunchStatus(
-            state: launchState == "running" ? .online : .warning,
-            launchctlState: launchState,
-            pid: pid,
-            uptime: await processUptime(pid: pid)
-        )
-    }
-
     private func launchAgentIsLoaded() async -> Bool {
         let result = await ShellClient.run(
             "launchctl print gui/\(geteuid())/\(Self.serviceLabel)",
@@ -221,27 +195,6 @@ struct V2AgentLaunchManager {
         return env.map { "        <key>\($0.0)</key>\n        <string>\($0.1)</string>" }.joined(
             separator: "\n")
     }
-
-    private func processUptime(pid: Int?) async -> String {
-        guard let pid else { return "-" }
-        let result = await ShellClient.run("ps -p \(pid) -o etime= | xargs", timeout: 3, config: config)
-        let uptime = result.output.trimmed
-        return uptime.isEmpty ? "-" : uptime
-    }
-
-    private func firstMatch(in text: String, pattern: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        guard let match = regex.firstMatch(in: text, range: range), match.numberOfRanges > 1 else {
-            return nil
-        }
-        guard let valueRange = Range(match.range(at: 1), in: text) else { return nil }
-        return String(text[valueRange])
-    }
-
-    private func intMatch(in text: String, pattern: String) -> Int? {
-        firstMatch(in: text, pattern: pattern).flatMap(Int.init)
-    }
 }
 
 enum V2AgentLaunchError: LocalizedError {
@@ -255,5 +208,11 @@ enum V2AgentLaunchError: LocalizedError {
         case .launchAgent(let message):
             return "LaunchAgent error: \(message)"
         }
+    }
+}
+
+extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

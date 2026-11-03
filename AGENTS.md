@@ -113,9 +113,3 @@ acceptance.
 The `ForkHorizon/ci-gates` routing fix is published on
 `daliys/vps-canary-group-fix` in draft PR #66; do not merge it until the release
 owner reviews the pinned gates SHA and the remaining canary evidence.
-
-The Agent runner launcher is checked in at
-`/Users/daliys/Daliys/Swift/CI Scope/scripts/ci-scope-runner-wrapper.sh`. It
-must be configured as `CI_SCOPE_RUNNER_EXECUTABLE`, with the stock Actions
-`run.sh` as `CI_SCOPE_RUNNER_SCRIPT`; it supervises the stock wrapper so Agent
-shutdown forwards termination and cannot leave an orphan `Runner.Listener`.

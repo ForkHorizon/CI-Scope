@@ -13,21 +13,6 @@ struct CIQueueSettingsSnapshot {
     var labelsText: String
     var capacity: Int
 
-    var normalizedServerURL: String {
-        serverURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(
-            in: CharacterSet(charactersIn: "/"))
-    }
-
-    var labels: [String] {
-        labelsText
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
-
-    var webhookURL: String {
-        normalizedServerURL.isEmpty ? "" : "\(normalizedServerURL)/api/ci/github/webhook"
-    }
 }
 
 @MainActor
@@ -116,20 +101,6 @@ final class CIQueueSettingsStore: ObservableObject {
         )
     }
 
-    var snapshot: CIQueueSettingsSnapshot {
-        CIQueueSettingsSnapshot(
-            serverModeEnabled: serverModeEnabled,
-            serverURL: serverURL,
-            localToken: localToken,
-            webhookSecret: webhookSecret,
-            deepSeekAPIKey: deepSeekAPIKey,
-            machineID: machineID,
-            machineName: machineName,
-            labelsText: labelsText,
-            capacity: capacity
-        )
-    }
-
     func startV2Lifecycle() {
         v2Control.startLifecycle()
     }
@@ -163,32 +134,6 @@ final class CIQueueSettingsStore: ObservableObject {
 
     func emergencyStopV2() async {
         await v2Control.emergencyStop()
-    }
-
-    func testConnection() async throws -> String {
-        let settings = snapshot
-        guard settings.serverModeEnabled else { return "Server mode is off." }
-        guard !settings.normalizedServerURL.isEmpty,
-            let url = URL(string: "\(settings.normalizedServerURL)/api/ci/local/heartbeat")
-        else {
-            return "Server URL is missing."
-        }
-        guard !settings.localToken.isEmpty else { return "Local token is missing." }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(settings.localToken)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "machineId": settings.machineID,
-            "name": settings.machineName,
-            "status": "online",
-            "labels": settings.labels,
-            "capacity": settings.capacity,
-        ])
-        let (_, response) = try await URLSession.shared.data(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        return (200..<300).contains(status) ? "Connected." : "Server returned HTTP \(status)."
     }
 
     private func persist() {

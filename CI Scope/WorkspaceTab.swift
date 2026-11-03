@@ -1,12 +1,9 @@
+// The three places the app has: a project's protection, the open alerts, and this Mac's settings.
 import Foundation
 
 enum WorkspaceTab: String, CaseIterable, Identifiable {
     case projects
-    case runners
-    case scripts
-    case coverage
-    case policy
-    case tests
+    case alerts
     case settings
 
     var id: String { rawValue }
@@ -14,11 +11,7 @@ enum WorkspaceTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .projects: "Projects"
-        case .runners: "Runners"
-        case .scripts: "Scripts"
-        case .coverage: "Coverage"
-        case .policy: "Policy"
-        case .tests: "Test protection"
+        case .alerts: "Alerts"
         case .settings: "Settings"
         }
     }

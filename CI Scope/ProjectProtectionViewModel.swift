@@ -14,10 +14,9 @@ final class ProjectProtectionViewModel: ObservableObject {
     var installer = GitHooksInstaller(
         gatesRoot: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ci-scope/gates"),
         requireCleanCheckout: true)
-    var readToken: () async throws -> String = { try await PolicyAuthorizer.configReadToken() }
+    var readToken: () async throws -> String = { try await ServerAuthorizer.configReadToken() }
     var adminLogin: (String) async throws -> (user: String, password: String) = { reason in
-        let password = try await PolicyAuthorizer.adminPassword(reason: reason)
-        return (try await PolicyGitHub(config: DashboardConfig()).login(), password)
+        try await ServerAuthorizer.adminLogin(reason: reason)
     }
 
     private var repository = ""
@@ -39,10 +38,14 @@ final class ProjectProtectionViewModel: ObservableObject {
         }
     }
 
+    /// Registers the project that was last loaded.
+    func register() async { await register(repository: repository) }
+
     /// Registers the project with the safe defaults (code rules and agent guard on).
-    func register() async {
+    func register(repository: String) async {
+        self.repository = repository
         await guarded("register \(repository) with CI Scope") { admin in
-            self.config = try await self.client.register(repository: self.repository, admin: admin)
+            self.config = try await self.client.register(repository: repository, admin: admin)
         }
     }
 
