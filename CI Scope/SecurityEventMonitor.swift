@@ -9,10 +9,9 @@ final class SecurityEventMonitor: ObservableObject {
     @Published var message: String?
 
     var client = SecurityEventsClient()
-    var readToken: () async throws -> String = { try await PolicyAuthorizer.configReadToken() }
+    var readToken: () async throws -> String = { try await ServerAuthorizer.configReadToken() }
     var adminLogin: (String) async throws -> (user: String, password: String) = { reason in
-        let password = try await PolicyAuthorizer.adminPassword(reason: reason)
-        return (try await PolicyGitHub(config: DashboardConfig()).login(), password)
+        try await ServerAuthorizer.adminLogin(reason: reason)
     }
     var notify: (SecurityEvent) -> Void = SecurityEventMonitor.postNotification
 

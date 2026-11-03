@@ -83,7 +83,7 @@ struct V2AgentLaunchManager {
             config: config)
     }
 
-    func launchStatus() async -> RunnerLaunchStatus {
+    func launchStatus() async -> AgentLaunchStatus {
         let uid = geteuid()
         let result = await ShellClient.run(
             "launchctl print gui/\(uid)/\(Self.serviceLabel)",
@@ -91,7 +91,7 @@ struct V2AgentLaunchManager {
             config: config
         )
         guard result.exitCode == 0 else {
-            return RunnerLaunchStatus(
+            return AgentLaunchStatus(
                 state: .offline,
                 launchctlState: "not running",
                 pid: nil,
@@ -101,7 +101,7 @@ struct V2AgentLaunchManager {
 
         let launchState = firstMatch(in: result.output, pattern: #"state = ([a-zA-Z]+)"#) ?? "running"
         let pid = intMatch(in: result.output, pattern: #"pid = ([0-9]+)"#)
-        return RunnerLaunchStatus(
+        return AgentLaunchStatus(
             state: launchState == "running" ? .online : .warning,
             launchctlState: launchState,
             pid: pid,
@@ -255,5 +255,19 @@ enum V2AgentLaunchError: LocalizedError {
         case .launchAgent(let message):
             return "LaunchAgent error: \(message)"
         }
+    }
+}
+
+/// What launchd says about the agent's launch agent.
+struct AgentLaunchStatus {
+    let state: ServiceState
+    let launchctlState: String
+    let pid: Int?
+    let uptime: String
+}
+
+extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
