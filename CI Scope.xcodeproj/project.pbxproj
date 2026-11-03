@@ -7,16 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A1B2C3D4E5F60718293A4B22 /* AuditBatchTwoXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B21 /* AuditBatchTwoXCTest.swift */; };
-		A1B2C3D4E5F60718293A4B12 /* ProjectApprovalXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B11 /* ProjectApprovalXCTest.swift */; };
 		462A8A7274B7089B5EB1887F /* PolicyAdminXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 405A8EFF2DD793DF7EE4E3A0 /* PolicyAdminXCTest.swift */; };
 		A1B2C3D4E5F60718293A4B02 /* ProjectConfigXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B01 /* ProjectConfigXCTest.swift */; };
 		A1B2C3D4E5F60718293A4B04 /* GitHooksInstallerXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B03 /* GitHooksInstallerXCTest.swift */; };
 		A1B2C3D4E5F60718293A4B06 /* SecurityEventsXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B05 /* SecurityEventsXCTest.swift */; };
 		A1B2C3D4E5F60718293A4B08 /* ProjectProtectionXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B07 /* ProjectProtectionXCTest.swift */; };
+		A1B2C3D4E5F60718293A4B12 /* ProjectApprovalXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B11 /* ProjectApprovalXCTest.swift */; };
+		A1B2C3D4E5F60718293A4B22 /* AuditBatchTwoXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B21 /* AuditBatchTwoXCTest.swift */; };
 		A9E1D0C2B3F44E5A8C7D6B01 /* AgentToolkitXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */; };
 		A9E1D0C2B3F44E5A8C7D6B31 /* StackChoiceXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B32 /* StackChoiceXCTest.swift */; };
 		A9E1D0C2B3F44E5A8C7D6B33 /* RecommendedGateStatusXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B34 /* RecommendedGateStatusXCTest.swift */; };
+		A9E1D0C2B3F44E5A8C7D6B41 /* RecommendedGatesGuidanceXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B42 /* RecommendedGatesGuidanceXCTest.swift */; };
 		A9E1D0C2B3F44E5A8C7D6B35 /* DominantStackXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E1D0C2B3F44E5A8C7D6B36 /* DominantStackXCTest.swift */; };
 		ADD25A823A8144A38444AE1A /* V2ClientXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42D670256517441C9CC91511 /* V2ClientXCTest.swift */; };
 		B7A1D0C2B3F44E5A8C7D6C01 /* LocalCheckResultXCTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */; };
@@ -35,8 +36,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A1B2C3D4E5F60718293A4B21 /* AuditBatchTwoXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditBatchTwoXCTest.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60718293A4B11 /* ProjectApprovalXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectApprovalXCTest.swift; sourceTree = "<group>"; };
 		405A8EFF2DD793DF7EE4E3A0 /* PolicyAdminXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolicyAdminXCTest.swift; sourceTree = "<group>"; };
 		42D670256517441C9CC91511 /* V2ClientXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V2ClientXCTest.swift; sourceTree = "<group>"; };
 		8EE0192E2FC70D83008B01AC /* CI Scope.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CI Scope.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -44,9 +43,12 @@
 		A1B2C3D4E5F60718293A4B03 /* GitHooksInstallerXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHooksInstallerXCTest.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B05 /* SecurityEventsXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityEventsXCTest.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B07 /* ProjectProtectionXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectProtectionXCTest.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B11 /* ProjectApprovalXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectApprovalXCTest.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B21 /* AuditBatchTwoXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditBatchTwoXCTest.swift; sourceTree = "<group>"; };
 		A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentToolkitXCTest.swift; sourceTree = "<group>"; };
 		A9E1D0C2B3F44E5A8C7D6B32 /* StackChoiceXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackChoiceXCTest.swift; sourceTree = "<group>"; };
 		A9E1D0C2B3F44E5A8C7D6B34 /* RecommendedGateStatusXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendedGateStatusXCTest.swift; sourceTree = "<group>"; };
+		A9E1D0C2B3F44E5A8C7D6B42 /* RecommendedGatesGuidanceXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendedGatesGuidanceXCTest.swift; sourceTree = "<group>"; };
 		A9E1D0C2B3F44E5A8C7D6B36 /* DominantStackXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DominantStackXCTest.swift; sourceTree = "<group>"; };
 		B4D581C73F9E4F3DA20E1B6C /* CI ScopeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CI ScopeTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B7A1D0C2B3F44E5A8C7D6C02 /* LocalCheckResultXCTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCheckResultXCTest.swift; sourceTree = "<group>"; };
@@ -97,6 +99,7 @@
 				A9E1D0C2B3F44E5A8C7D6B02 /* AgentToolkitXCTest.swift */,
 				A9E1D0C2B3F44E5A8C7D6B32 /* StackChoiceXCTest.swift */,
 				A9E1D0C2B3F44E5A8C7D6B34 /* RecommendedGateStatusXCTest.swift */,
+				A9E1D0C2B3F44E5A8C7D6B42 /* RecommendedGatesGuidanceXCTest.swift */,
 				A9E1D0C2B3F44E5A8C7D6B36 /* DominantStackXCTest.swift */,
 			);
 			path = "CI ScopeTests";
@@ -238,6 +241,7 @@
 				A9E1D0C2B3F44E5A8C7D6B01 /* AgentToolkitXCTest.swift in Sources */,
 				A9E1D0C2B3F44E5A8C7D6B31 /* StackChoiceXCTest.swift in Sources */,
 				A9E1D0C2B3F44E5A8C7D6B33 /* RecommendedGateStatusXCTest.swift in Sources */,
+				A9E1D0C2B3F44E5A8C7D6B41 /* RecommendedGatesGuidanceXCTest.swift in Sources */,
 				A9E1D0C2B3F44E5A8C7D6B35 /* DominantStackXCTest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

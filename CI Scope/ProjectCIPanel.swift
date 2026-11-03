@@ -12,6 +12,7 @@ struct ProjectCIPanel: View {
     let removalSnapshot: (AutomationScript) -> AutomationScriptInstallSnapshot
     let onAttachToRunner: () -> Void
     let onRemoveScript: (AutomationScript) -> Void
+    let onOpenPolicy: () -> Void
     @ObservedObject var installViewModel: AutomationScriptInstallViewModel
     @State var codeLinterStatus: CodeLinterWorkflowStatus = .unavailable
 
@@ -53,6 +54,7 @@ struct ProjectCIPanel: View {
                         scripts: scripts,
                         isInstalled: { $0.matchingWorkflow(in: snapshot) != nil },
                         manifestCheckTypes: snapshot?.unifiedChecks.map { Set($0.manifest.checks.map(\.type)) },
+                        openPolicy: onOpenPolicy,
                         installViewModel: installViewModel
                     )
                     Spacer()

@@ -9,6 +9,8 @@ struct RecommendedGatesButton: View {
     let isInstalled: (AutomationScript) -> Bool
     /// Check types of the repository's Unified Checks manifest, nil when it has none.
     let manifestCheckTypes: Set<String>?
+    /// Switches the workspace to the Policy tab, where checks missing from a Unified Checks manifest are added.
+    let openPolicy: () -> Void
     @ObservedObject var installViewModel: AutomationScriptInstallViewModel
 
     @State private var detected: [AutomationScript] = []
@@ -37,19 +39,12 @@ struct RecommendedGatesButton: View {
             Text("Recommended gates").nothingDisplay(24)
             Text(project.repositorySlug).nothingCaption()
 
-            if detected.isEmpty {
-                Text("No matching gates were detected for this repository.")
-                    .font(NothingTheme.body)
-                    .foregroundStyle(NothingTheme.inkDim)
-            } else {
-                ForEach(detected) { script in
-                    gateRow(script)
-                }
+            ForEach(detected) { script in
+                gateRow(script)
             }
 
-            if manifestCheckTypes != nil {
-                Text("This repository uses Unified Checks. Missing checks are added in the Policy tab.")
-                    .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
+            if let message = guidance.message {
+                Text(message).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
             }
 
             AutomationScriptInstallStatusBox(status: installViewModel.bundleSnapshot(for: project))
@@ -57,9 +52,20 @@ struct RecommendedGatesButton: View {
             HStack {
                 Spacer()
                 Button("Close") { isPresented = false }.buttonStyle(.pill)
-                Button(installLabel) { install() }
+                switch guidance {
+                case .installSelected:
+                    Button(installLabel) { install() }
+                        .buttonStyle(.pillPrimary)
+                        .disabled(selected.isEmpty || installViewModel.bundleSnapshot(for: project).isInstalling)
+                case .openPolicy:
+                    Button("Open Policy") {
+                        isPresented = false
+                        openPolicy()
+                    }
                     .buttonStyle(.pillPrimary)
-                    .disabled(selected.isEmpty || installViewModel.bundleSnapshot(for: project).isInstalling)
+                case .nothingToDo, .nothingDetected:
+                    EmptyView()
+                }
             }
         }
         .padding(22)
@@ -73,24 +79,45 @@ struct RecommendedGatesButton: View {
             manifestTypes: manifestCheckTypes, toolkitInstalled: toolkitInstalled)
     }
 
+    private var guidance: RecommendedGatesGuidance {
+        RecommendedGatesGuidance.guidance(for: detected.map { status(of: $0) })
+    }
+
+    /// A gate that cannot be installed here is shown as a plain row, not as a switch that looks broken.
+    @ViewBuilder
     private func gateRow(_ script: AutomationScript) -> some View {
         let status = status(of: script)
-        return Toggle(isOn: binding(for: script.id)) {
+        if status.isSelectable { selectableRow(script, status: status) } else { infoRow(script, status: status) }
+    }
+
+    private func infoRow(_ script: AutomationScript, status: RecommendedGateStatus) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 6) {
+                Text(script.title).font(NothingTheme.body.weight(.semibold))
+                if let label = status.label { statusLabel(label, status: status) }
+            }
+            Text(script.summary).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
+        }
+        .opacity(0.75)
+    }
+
+    private func statusLabel(_ label: String, status: RecommendedGateStatus) -> some View {
+        Text(label)
+            .font(NothingTheme.tiny.weight(.semibold))
+            .foregroundStyle(status == .addViaPolicy ? NothingTheme.amber : NothingTheme.inkDim)
+    }
+
+    private func selectableRow(_ script: AutomationScript, status: RecommendedGateStatus) -> some View {
+        Toggle(isOn: binding(for: script.id)) {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(script.title).font(NothingTheme.body.weight(.semibold))
-                    if let label = status.label {
-                        Text(label)
-                            .font(NothingTheme.tiny.weight(.semibold))
-                            .foregroundStyle(status == .addViaPolicy ? NothingTheme.amber : NothingTheme.inkDim)
-                    }
+                    if let label = status.label { statusLabel(label, status: status) }
                 }
                 Text(script.summary).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
             }
         }
         .toggleStyle(NothingToggleStyle())
-        .disabled(!status.isSelectable)
-        .opacity(status.isSelectable ? 1 : 0.6)
     }
 
     private var installLabel: String {

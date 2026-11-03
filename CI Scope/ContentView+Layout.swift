@@ -81,6 +81,7 @@ extension ContentView {
                             refreshSelectedProject()
                         }
                     },
+                    onOpenPolicy: { workspaceTab = .policy },
                     installViewModel: scriptInstallViewModel
                 )
                 .frame(minHeight: 260, maxHeight: .infinity)
