@@ -4,7 +4,10 @@ package main
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+
+	"github.com/forkhorizon/ci-scope/agent"
 )
 
 const envCapabilities = "CI_SCOPE_CAPABILITIES"
@@ -43,4 +46,12 @@ func splitCapabilities(value string) []string {
 	return items
 }
 
-func lookPathOnSystem(name string) (string, error) { return exec.LookPath(name) }
+// lookPathOnSystem searches the PATH the gate commands will run with, not this process's own.
+func lookPathOnSystem(name string) (string, error) {
+	for _, dir := range filepath.SplitList(agent.GateSearchPath()) {
+		if path, err := exec.LookPath(filepath.Join(dir, name)); err == nil {
+			return path, nil
+		}
+	}
+	return "", exec.ErrNotFound
+}

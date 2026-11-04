@@ -41,6 +41,17 @@ func gateEnvironment() []string {
 	}
 }
 
+// GateSearchPath is the PATH checked commands run with. Capability detection must look there too: a LaunchAgent's own
+// PATH is only /usr/bin:/bin:..., so cargo under /opt/homebrew/bin would never be found and its jobs never claimed.
+func GateSearchPath() string {
+	for _, entry := range gateEnvironment() {
+		if path, ok := strings.CutPrefix(entry, "PATH="); ok {
+			return path
+		}
+	}
+	return ""
+}
+
 // gateKillGrace is how long a cancelled command gets before its output pipes are abandoned.
 const gateKillGrace = 5 * time.Second
 

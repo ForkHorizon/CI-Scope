@@ -196,3 +196,9 @@ func TestReportUsesLastLineOfACrashAndEnvironmentErrorsAreMarked(t *testing.T) {
 		t.Fatalf("summary = %q", env.Summary)
 	}
 }
+
+func TestGateSearchPathCoversHomebrew(t *testing.T) {
+	if !strings.Contains(GateSearchPath(), "/opt/homebrew/bin") {
+		t.Fatalf("GateSearchPath = %q", GateSearchPath())
+	}
+}
