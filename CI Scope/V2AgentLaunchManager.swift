@@ -108,6 +108,7 @@ struct V2AgentLaunchManager {
 
         let standardLocations = [
             Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("ci-scope-agent"),
+            fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/ci-scope-agent"),
             URL(fileURLWithPath: "/usr/local/bin/ci-scope-agent"),
             URL(fileURLWithPath: "/opt/homebrew/bin/ci-scope-agent"),
             stateRootURL.appendingPathComponent("bin/ci-scope-agent"),
