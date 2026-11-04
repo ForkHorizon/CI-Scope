@@ -9,6 +9,7 @@
     .h { font-size: 17px; font-weight: 700; }
     .s { font-size: 13px; fill: #bdbdbd; }
     .no { font-size: 12px; letter-spacing: 1.6px; fill: #6f6f6f; }
+    .bign { font-size: 56px; font-weight: 800; letter-spacing: -2px; fill: #2d2d2d; }
     .card { fill: url(#cardfill); stroke: #3d3d3d; stroke-width: 1.5; }
     .tile { fill: #000; stroke: #4a4a4a; stroke-width: 1.5; }
     .ico { fill: none; stroke: #f2f2f2; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -33,7 +34,7 @@
   <rect class="card" x="40" y="186" width="270" height="186" rx="16"/>
   <rect class="tile" x="60" y="206" width="48" height="48" rx="12"/>
   <g class="ico" transform="translate(72 218)"><circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M6 7.5v9M18 16.5V11a4 4 0 0 0-4-4h-3M13 4l-2.5 3 2.5 3"/></g>
-  <text x="290" y="236" class="no" text-anchor="end">01</text>
+  <text x="290" y="244" class="bign" text-anchor="end">01</text>
   <text x="60" y="286" class="h">A change is proposed</text>
   <text x="60" y="313" class="s">A developer or an AI</text>
   <text x="60" y="333" class="s">assistant proposes a change</text>
@@ -43,7 +44,7 @@
   <rect class="card" x="350" y="186" width="270" height="186" rx="16"/>
   <rect class="tile" x="370" y="206" width="48" height="48" rx="12"/>
   <g class="ico" transform="translate(382 218)"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></g>
-  <text x="600" y="236" class="no" text-anchor="end">02</text>
+  <text x="600" y="244" class="bign" text-anchor="end">02</text>
   <text x="370" y="286" class="h">The rules are loaded</text>
   <text x="370" y="313" class="s">CI Scope loads the checks the</text>
   <text x="370" y="333" class="s">owner chose. They are kept on</text>
@@ -53,7 +54,7 @@
   <rect class="card" x="660" y="186" width="270" height="186" rx="16"/>
   <rect class="tile" x="680" y="206" width="48" height="48" rx="12"/>
   <g class="ico" transform="translate(692 218)"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10l3 2.5-3 2.5M12 16h5"/></g>
-  <text x="910" y="236" class="no" text-anchor="end">03</text>
+  <text x="910" y="244" class="bign" text-anchor="end">03</text>
   <text x="680" y="286" class="h">The checks run</text>
   <text x="680" y="313" class="s">A program on the owner's Mac</text>
   <text x="680" y="333" class="s">runs them. Nothing is added</text>
@@ -63,7 +64,7 @@
   <rect class="card" x="970" y="186" width="270" height="186" rx="16"/>
   <rect class="tile" x="990" y="206" width="48" height="48" rx="12" style="stroke:#4dd985"/>
   <g class="ico" transform="translate(1002 218)" style="stroke:#4dd985"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6.5"/></g>
-  <text x="1220" y="236" class="no" text-anchor="end">04</text>
+  <text x="1220" y="244" class="bign" text-anchor="end" style="fill:#1f4a31">04</text>
   <text x="990" y="286" class="h">A verdict comes back</text>
   <text x="990" y="313" class="s">GitHub shows pass or fail,</text>
   <text x="990" y="333" class="s">with a plain-language reason.</text>
