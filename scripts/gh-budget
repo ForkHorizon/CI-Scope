@@ -1,0 +1,12 @@
+#!/bin/bash
+# Drop-in for `gh`: refuses to call GitHub while the shared 5000/hour token is nearly spent, so one tool's
+# polling cannot starve every other agent. Use as `scripts/gh-budget run list ...`; set GH_BUDGET_MIN to change 500.
+set -uo pipefail
+if [[ "${1:-}" != "api" || "${2:-}" != "rate_limit" ]]; then
+  read -r left reset < <(gh api rate_limit --jq '.resources.core | "\(.remaining) \(.reset)"' 2>/dev/null || echo "9999 0")
+  if (( left < ${GH_BUDGET_MIN:-500} )); then
+    echo "gh-budget: only $left GitHub requests left until $(date -r "$reset" '+%H:%M:%S'); not calling gh. Wait for the reset." >&2
+    exit 75
+  fi
+fi
+exec gh "$@"
