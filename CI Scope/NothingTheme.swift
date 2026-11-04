@@ -67,9 +67,18 @@ extension View {
 struct NothingPillStyle: ButtonStyle {
     enum Kind { case plain, primary, danger }
     var kind: Kind = .plain
-    @Environment(\.isEnabled) private var isEnabled
 
-    func makeBody(configuration: Configuration) -> some View {
+    func makeBody(configuration: Configuration) -> some View { PillBody(configuration: configuration, style: self) }
+}
+
+private struct PillBody: View {
+    let configuration: ButtonStyleConfiguration
+    let style: NothingPillStyle
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+
+    var body: some View {
+        let hot = hovering && isEnabled
         configuration.label
             .font(.system(size: 11, weight: .regular, design: .monospaced))
             .tracking(1)
@@ -78,26 +87,42 @@ struct NothingPillStyle: ButtonStyle {
             .fixedSize()
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
-            .foregroundStyle(foreground)
-            .background(kind == .primary ? NothingTheme.ink : Color.clear, in: Capsule())
-            .overlay(Capsule().stroke(border, lineWidth: 1))
-            .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.35)
+            .foregroundStyle(foreground(hot))
+            .background(fill(hot), in: Capsule())
+            .overlay(Capsule().stroke(border(hot), lineWidth: 1))
+            .shadow(color: glow.opacity(hot ? 0.4 : 0), radius: 10)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .opacity(isEnabled ? 1 : 0.35)
             .contentShape(Capsule())
+            .onHover { hovering = $0 }
+            .pointerStyle(isEnabled ? .link : nil)
+            .animation(.smooth(duration: 0.18), value: hovering)
+            .animation(.spring(duration: 0.25, bounce: 0.4), value: configuration.isPressed)
     }
 
-    private var foreground: Color {
-        switch kind {
+    private var glow: Color { style.kind == .danger ? NothingTheme.red : .white }
+
+    private func fill(_ hot: Bool) -> Color {
+        switch style.kind {
+        case .primary: hot ? .white : NothingTheme.ink
+        case .danger: hot ? NothingTheme.red : .clear
+        case .plain: hot ? Color.white.opacity(0.1) : .clear
+        }
+    }
+
+    private func foreground(_ hot: Bool) -> Color {
+        switch style.kind {
         case .primary: .black
-        case .danger: NothingTheme.red
+        case .danger: hot ? .white : NothingTheme.red
         case .plain: NothingTheme.ink
         }
     }
 
-    private var border: Color {
-        switch kind {
+    private func border(_ hot: Bool) -> Color {
+        switch style.kind {
         case .primary: NothingTheme.ink
         case .danger: NothingTheme.red
-        case .plain: NothingTheme.lineStrong
+        case .plain: hot ? NothingTheme.ink : NothingTheme.lineStrong
         }
     }
 }
@@ -108,10 +133,9 @@ extension ButtonStyle where Self == NothingPillStyle {
     static var pillDanger: NothingPillStyle { NothingPillStyle(kind: .danger) }
 }
 
-/// Flat list row: vertical padding and a hairline below instead of a tinted card.
+/// Flat list row: hairline below, hover wash and bar; `fresh` flashes it once when it arrives live.
 extension View {
-    func nothingRow() -> some View {
-        padding(.vertical, 9)
-            .overlay(alignment: .bottom) { Rectangle().fill(NothingTheme.line).frame(height: 1) }
+    func nothingRow(fresh: Bool = false, tint: Color = NothingTheme.ink) -> some View {
+        modifier(NothingRow(fresh: fresh, tint: tint))
     }
 }

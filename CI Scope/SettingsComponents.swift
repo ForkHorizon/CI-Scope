@@ -39,14 +39,28 @@ struct SettingsRow<Control: View>: View {
 
 extension View {
     /// Outlined field look for plain text and secure fields.
-    func nothingField() -> some View {
-        textFieldStyle(.plain)
+    func nothingField() -> some View { modifier(NothingField()) }
+}
+
+/// Outlined field that brightens its border on hover and focus.
+private struct NothingField: ViewModifier {
+    @State private var hovering = false
+    @FocusState private var focused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .textFieldStyle(.plain)
             .focusEffectDisabled()
+            .focused($focused)
             .font(NothingTheme.small)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(NothingTheme.panel, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(NothingTheme.line, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(focused ? NothingTheme.ink : (hovering ? NothingTheme.lineStrong : NothingTheme.line), lineWidth: 1))
+            .shadow(color: Color.white.opacity(focused ? 0.12 : 0), radius: 6)
+            .onHover { hovering = $0 }
+            .animation(.smooth(duration: 0.18), value: hovering)
+            .animation(.smooth(duration: 0.18), value: focused)
     }
 }
 
@@ -63,8 +77,10 @@ struct NothingToggleStyle: ToggleStyle {
                 .overlay(alignment: configuration.isOn ? .trailing : .leading) {
                     Circle().fill(configuration.isOn ? Color.black : NothingTheme.inkDim).frame(width: 16, height: 16).padding(3)
                 }
-                .animation(.easeOut(duration: 0.12), value: configuration.isOn)
+                .animation(.spring(duration: 0.3, bounce: 0.35), value: configuration.isOn)
+                .contentShape(Capsule())
                 .onTapGesture { configuration.isOn.toggle() }
+                .pointerStyle(.link)
         }
     }
 }

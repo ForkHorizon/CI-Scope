@@ -9,9 +9,9 @@ struct ProjectDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                protectionSection
-                alertsSection
-                hooksSection
+                protectionSection.nothingEntrance(0)
+                alertsSection.nothingEntrance(1)
+                hooksSection.nothingEntrance(2)
                 if let message = model.message {
                     Text(message).font(NothingTheme.small).foregroundStyle(NothingTheme.amber).textSelection(.enabled)
                 }

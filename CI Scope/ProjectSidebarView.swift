@@ -74,6 +74,7 @@ struct WorkspaceMenuRow: View {
     let count: Int
     let isActive: Bool
     let action: () -> Void
+    @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
@@ -86,9 +87,14 @@ struct WorkspaceMenuRow: View {
             .foregroundStyle(isActive ? Color.black : NothingTheme.ink)
             .padding(.horizontal, 12)
             .frame(height: 36)
-            .background(isActive ? NothingTheme.ink : Color.clear, in: Capsule())
+            .background(isActive ? NothingTheme.ink : (hovering ? NothingTheme.panel : Color.clear), in: Capsule())
+            .overlay(Capsule().stroke(hovering && !isActive ? NothingTheme.line : .clear, lineWidth: 1))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .pointerStyle(.link)
+        .animation(.smooth(duration: 0.18), value: hovering)
+        .animation(.smooth(duration: 0.25), value: isActive)
     }
 }

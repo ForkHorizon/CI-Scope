@@ -1,7 +1,6 @@
-// Polls the server for security events, raises a notification for each new one, and acknowledges them on request.
+// Polls the server for security events, raises a toast for each new one, and acknowledges them on request.
 import Combine
 import Foundation
-import UserNotifications
 
 @MainActor
 final class SecurityEventMonitor: ObservableObject {
@@ -13,7 +12,9 @@ final class SecurityEventMonitor: ObservableObject {
     var adminLogin: (String) async throws -> (user: String, password: String) = { reason in
         try await ServerAuthorizer.adminLogin(reason: reason)
     }
-    var notify: (SecurityEvent) -> Void = SecurityEventMonitor.postNotification
+    var notify: (SecurityEvent) -> Void = { event in
+        ToastCenter.shared.post(Toast(kind: .alert, title: event.title, detail: "\(event.repository) · \(event.detail)", destination: .alerts))
+    }
 
     private var seen: Set<Int> = []
 
@@ -43,15 +44,5 @@ final class SecurityEventMonitor: ObservableObject {
         } catch {
             message = error.localizedDescription
         }
-    }
-
-    nonisolated static func postNotification(_ event: SecurityEvent) {
-        let content = UNMutableNotificationContent()
-        content.title = "⚠️ " + event.title
-        content.subtitle = event.repository
-        content.body = event.detail
-        content.sound = UNNotificationSound.default
-        let request = UNNotificationRequest(identifier: "security-\(event.id)", content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
     }
 }

@@ -75,6 +75,6 @@ struct EmptyProjectDashboard: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-
+        .nothingEntrance()
     }
 }
