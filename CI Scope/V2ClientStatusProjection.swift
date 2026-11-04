@@ -15,9 +15,13 @@ nonisolated struct V2ClientStatusProjection: Codable, Equatable, Sendable {
     let localEpoch: Int64?
     let serverSessionEpoch: Int64?
     let controlLeaseExpiresAt: Int64?
+    // The Agent also signs these two; dropping or recomputing them changes the payload hash and the
+    // whole status is rejected as "Payload hash mismatch" (seen once the agent ran the local gate worker).
+    let schedulerLeaseActive: Bool?
+    private let reportedReadyToClaim: Bool?
 
     var readyToClaim: Bool {
-        Self.canClaim(
+        reportedReadyToClaim ?? Self.canClaim(
             health: V2ClientStatusHealth(
                 processAlive: processAlive,
                 schedulerHealthy: schedulerHealthy,
@@ -48,6 +52,8 @@ nonisolated struct V2ClientStatusProjection: Codable, Equatable, Sendable {
         localEpoch = details.localEpoch
         serverSessionEpoch = details.serverSessionEpoch
         controlLeaseExpiresAt = details.controlLeaseExpiresAt
+        schedulerLeaseActive = nil
+        reportedReadyToClaim = nil
     }
 
     static func canClaim(
@@ -72,6 +78,7 @@ nonisolated struct V2ClientStatusProjection: Codable, Equatable, Sendable {
         case localEpoch
         case serverSessionEpoch
         case controlLeaseExpiresAt
+        case schedulerLeaseActive
     }
 
     init(from decoder: Decoder) throws {
@@ -88,7 +95,8 @@ nonisolated struct V2ClientStatusProjection: Codable, Equatable, Sendable {
         serverSessionEpoch = try container.decodeIfPresent(Int64.self, forKey: .serverSessionEpoch)
         controlLeaseExpiresAt = try container.decodeIfPresent(
             Int64.self, forKey: .controlLeaseExpiresAt)
-        _ = try container.decodeIfPresent(Bool.self, forKey: .readyToClaim)
+        schedulerLeaseActive = try container.decodeIfPresent(Bool.self, forKey: .schedulerLeaseActive)
+        reportedReadyToClaim = try container.decodeIfPresent(Bool.self, forKey: .readyToClaim)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -105,5 +113,6 @@ nonisolated struct V2ClientStatusProjection: Codable, Equatable, Sendable {
         try container.encodeIfPresent(localEpoch, forKey: .localEpoch)
         try container.encodeIfPresent(serverSessionEpoch, forKey: .serverSessionEpoch)
         try container.encodeIfPresent(controlLeaseExpiresAt, forKey: .controlLeaseExpiresAt)
+        try container.encodeIfPresent(schedulerLeaseActive, forKey: .schedulerLeaseActive)
     }
 }
