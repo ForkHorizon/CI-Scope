@@ -78,6 +78,6 @@
   <text x="718" y="433" style="font-size:15px">CI Scope: FAILED — protected files were modified</text>
 
   <text x="40" y="500" class="lead">Loosening a rule takes the owner's fingerprint (Touch ID) on the website, so an AI cannot weaken its own checks.</text>
-  <text x="40" y="528" class="s">Illustrative results. Technical diagram: docs/architecture.svg</text>
+  <text x="40" y="528" class="s">Illustrative results.</text>
   </g>
 </svg>
