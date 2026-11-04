@@ -38,12 +38,16 @@ struct V2AgentLaunchManager {
         let machineID =
             settings.machineID.isEmpty ? (Host.current().localizedName ?? "macbook") : settings.machineID
         let credentialID = "machine-credential"
+        // An enrolled agent keeps the identity it was enrolled with; a fresh one would not match its Keychain
+        // credential and the agent would crash-loop (and every Install/Restart would also restart a healthy one).
+        let enrolled = enrolledIdentity()
 
         let plistContent = renderAgentPlist(
             agentPath: agentExecutableURL.path,
             controlPlaneURL: controlPlaneURL,
             machineID: machineID,
-            credentialID: credentialID
+            credentialID: credentialID,
+            enrolled: enrolled
         )
 
         let existing = try? String(contentsOf: launchAgentURL, encoding: .utf8)
@@ -126,18 +130,35 @@ struct V2AgentLaunchManager {
         throw V2AgentLaunchError.missingExecutable
     }
 
+    private static let identityKeys = [
+        "CI_SCOPE_MACHINE_ID", "CI_SCOPE_BOOT_ID", "CI_SCOPE_AGENT_INSTANCE_ID", "CI_SCOPE_CREDENTIAL_ID",
+        "CI_SCOPE_POOL_IDENTITY", "CI_SCOPE_SESSION_REQUEST_ID",
+    ]
+
+    /// The identity in the LaunchAgent that is already installed, if it has a complete one.
+    private func enrolledIdentity() -> [String: String] {
+        guard let data = try? Data(contentsOf: launchAgentURL),
+            let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+            let env = plist["EnvironmentVariables"] as? [String: String]
+        else { return [:] }
+        let kept = env.filter { Self.identityKeys.contains($0.key) && !$0.value.isEmpty }
+        return kept.count == Self.identityKeys.count ? kept : [:]
+    }
+
     private func renderAgentPlist(
         agentPath: String,
         controlPlaneURL: String,
         machineID: String,
-        credentialID: String
+        credentialID: String,
+        enrolled: [String: String]
     ) -> String {
         let stdoutPath = logDirURL.appendingPathComponent("agent.log").path
         let stderrPath = logDirURL.appendingPathComponent("agent.err.log").path
         let envXml = agentEnvironmentXML(
             controlPlaneURL: controlPlaneURL,
             machineID: machineID,
-            credentialID: credentialID
+            credentialID: credentialID,
+            enrolled: enrolled
         )
 
         return """
@@ -175,7 +196,8 @@ struct V2AgentLaunchManager {
     private func agentEnvironmentXML(
         controlPlaneURL: String,
         machineID: String,
-        credentialID: String
+        credentialID: String,
+        enrolled: [String: String]
     ) -> String {
         let socketPath = stateRootURL.appendingPathComponent("agent.sock").path
         let bootID = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
@@ -193,7 +215,7 @@ struct V2AgentLaunchManager {
             ("CI_SCOPE_KEYCHAIN_SERVICE", "com.forkhorizon.ci-scope.agent"),
             ("CI_SCOPE_V2_SHADOW_TOKEN_KEYCHAIN_ACCOUNT", "shadow-token"),
         ]
-        return env.map { "        <key>\($0.0)</key>\n        <string>\($0.1)</string>" }.joined(
+        return env.map { "        <key>\($0.0)</key>\n        <string>\(enrolled[$0.0] ?? $0.1)</string>" }.joined(
             separator: "\n")
     }
 }

@@ -8,6 +8,7 @@ struct ContentView: View {
     @StateObject var settingsStore = CIQueueSettingsStore()
     @StateObject var protection = ProjectProtectionViewModel()
     @StateObject var securityEvents = SecurityEventMonitor()
+    @StateObject var gateJobs = GateJobsMonitor()
     @State var workspaceTab: WorkspaceTab = .projects
     @State var isAddingProject = false
 
@@ -18,6 +19,7 @@ struct ContentView: View {
                 projects: projectStore.projects,
                 selectedProjectID: projectStore.selectedProjectID,
                 alertCount: securityEvents.events.count,
+                activeTaskCount: gateJobs.activeCount,
                 stateForProject: state(for:),
                 onSelect: selectProject,
                 onRemove: { projectStore.removeProject($0) },
@@ -35,6 +37,7 @@ struct ContentView: View {
             settingsStore.startV2Lifecycle()
             while !Task.isCancelled {
                 await securityEvents.refresh()
+                await gateJobs.refresh()
                 try? await Task.sleep(for: .seconds(30))
             }
         }
@@ -57,6 +60,8 @@ struct ContentView: View {
             } else {
                 EmptyProjectDashboard { isAddingProject = true }
             }
+        case .activity:
+            ActivityView(monitor: gateJobs)
         case .alerts:
             AlertsView(events: securityEvents)
         case .settings:
@@ -92,6 +97,7 @@ struct ContentView: View {
     private var headerSubtitle: String {
         switch workspaceTab {
         case .projects: projectStore.selectedProject?.repositorySlug ?? "No project selected"
+        case .activity: gateJobs.activeCount == 0 ? "Idle" : "\(gateJobs.activeCount) in progress or waiting"
         case .alerts: securityEvents.events.isEmpty ? "Nothing needs your attention" : "\(securityEvents.events.count) open"
         case .settings: "This Mac and the website"
         }

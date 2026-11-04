@@ -27,7 +27,11 @@ enum ServerAuthorizer {
 
     /// Read-only token for the project config and security event routes; needs no Touch ID.
     static func configReadToken() async throws -> String {
-        try await serverValue("CI_SCOPE_CONFIG_READ_TOKEN")
+        // Asked once per run: every ask is an ssh to the VPS, and the screens refresh every few seconds.
+        if let cached = await ReadTokenCache.shared.value { return cached }
+        let token = try await serverValue("CI_SCOPE_CONFIG_READ_TOKEN")
+        await ReadTokenCache.shared.store(token)
+        return token
     }
 
     /// Prompts for Touch ID, then returns the admin login (the GitHub login of this Mac's owner) and password.
@@ -72,3 +76,9 @@ enum ServerAuthorizer {
 
 /// Older tests and callers refer to the authorizer by its former name.
 typealias PolicyAuthorizerError = ServerAuthorizerError
+
+private actor ReadTokenCache {
+    static let shared = ReadTokenCache()
+    private(set) var value: String?
+    func store(_ token: String) { value = token }
+}
