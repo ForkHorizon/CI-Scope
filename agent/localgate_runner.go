@@ -52,10 +52,24 @@ func GateSearchPath() string {
 	return ""
 }
 
+// LookGatePath finds a tool the way the gate commands will: on GateSearchPath. exec.Command resolves a bare name
+// with this process's PATH instead of command.Env, so a LaunchAgent would run /usr/bin/python3 (3.9) and not Homebrew's.
+func LookGatePath(name string) (string, error) {
+	for _, dir := range filepath.SplitList(GateSearchPath()) {
+		if path, err := exec.LookPath(filepath.Join(dir, name)); err == nil {
+			return path, nil
+		}
+	}
+	return "", exec.ErrNotFound
+}
+
 // gateKillGrace is how long a cancelled command gets before its output pipes are abandoned.
 const gateKillGrace = 5 * time.Second
 
 func execCommand(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
+	if resolved, err := LookGatePath(name); err == nil {
+		name = resolved
+	}
 	command := exec.CommandContext(ctx, name, args...)
 	command.Dir = dir
 	command.Env = gateEnvironment()

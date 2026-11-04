@@ -202,3 +202,9 @@ func TestGateSearchPathCoversHomebrew(t *testing.T) {
 		t.Fatalf("GateSearchPath = %q", GateSearchPath())
 	}
 }
+
+func TestLookGatePathFindsHomebrewTools(t *testing.T) {
+	if path, err := LookGatePath("python3"); err != nil || !strings.HasPrefix(path, "/opt/homebrew/bin/") {
+		t.Skipf("python3 not under Homebrew on this machine: %q %v", path, err)
+	}
+}
