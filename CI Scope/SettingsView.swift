@@ -4,6 +4,9 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var store: CIQueueSettingsStore
     @ObservedObject var v2Control: V2ClientControlSession
+    @AppStorage(ToastSettings.enabledKey) private var toastsEnabled = true
+    @AppStorage(ToastSettings.animationKey) private var toastAnimation = ToastSettings.defaultAnimation
+    @AppStorage(ToastSettings.durationKey) private var toastDuration = ToastSettings.defaultDuration
     @State private var message: String?
     @State private var isWorking = false
     @State private var confirmEmergencyStop = false
@@ -28,16 +31,32 @@ struct SettingsView: View {
 
     private var notificationsSection: some View {
         SettingsSection(title: "Notifications") {
-            SettingsRow(title: "Preview", hint: "CI Scope shows its own cards in the corner of the screen, not macOS notifications") {
+            SettingsRow(title: "Show notifications", hint: "CI Scope's own cards in the corner of the screen, not macOS notifications") {
+                Toggle("", isOn: $toastsEnabled).labelsHidden()
+            }
+            SettingsRow(title: "Animation", hint: "How long a card takes to slide in and out") {
+                seconds($toastAnimation, range: 0.1...1.5, step: 0.05, digits: 2)
+            }
+            SettingsRow(title: "Stays on screen", hint: "Alerts and failures stay 60% longer") {
+                seconds($toastDuration, range: 2...20, step: 1, digits: 0)
+            }
+            SettingsRow(title: "Preview", hint: "Shows a card with the current settings") {
                 HStack(spacing: 8) {
                     Button("Check passed") {
-                        ToastCenter.shared.post(Toast(kind: .passed, title: "ForkHorizon/CI-Scope #184", detail: "All checks passed · 3f9a1c2"))
+                        ToastCenter.shared.post(Toast(kind: .passed, title: "ForkHorizon/CI-Scope #184", detail: "All checks passed · 3f9a1c2"), preview: true)
                     }.buttonStyle(.pill)
                     Button("Alert") {
-                        ToastCenter.shared.post(Toast(kind: .alert, title: "Protected files changed", detail: "ForkHorizon/CI-Scope · .github/workflows", destination: .alerts))
+                        ToastCenter.shared.post(Toast(kind: .alert, title: "Protected files changed", detail: "ForkHorizon/CI-Scope · .github/workflows", destination: .alerts), preview: true)
                     }.buttonStyle(.pillDanger)
                 }
             }
+        }
+    }
+
+    private func seconds(_ value: Binding<Double>, range: ClosedRange<Double>, step: Double, digits: Int) -> some View {
+        HStack(spacing: 12) {
+            Slider(value: value, in: range, step: step).frame(maxWidth: 180).pointerStyle(.link)
+            Text(String(format: "%.\(digits)f s", value.wrappedValue)).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).frame(width: 52, alignment: .trailing)
         }
     }
 

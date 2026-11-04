@@ -3,6 +3,19 @@ import AppKit
 import Combine
 import SwiftUI
 
+/// User-tunable notification behavior, stored in UserDefaults (edited in Settings).
+enum ToastSettings {
+    static let enabledKey = "toast.enabled"
+    static let animationKey = "toast.animationSeconds"
+    static let durationKey = "toast.displaySeconds"
+    static let defaultAnimation = 0.45
+    static let defaultDuration = 6.0
+
+    static var enabled: Bool { UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true }
+    static var animation: Double { UserDefaults.standard.object(forKey: animationKey) as? Double ?? defaultAnimation }
+    static var duration: Double { UserDefaults.standard.object(forKey: durationKey) as? Double ?? defaultDuration }
+}
+
 struct Toast: Identifiable, Equatable {
     enum Kind { case queued, running, passed, failed, alert, info }
 
@@ -11,10 +24,18 @@ struct Toast: Identifiable, Equatable {
     var title: String
     var detail: String
     /// Screen to open when the card is clicked.
-    var destination: WorkspaceTab = .activity
+    var destination: WorkspaceTab
 
-    /// Alerts stay longer than progress updates.
-    var lifetime: Double { kind == .alert || kind == .failed ? 10 : 6 }
+    /// Seconds on screen; alerts and failures stay longer than progress updates.
+    let lifetime: Double
+
+    init(kind: Toast.Kind, title: String, detail: String, destination: WorkspaceTab = .activity) {
+        self.kind = kind
+        self.title = title
+        self.detail = detail
+        self.destination = destination
+        lifetime = ToastSettings.duration * (kind == .alert || kind == .failed ? 1.6 : 1)
+    }
 }
 
 @MainActor
@@ -35,7 +56,9 @@ final class ToastCenter: ObservableObject {
 
     private var panel: NSPanel?
 
-    func post(_ toast: Toast) {
+    /// `preview` shows the card even when notifications are switched off, so Settings can demonstrate the look.
+    func post(_ toast: Toast, preview: Bool = false) {
+        guard preview || ToastSettings.enabled else { return }
         toasts.insert(toast, at: 0)
         if toasts.count > Self.limit { toasts.removeLast(toasts.count - Self.limit) }
         if toast.kind == .alert || toast.kind == .failed { NSSound(named: "Funk")?.play() }
@@ -46,7 +69,7 @@ final class ToastCenter: ObservableObject {
         toasts.removeAll { $0.id == id }
         // Let the card finish sliding out before the window shrinks around it.
         Task {
-            try? await Task.sleep(for: .milliseconds(450))
+            try? await Task.sleep(for: .seconds(ToastSettings.animation + 0.05))
             layout()
         }
     }
@@ -90,6 +113,7 @@ final class ToastCenter: ObservableObject {
 
 private struct ToastStack: View {
     @ObservedObject var center: ToastCenter
+    @AppStorage(ToastSettings.animationKey) private var animation = ToastSettings.defaultAnimation
 
     var body: some View {
         VStack(spacing: ToastCenter.gap) {
@@ -104,7 +128,7 @@ private struct ToastStack: View {
         }
         .padding(ToastCenter.glow)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(.spring(duration: 0.45, bounce: 0.25), value: center.toasts)
+        .animation(.spring(duration: max(0.05, animation), bounce: 0.25), value: center.toasts)
     }
 }
 
