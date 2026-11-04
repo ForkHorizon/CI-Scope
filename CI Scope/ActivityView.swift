@@ -7,6 +7,12 @@ struct ActivityView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    tile("Waiting", count(["queued"]), NothingTheme.amber)
+                    tile("Running", count(["leased", "running"]), NothingTheme.green)
+                    tile("Passed", count(["succeeded"]), NothingTheme.ink)
+                    tile("Failed", count(["failed"]), NothingTheme.red)
+                }
                 Text(summary).font(NothingTheme.body).foregroundStyle(NothingTheme.inkDim)
                 ForEach(monitor.jobs) { job in row(job) }
                 if let message = monitor.message {
@@ -22,6 +28,20 @@ struct ActivityView: View {
                 try? await Task.sleep(for: .seconds(5))
             }
         }
+    }
+
+    private func count(_ statuses: [String]) -> Int { monitor.jobs.filter { statuses.contains($0.status) }.count }
+
+    /// A stat tile; the number lights up in its signal color only when there is something to see.
+    private func tile(_ title: String, _ value: Int, _ signal: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).nothingCaption()
+            Text("\(value)").nothingDisplay(34).foregroundStyle(value > 0 ? signal : NothingTheme.inkDim)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(NothingTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(NothingTheme.line, lineWidth: 1))
     }
 
     private var summary: String {
