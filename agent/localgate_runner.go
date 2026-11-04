@@ -91,13 +91,24 @@ func (r *GateScriptRunner) Run(ctx context.Context, job LocalGateJob) (LocalGate
 }
 
 func (r *GateScriptRunner) verifyGates(ctx context.Context) error {
+	// The report goes to a PR check where nobody sees the agent's log: say what was found, where, and the fix.
 	head, err := r.run(ctx, r.GatesRoot, "git", "rev-parse", "HEAD")
-	if err != nil || strings.TrimSpace(string(head)) != r.GatesSHA {
-		return fmt.Errorf("ci-gates is not at the pinned commit %s", r.GatesSHA)
+	if err != nil {
+		return &environmentError{fmt.Sprintf("cannot read ci-gates HEAD in %s: %s", r.GatesRoot, clip(string(head)+" "+err.Error(), 120))}
+	}
+	if got := strings.TrimSpace(string(head)); got != r.GatesSHA {
+		// Self-heal: the pin moved ahead of this checkout. Checkout without --force, so local edits are never lost.
+		if out, err := r.syncGates(ctx); err != nil {
+			return &environmentError{fmt.Sprintf("ci-gates in %s is at %s, expected pinned %s, and auto-sync failed: %s",
+				r.GatesRoot, shortSHA(got), shortSHA(r.GatesSHA), clip(out, 120))}
+		}
 	}
 	status, err := r.run(ctx, r.GatesRoot, "git", "status", "--porcelain", "--untracked-files=all")
-	if err != nil || strings.TrimSpace(string(status)) != "" {
-		return fmt.Errorf("ci-gates checkout has local changes; refusing to run unpinned code")
+	if err != nil {
+		return &environmentError{fmt.Sprintf("cannot read ci-gates status in %s: %s", r.GatesRoot, clip(string(status)+" "+err.Error(), 120))}
+	}
+	if changed := strings.TrimSpace(string(status)); changed != "" {
+		return &environmentError{fmt.Sprintf("ci-gates checkout %s has local changes, refusing unpinned code: %s", r.GatesRoot, clip(changed, 120))}
 	}
 	return nil
 }
@@ -112,7 +123,7 @@ func (r *GateScriptRunner) checkout(ctx context.Context, job LocalGateJob) (stri
 			return "", err
 		}
 		if out, err := r.run(ctx, dir, "git", "clone", "--no-checkout", "https://github.com/"+job.Repository+".git", "."); err != nil {
-			return "", fmt.Errorf("clone failed: %s", clip(string(out), 300))
+			return "", &environmentError{"clone failed: " + clip(string(out), 300)}
 		}
 	}
 	steps := [][]string{
@@ -122,7 +133,7 @@ func (r *GateScriptRunner) checkout(ctx context.Context, job LocalGateJob) (stri
 	}
 	for _, step := range steps {
 		if out, err := r.run(ctx, dir, "git", step...); err != nil {
-			return "", fmt.Errorf("git %s failed: %s", step[0], clip(string(out), 300))
+			return "", &environmentError{fmt.Sprintf("git %s failed: %s", step[0], clip(string(out), 300))}
 		}
 	}
 	return dir, nil
@@ -132,6 +143,10 @@ func (r *GateScriptRunner) checkout(ctx context.Context, job LocalGateJob) (stri
 func (r *GateScriptRunner) report(output []byte, runErr error) LocalGateReport {
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	summary := clip(lines[0], localGateMaxSummary)
+	if last := lines[len(lines)-1]; last != "" && (len(lines) < 2 || !strings.HasPrefix(lines[0], "CI Scope:")) {
+		// No verdict line: the script crashed, and the cause is at the end of its output (a traceback's last line).
+		summary = clip("CI Scope: FAILED — "+last, localGateMaxSummary)
+	}
 	report := LocalGateReport{Status: "failed", Summary: summary, Checks: []LocalGateCheck{}, CompletedAt: r.now().UnixMilli()}
 	var parsed struct {
 		ConfigVersion int `json:"configVersion"`
@@ -157,6 +172,32 @@ func (r *GateScriptRunner) report(output []byte, runErr error) LocalGateReport {
 		report.Status = "passed"
 	}
 	return report
+}
+
+// environmentError is a problem with the agent's machine, not with the pull request being checked.
+type environmentError struct{ msg string }
+
+func (e *environmentError) Error() string { return e.msg }
+
+// syncGates moves the pinned ci-gates checkout to GatesSHA and confirms it landed there.
+func (r *GateScriptRunner) syncGates(ctx context.Context) (string, error) {
+	for _, step := range [][]string{{"fetch", "--quiet", "origin", r.GatesSHA}, {"checkout", "--quiet", "--detach", r.GatesSHA}} {
+		if out, err := r.run(ctx, r.GatesRoot, "git", step...); err != nil {
+			return "git " + step[0] + ": " + string(out), err
+		}
+	}
+	head, err := r.run(ctx, r.GatesRoot, "git", "rev-parse", "HEAD")
+	if err != nil || strings.TrimSpace(string(head)) != r.GatesSHA {
+		return "checkout did not land on the pinned commit", fmt.Errorf("not synced")
+	}
+	return "", nil
+}
+
+func shortSHA(sha string) string {
+	if len(sha) > 12 {
+		return sha[:12]
+	}
+	return sha
 }
 
 func clip(text string, limit int) string {

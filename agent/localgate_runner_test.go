@@ -108,7 +108,7 @@ func TestRunnerFetchesInsteadOfCloningWhenTheWorkspaceExists(t *testing.T) {
 
 func TestRunnerRefusesUnpinnedOrModifiedGates(t *testing.T) {
 	wrong := &scriptedCommands{gitHead: "dddddddddddddddddddddddddddddddddddddddd"}
-	if _, err := newScriptedRunner(t, wrong).Run(context.Background(), gateJob()); err == nil || !strings.Contains(err.Error(), "pinned commit") {
+	if _, err := newScriptedRunner(t, wrong).Run(context.Background(), gateJob()); err == nil || !strings.Contains(err.Error(), "expected pinned") {
 		t.Fatalf("err = %v, want a pin error", err)
 	}
 	dirty := &scriptedCommands{gitHead: gatePin, dirty: " M scripts/code-linter.py\n"}
@@ -181,5 +181,18 @@ func TestRunnerSurfacesGitFailures(t *testing.T) {
 	commands := &scriptedCommands{gitHead: gatePin, failOn: "git fetch"}
 	if _, err := newScriptedRunner(t, commands).Run(context.Background(), gateJob()); err == nil || !strings.Contains(err.Error(), "git fetch failed") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestReportUsesLastLineOfACrashAndEnvironmentErrorsAreMarked(t *testing.T) {
+	r := &GateScriptRunner{now: func() time.Time { return time.UnixMilli(1) }}
+	got := r.report([]byte("Traceback (most recent call last):\n  File x\nValueError: bad config"), errors.New("exit 1"))
+	if !strings.Contains(got.Summary, "ValueError: bad config") {
+		t.Fatalf("summary = %q", got.Summary)
+	}
+	w := &LocalGateWorker{now: func() time.Time { return time.UnixMilli(1) }}
+	env := w.finalReport(LocalGateReport{}, &environmentError{"ci-gates is at abc"}, false)
+	if !env.Environment || !strings.Contains(env.Summary, "ENVIRONMENT ERROR") || !strings.Contains(env.Summary, "ci-gates is at abc") {
+		t.Fatalf("summary = %q", env.Summary)
 	}
 }

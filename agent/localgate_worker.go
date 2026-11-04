@@ -3,6 +3,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sync/atomic"
@@ -108,6 +109,11 @@ func (w *LocalGateWorker) finalReport(report LocalGateReport, runErr error, canc
 	case cancelled:
 		return LocalGateReport{Status: "cancelled", Summary: "CI Scope: CANCELLED — the run was stopped before it finished", Checks: []LocalGateCheck{}, CompletedAt: w.now().UnixMilli()}
 	case runErr != nil:
+		var env *environmentError
+		if errors.As(runErr, &env) {
+			prefix := "CI Scope: ENVIRONMENT ERROR (your code was not checked) — "
+			return LocalGateReport{Status: "failed", Summary: prefix + clip(env.msg, localGateMaxSummary-len(prefix)), Checks: []LocalGateCheck{}, CompletedAt: w.now().UnixMilli(), Environment: true}
+		}
 		return LocalGateReport{Status: "failed", Summary: fmt.Sprintf("CI Scope: FAILED — %s", clip(runErr.Error(), localGateMaxSummary-len("CI Scope: FAILED — "))), Checks: []LocalGateCheck{}, CompletedAt: w.now().UnixMilli()}
 	}
 	return report
