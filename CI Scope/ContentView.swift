@@ -22,7 +22,6 @@ struct ContentView: View {
                 activeTaskCount: gateJobs.activeCount,
                 stateForProject: state(for:),
                 onSelect: selectProject,
-                onRemove: { projectStore.removeProject($0) },
                 onAddProject: { isAddingProject = true }
             )
             VStack(spacing: 0) {
@@ -43,6 +42,7 @@ struct ContentView: View {
             }
             settingsStore.startV2Lifecycle()
             while !Task.isCancelled {
+                await refreshProjects()
                 await securityEvents.refresh()
                 await gateJobs.refresh()
                 try? await Task.sleep(for: .seconds(10))
@@ -53,7 +53,10 @@ struct ContentView: View {
             AddProjectSheet { input in
                 let project = try projectStore.addProject(from: input)
                 workspaceTab = .projects
-                Task { await protection.register(repository: project.repositorySlug) }
+                Task {
+                    await protection.register(repository: project.repositorySlug)
+                    await refreshProjects()
+                }
             }
         }
     }
@@ -74,6 +77,13 @@ struct ContentView: View {
         case .settings:
             SettingsView(store: settingsStore, v2Control: settingsStore.v2Control)
         }
+    }
+
+    /// The sidebar mirrors the server's registered projects; a failed read keeps the list as it is.
+    private func refreshProjects() async {
+        guard let token = try? await ServerAuthorizer.configReadToken(),
+              let slugs = try? await ProjectConfigClient().listRepositories(readToken: token) else { return }
+        projectStore.sync(with: slugs)
     }
 
     private func state(for project: CIProject) -> ServiceState {

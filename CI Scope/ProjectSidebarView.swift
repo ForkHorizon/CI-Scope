@@ -10,7 +10,6 @@ struct ProjectMenuPanel: View {
     let activeTaskCount: Int
     let stateForProject: (CIProject) -> ServiceState
     let onSelect: (CIProject) -> Void
-    let onRemove: (CIProject) -> Void
     let onAddProject: () -> Void
 
     var body: some View {
@@ -43,8 +42,6 @@ struct ProjectMenuPanel: View {
                             isActive: workspaceTab == .projects && project.id == selectedProjectID
                         ) {
                             onSelect(project)
-                        } onRemove: {
-                            onRemove(project)
                         }
                     }
                 }
