@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 536" width="1280" height="536" role="img" aria-labelledby="t d">
+  <title id="t">CI Scope in one minute</title>
+  <desc id="d">A developer or an AI assistant proposes a change on GitHub. CI Scope loads the checks the owner chose, a program on the owner's Mac runs them, and GitHub shows pass or fail with a reason. Relaxing a rule needs the owner's fingerprint.</desc>
+  <style>
+    text { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fill: #f2f2f2; }
+    .cap { font-size: 12px; letter-spacing: 1.8px; fill: #adadad; }
+    .big { font-size: 32px; font-weight: 700; }
+    .lead { font-size: 15px; fill: #cfcfcf; }
+    .h { font-size: 17px; font-weight: 700; }
+    .s { font-size: 13px; fill: #bdbdbd; }
+    .card { fill: #0e0e0e; stroke: #525252; stroke-width: 1.5; }
+    .num { fill: #f2f2f2; }
+    .n { font-size: 13px; font-weight: 700; fill: #000; }
+    .ico { fill: none; stroke: #f2f2f2; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .arrow { fill: none; stroke: #8a8a8a; stroke-width: 1.5; }
+    .ok { fill: #0e0e0e; stroke: #4dd985; stroke-width: 1.5; }
+    .bad { fill: #0e0e0e; stroke: #d61a21; stroke-width: 1.5; }
+    .dot { fill: #4dd985; }
+    @media (prefers-reduced-motion: reduce) { .dot { display: none; } }
+  </style>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#8a8a8a"/></marker></defs>
+  <rect width="1280" height="536" fill="#000"/>
+
+  <text x="40" y="52" class="cap">CI SCOPE · IN ONE MINUTE</text>
+  <text x="40" y="100" class="big">Checks every code change before it ships.</text>
+  <text x="40" y="136" class="lead">AI assistants write more and more code. CI Scope makes sure their work is checked by rules they cannot quietly loosen.</text>
+
+  <!-- four steps -->
+  <rect class="card" x="40"  y="176" width="282" height="165" rx="16"/>
+  <rect class="card" x="346" y="176" width="282" height="165" rx="16"/>
+  <rect class="card" x="652" y="176" width="282" height="165" rx="16"/>
+  <rect class="card" x="958" y="176" width="282" height="165" rx="16"/>
+
+  <circle class="num" cx="68" cy="206" r="13"/><text x="68" y="211" class="n" text-anchor="middle">1</text>
+  <circle class="num" cx="374" cy="206" r="13"/><text x="374" y="211" class="n" text-anchor="middle">2</text>
+  <circle class="num" cx="680" cy="206" r="13"/><text x="680" y="211" class="n" text-anchor="middle">3</text>
+  <circle class="num" cx="986" cy="206" r="13"/><text x="986" y="211" class="n" text-anchor="middle">4</text>
+
+  <!-- icons: change, rules, run, verdict -->
+  <g class="ico" transform="translate(282 190)"><circle cx="8" cy="8" r="4"/><circle cx="8" cy="30" r="4"/><circle cx="30" cy="30" r="4"/><path d="M8 12v14M30 26V18a6 6 0 0 0-6-6h-6M21 9l-3 3 3 3"/></g>
+  <g class="ico" transform="translate(588 190)"><rect x="4" y="6" width="30" height="26" rx="4"/><path d="M10 14h18M10 20h18M10 26h10"/></g>
+  <g class="ico" transform="translate(894 190)"><rect x="3" y="6" width="32" height="22" rx="3"/><path d="M12 33h14M19 28v5M12 14l5 4-5 4M21 22h6"/></g>
+  <g class="ico" transform="translate(1200 190)"><circle cx="19" cy="19" r="15"/><path d="M12 19l5 5 10-11"/></g>
+
+  <text x="64" y="250" class="h">A change is proposed</text>
+  <text x="64" y="278" class="s">A developer or an AI assistant</text>
+  <text x="64" y="297" class="s">proposes a change on GitHub.</text>
+
+  <text x="370" y="250" class="h">The rules are loaded</text>
+  <text x="370" y="278" class="s">CI Scope loads the checks the</text>
+  <text x="370" y="297" class="s">owner chose, kept on a website</text>
+  <text x="370" y="316" class="s">out of an AI's reach.</text>
+
+  <text x="676" y="250" class="h">The checks run</text>
+  <text x="676" y="278" class="s">A program on the owner's Mac</text>
+  <text x="676" y="297" class="s">runs them. Nothing is added</text>
+  <text x="676" y="316" class="s">to the project itself.</text>
+
+  <text x="982" y="250" class="h">A verdict comes back</text>
+  <text x="982" y="278" class="s">GitHub shows pass or fail,</text>
+  <text x="982" y="297" class="s">with a plain-language reason.</text>
+
+  <!-- arrows between steps -->
+  <path class="arrow" d="M326 271 L342 271" marker-end="url(#ah)"/>
+  <path class="arrow" d="M632 271 L648 271" marker-end="url(#ah)"/>
+  <path class="arrow" d="M938 271 L954 271" marker-end="url(#ah)"/>
+  <circle class="dot" r="3"><animateMotion dur="6s" repeatCount="indefinite" path="M326 271 L342 271"/></circle>
+  <circle class="dot" r="3"><animateMotion dur="6s" begin="2s" repeatCount="indefinite" path="M632 271 L648 271"/></circle>
+  <circle class="dot" r="3"><animateMotion dur="6s" begin="4s" repeatCount="indefinite" path="M938 271 L954 271"/></circle>
+
+  <g transform="translate(0 -24)">
+  <!-- two outcomes -->
+  <rect class="ok" x="40" y="400" width="600" height="56" rx="14"/>
+  <circle cx="72" cy="428" r="11" fill="#4dd985"/><path d="M66 428l4 4 8-9" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="98" y="433" style="font-size:15px">CI Scope: PASSED — all checks passed</text>
+  <rect class="bad" x="660" y="400" width="580" height="56" rx="14"/>
+  <circle cx="692" cy="428" r="11" fill="#d61a21"/><path d="M687 423l10 10M697 423l-10 10" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+  <text x="718" y="433" style="font-size:15px">CI Scope: FAILED — protected files were modified</text>
+
+  <text x="40" y="500" class="lead">Loosening a rule takes the owner's fingerprint (Touch ID) on the website, so an AI cannot weaken its own checks.</text>
+  <text x="40" y="528" class="s">Illustrative results. Technical diagram: docs/architecture.svg</text>
+  </g>
+</svg>

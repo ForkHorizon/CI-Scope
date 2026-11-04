@@ -3,16 +3,16 @@
   <desc id="d">A pull request reaches the CI Scope control plane on a VPS through the GitHub App. The agent on the owner's Mac claims the job, runs gates pinned by commit SHA, and reports back. The control plane posts the CI Scope check to GitHub. The macOS app and website show status; weakening protection needs the owner's Touch ID.</desc>
   <style>
     text { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fill: #f2f2f2; }
-    .cap { font-size: 11px; letter-spacing: 1.6px; fill: #adadad; text-transform: uppercase; }
-    .h { font-size: 15px; font-weight: 600; }
-    .s { font-size: 12px; fill: #adadad; }
+    .cap { font-size: 12px; letter-spacing: 1.6px; fill: #adadad; text-transform: uppercase; }
+    .h { font-size: 16px; font-weight: 600; }
+    .s { font-size: 13px; fill: #adadad; }
     .zone { fill: none; stroke: #2a2a2a; stroke-width: 1.5; stroke-dasharray: 3 6; }
     .node { fill: #0e0e0e; stroke: #525252; stroke-width: 1.5; }
     .own { fill: #0e0e0e; stroke: #d61a21; stroke-width: 1.5; }
     .link { fill: none; stroke: #8a8a8a; stroke-width: 1.5; }
     .soft { fill: none; stroke: #3a3a3a; stroke-width: 1.5; stroke-dasharray: 4 5; }
     .red { fill: none; stroke: #d61a21; stroke-width: 1.5; stroke-dasharray: 4 5; }
-    .lbl { font-size: 11px; fill: #cfcfcf; }
+    .lbl { font-size: 12px; fill: #cfcfcf; }
     .n { font-size: 11px; font-weight: 700; fill: #000; }
     .dot { fill: #4dd985; }
     @media (prefers-reduced-motion: reduce) { .dot { display: none; } }
@@ -23,8 +23,8 @@
     <path id="flow" d="M190 210 L190 290 M320 310 C375 310 375 195 430 195 M850 185 L960 185 M960 215 L850 215 M430 235 C375 235 375 365 320 365"/>
   </defs>
   <rect width="1280" height="780" fill="#000"/>
-  <text x="40" y="48" class="cap">CI Scope · how a pull request is checked</text>
-  <text x="40" y="70" class="s">Protection lives on the website, not in the repositories. The checks run on the owner's Mac.</text>
+  <text x="40" y="48" class="cap">CI Scope · how a pull request is checked · current path</text>
+  <text x="40" y="70" class="s">Checks are set on the website, not inside the repositories. They run on the owner's Mac.</text>
 
   <!-- zones -->
   <rect class="zone" x="40" y="100" width="300" height="560" rx="18"/><text x="60" y="126" class="cap">GitHub</text>
@@ -32,21 +32,21 @@
   <rect class="zone" x="940" y="100" width="300" height="560" rx="18"/><text x="960" y="126" class="cap">The owner's Mac</text>
 
   <!-- GitHub -->
-  <rect class="node" x="60" y="150" width="260" height="70" rx="12"/><text x="80" y="178" class="h">Pull request</text><text x="80" y="198" class="s">opened or updated by an AI agent</text>
+  <rect class="node" x="60" y="150" width="260" height="70" rx="12"/><text x="80" y="178" class="h">Pull request</text><text x="80" y="198" class="s">opened by a person or an AI</text>
   <rect class="node" x="60" y="290" width="260" height="90" rx="12"/><text x="80" y="318" class="h">GitHub App</text><text x="80" y="338" class="s">webhooks in</text><text x="80" y="356" class="s">Check “CI Scope” out</text>
-  <rect class="node" x="60" y="470" width="260" height="70" rx="12"/><text x="80" y="498" class="h">Protected repository</text><text x="80" y="518" class="s">nothing is installed in it</text>
+  <rect class="node" x="60" y="470" width="260" height="70" rx="12"/><text x="80" y="498" class="h">Protected repository</text><text x="80" y="518" class="s">nothing is added to it</text>
 
   <!-- VPS -->
   <rect class="node" x="430" y="150" width="420" height="100" rx="12"/><text x="450" y="178" class="h">Control plane</text><text x="450" y="198" class="s">queue · V2 protocol · policy</text><text x="450" y="216" class="s">posts the Check · raises alerts</text>
   <rect class="node" x="430" y="300" width="420" height="70" rx="12"/><text x="450" y="328" class="h">State</text><text x="450" y="348" class="s">SQLite · configs · baselines · events</text>
-  <rect class="node" x="430" y="420" width="420" height="90" rx="12"/><text x="450" y="448" class="h">Website</text><text x="450" y="468" class="s">projects · checks · history</text><text x="450" y="486" class="s">the single place protection is changed</text>
-  <rect class="own" x="520" y="560" width="240" height="70" rx="12"/><text x="540" y="588" class="h">Owner approval</text><text x="540" y="608" class="s">Touch ID passkey to weaken</text>
+  <rect class="node" x="430" y="420" width="420" height="90" rx="12"/><text x="450" y="448" class="h">Website</text><text x="450" y="468" class="s">projects · checks · history</text><text x="450" y="486" class="s">the one place checks are changed</text>
+  <rect class="own" x="520" y="560" width="240" height="70" rx="12"/><text x="540" y="588" class="h">Owner approval</text><text x="540" y="608" class="s">Touch ID to loosen a check</text>
 
   <!-- Mac -->
   <rect class="node" x="960" y="150" width="260" height="100" rx="12"/><text x="980" y="178" class="h">Agent · Go</text><text x="980" y="198" class="s">claims jobs from the server</text><text x="980" y="216" class="s">runs the checks on this Mac</text>
   <rect class="node" x="960" y="300" width="260" height="70" rx="12" stroke-dasharray="5 5"/><text x="980" y="328" class="h">ci-gates</text><text x="980" y="348" class="s">pinned by commit SHA</text>
   <rect class="node" x="960" y="420" width="260" height="90" rx="12"/><text x="980" y="448" class="h">macOS app</text><text x="980" y="468" class="s">status · alerts · cards</text><text x="980" y="486" class="s">opens the website to change</text>
-  <rect class="node" x="960" y="560" width="260" height="70" rx="12"/><text x="980" y="588" class="h">Git hooks</text><text x="980" y="608" class="s">check an agent's commit locally</text>
+  <rect class="node" x="960" y="560" width="260" height="70" rx="12"/><text x="980" y="588" class="h">Git hooks</text><text x="980" y="608" class="s">checks commits on this Mac</text>
 
   <!-- links -->
   <path class="link" d="M190 220 L190 290" marker-end="url(#ah)"/>
@@ -69,15 +69,15 @@
   <circle cx="375" cy="300" r="9" fill="#f2f2f2"/><text x="375" y="304" class="n" text-anchor="middle">5</text>
 
   <!-- flow dots -->
-  <circle class="dot" r="3.5"><animateMotion dur="3.2s" repeatCount="indefinite" path="M190 220 L190 290"/></circle>
-  <circle class="dot" r="3.5"><animateMotion dur="3.2s" begin="0.4s" repeatCount="indefinite" path="M320 310 C375 310 375 195 430 195"/></circle>
-  <circle class="dot" r="3.5"><animateMotion dur="3.2s" begin="0.9s" repeatCount="indefinite" path="M850 185 L960 185"/></circle>
-  <circle class="dot" r="3.5"><animateMotion dur="3.2s" begin="1.5s" repeatCount="indefinite" path="M960 215 L850 215"/></circle>
-  <circle class="dot" r="3.5"><animateMotion dur="3.2s" begin="2.1s" repeatCount="indefinite" path="M430 235 C375 235 375 365 320 365"/></circle>
+  <circle class="dot" r="3.5"><animateMotion dur="6s" repeatCount="indefinite" path="M190 220 L190 290"/></circle>
+  <circle class="dot" r="3.5"><animateMotion dur="6s" begin="1.2s" repeatCount="indefinite" path="M320 310 C375 310 375 195 430 195"/></circle>
+  <circle class="dot" r="3.5"><animateMotion dur="6s" begin="2.4s" repeatCount="indefinite" path="M850 185 L960 185"/></circle>
+  <circle class="dot" r="3.5"><animateMotion dur="6s" begin="3.6s" repeatCount="indefinite" path="M960 215 L850 215"/></circle>
+  <circle class="dot" r="3.5"><animateMotion dur="6s" begin="4.8s" repeatCount="indefinite" path="M430 235 C375 235 375 365 320 365"/></circle>
 
   <!-- legend -->
   <text x="40" y="700" class="cap">The path</text>
   <text x="40" y="722" class="s">1 the GitHub App sends the webhook · 2 the control plane queues the check · 3 the agent claims the job</text>
   <text x="40" y="742" class="s">4 it runs the pinned gates on the Mac · 5 the result goes back and the “CI Scope” Check is posted</text>
-  <text x="40" y="762" class="s">A merge without a green check raises an alert. Weakening protection needs the owner's Touch ID on the website.</text>
+  <text x="40" y="762" class="s">A merge without a green check raises an alert. Loosening a check needs the owner's Touch ID on the website.</text>
 </svg>

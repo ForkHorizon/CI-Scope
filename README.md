@@ -4,7 +4,7 @@ CI Scope keeps AI coding agents honest. Protection lives on the website (`https:
 repositories: one GitHub check, "CI Scope", is posted by the GitHub App for every pull request, and the checks run on
 this Mac. Nothing is installed into the protected repositories.
 
-![How CI Scope checks a pull request: GitHub App, control plane on a VPS, agent and app on the owner's Mac](docs/architecture.svg)
+![CI Scope in one minute: a change is proposed, the owner's rules are loaded, the checks run on the owner's Mac, a verdict comes back to GitHub](docs/overview.svg)
 
 ## The two halves
 
@@ -19,6 +19,12 @@ this Mac. Nothing is installed into the protected repositories.
 1. The GitHub App sends the webhook to the website, which queues the check for the project.
 2. The agent on this Mac claims it, runs the pinned gates from `ci-gates` and reports the result.
 3. The website posts the "CI Scope" check. A merge without a green check raises an alert.
+
+## Architecture
+
+The current path, for engineers:
+
+![How CI Scope checks a pull request: GitHub App, control plane on a VPS, agent and app on the owner's Mac](docs/architecture.svg)
 
 ## Layout
 
