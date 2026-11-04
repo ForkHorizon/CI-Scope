@@ -11,6 +11,7 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
+                notificationsSection
                 websiteSection
                 agentSection
                 if let message {
@@ -22,6 +23,21 @@ struct SettingsView: View {
             }
             .padding(22)
             .toggleStyle(NothingToggleStyle())
+        }
+    }
+
+    private var notificationsSection: some View {
+        SettingsSection(title: "Notifications") {
+            SettingsRow(title: "Preview", hint: "CI Scope shows its own cards in the corner of the screen, not macOS notifications") {
+                HStack(spacing: 8) {
+                    Button("Check passed") {
+                        ToastCenter.shared.post(Toast(kind: .passed, title: "ForkHorizon/CI-Scope #184", detail: "All checks passed · 3f9a1c2"))
+                    }.buttonStyle(.pill)
+                    Button("Alert") {
+                        ToastCenter.shared.post(Toast(kind: .alert, title: "Protected files changed", detail: "ForkHorizon/CI-Scope · .github/workflows", destination: .alerts))
+                    }.buttonStyle(.pillDanger)
+                }
+            }
         }
     }
 

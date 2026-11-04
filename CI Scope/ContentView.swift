@@ -37,11 +37,15 @@ struct ContentView: View {
         .frame(minWidth: 760, idealWidth: 860, minHeight: 560, idealHeight: 620)
         .background(NothingTheme.canvas)
         .task {
+            ToastCenter.shared.onOpen = { tab in
+                workspaceTab = tab
+                NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
+            }
             settingsStore.startV2Lifecycle()
             while !Task.isCancelled {
                 await securityEvents.refresh()
                 await gateJobs.refresh()
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .seconds(10))
             }
         }
         .onDisappear { settingsStore.stopV2Lifecycle() }
