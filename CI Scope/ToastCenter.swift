@@ -25,6 +25,8 @@ final class ToastCenter: ObservableObject {
     static let cardHeight: CGFloat = 78
     static let gap: CGFloat = 10
     static let margin: CGFloat = 16
+    /// Transparent room around the cards inside the window, so their glow is never cut off at the window edge.
+    static let glow: CGFloat = 32
     private static let limit = 4
 
     @Published private(set) var toasts: [Toast] = []
@@ -79,9 +81,9 @@ final class ToastCenter: ObservableObject {
         guard let panel else { return }
         guard !toasts.isEmpty, let screen = NSScreen.main else { panel.orderOut(nil); return }
         let count = CGFloat(toasts.count)
-        let height = count * Self.cardHeight + (count - 1) * Self.gap + 24
+        let height = count * Self.cardHeight + (count - 1) * Self.gap + 2 * Self.glow
         let area = screen.visibleFrame
-        let frame = NSRect(x: area.maxX - Self.width - Self.margin - 12, y: area.maxY - height - Self.margin + 12, width: Self.width + 24, height: height)
+        let frame = NSRect(x: area.maxX - Self.width - Self.margin - Self.glow, y: area.maxY - Self.margin + Self.glow - height, width: Self.width + 2 * Self.glow, height: height)
         panel.setFrame(frame, display: true)
     }
 }
@@ -100,7 +102,7 @@ private struct ToastStack: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(12)
+        .padding(ToastCenter.glow)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(.spring(duration: 0.45, bounce: 0.25), value: center.toasts)
     }
@@ -138,7 +140,7 @@ private struct ToastCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(hovering ? tint.opacity(0.9) : NothingTheme.lineStrong, lineWidth: 1))
         .overlay(alignment: .topTrailing) { close }
-        .shadow(color: tint.opacity(hovering ? 0.28 : 0.12), radius: hovering ? 22 : 14, y: 8)
+        .shadow(color: tint.opacity(hovering ? 0.26 : 0.1), radius: hovering ? 16 : 10, y: 6)
         .scaleEffect(hovering ? 1.02 : 1)
         .offset(x: drag)
         .opacity(1 - Double(max(0, drag)) / 260)
