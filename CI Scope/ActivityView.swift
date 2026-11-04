@@ -3,24 +3,30 @@ import SwiftUI
 
 struct ActivityView: View {
     @ObservedObject var monitor: GateJobsMonitor
+    @State private var feed = FreshSet<String>()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
-                    tile("Waiting", count(["queued"]), NothingTheme.amber)
-                    tile("Running", count(["leased", "running"]), NothingTheme.green)
-                    tile("Passed", count(["succeeded"]), NothingTheme.ink)
-                    tile("Failed", count(["failed"]), NothingTheme.red)
+                    tile("Waiting", count(["queued"]), NothingTheme.amber).nothingEntrance(0)
+                    tile("Running", count(["leased", "running"]), NothingTheme.green).nothingEntrance(1)
+                    tile("Passed", count(["succeeded"]), NothingTheme.ink).nothingEntrance(2)
+                    tile("Failed", count(["failed"]), NothingTheme.red).nothingEntrance(3)
                 }
-                Text(summary).font(NothingTheme.body).foregroundStyle(NothingTheme.inkDim)
-                ForEach(monitor.jobs) { job in row(job) }
+                Text(summary).font(NothingTheme.body).foregroundStyle(NothingTheme.inkDim).nothingEntrance(4)
+                ForEach(Array(monitor.jobs.enumerated()), id: \.element.id) { index, job in
+                    row(job).nothingEntrance(index + 5)
+                }
                 if let message = monitor.message {
                     Text(message).font(NothingTheme.small).foregroundStyle(NothingTheme.amber).textSelection(.enabled)
                 }
             }
             .padding(22)
+            .animation(.smooth(duration: 0.35), value: monitor.jobs.map(\.id))
         }
+        .onAppear { feed.seed(monitor.jobs.map(\.id)) }
+        .onChange(of: monitor.jobs.map(\.id)) { _, ids in feed.update(ids) }
         .task {
             // Only while this tab is on screen: the server is ours, but there is no reason to ask when nobody looks.
             while !Task.isCancelled {
@@ -36,12 +42,10 @@ struct ActivityView: View {
     private func tile(_ title: String, _ value: Int, _ signal: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).nothingCaption()
-            Text("\(value)").nothingDisplay(34).foregroundStyle(value > 0 ? signal : NothingTheme.inkDim)
+            DotCounter(value, color: value > 0 ? signal : NothingTheme.inkDim)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(NothingTheme.panel, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(NothingTheme.line, lineWidth: 1))
+        .nothingTile(alarm: signal == NothingTheme.red && value > 0)
     }
 
     private var summary: String {
@@ -64,7 +68,7 @@ struct ActivityView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .nothingRow()
+        .nothingRow(fresh: feed.fresh.contains(job.id), tint: color(job))
     }
 
     private func color(_ job: GateJob) -> Color {

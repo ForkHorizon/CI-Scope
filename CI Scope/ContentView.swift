@@ -28,7 +28,10 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 header
                 content
+                    .id(contentID)
+                    .transition(.opacity.combined(with: .offset(y: 8)))
             }
+            .animation(.smooth(duration: 0.3), value: contentID)
             .frame(minWidth: 520, maxWidth: .infinity)
         }
         .frame(minWidth: 760, idealWidth: 860, minHeight: 560, idealHeight: 620)
@@ -79,15 +82,20 @@ struct ContentView: View {
         projectStore.select(project)
     }
 
+    /// Changes when the visible screen does, so it cross-fades instead of snapping.
+    private var contentID: String { "\(workspaceTab.rawValue)-\(projectStore.selectedProjectID.map { "\($0)" } ?? "")" }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(headerTitle).nothingDisplay(26).foregroundStyle(NothingTheme.ink).lineLimit(1)
+                .id(headerTitle).transition(.opacity.combined(with: .offset(y: -6)))
             Text(headerSubtitle).nothingCaption().lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
         .overlay(alignment: .bottom) { Rectangle().fill(NothingTheme.line).frame(height: 1) }
+        .animation(.smooth(duration: 0.3), value: headerTitle)
     }
 
     private var headerTitle: String {

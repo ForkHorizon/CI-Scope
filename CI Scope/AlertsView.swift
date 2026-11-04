@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AlertsView: View {
     @ObservedObject var events: SecurityEventMonitor
+    @State private var feed = FreshSet<Int>()
 
     var body: some View {
         ScrollView {
@@ -10,13 +11,14 @@ struct AlertsView: View {
                 if events.events.isEmpty {
                     Text("All clear. Nothing needs your attention.").font(NothingTheme.body).foregroundStyle(NothingTheme.inkDim)
                 }
-                ForEach(events.events) { event in
+                ForEach(Array(events.events.enumerated()), id: \.element.id) { index, event in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(event.title).font(NothingTheme.body.weight(.semibold)).foregroundStyle(NothingTheme.red)
                         Text("\(event.repository) · \(event.detail)").font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .nothingRow()
+                    .nothingRow(fresh: feed.fresh.contains(event.id), tint: NothingTheme.red)
+                    .nothingEntrance(index)
                 }
                 HStack(spacing: 10) {
                     if !events.events.isEmpty {
@@ -29,6 +31,9 @@ struct AlertsView: View {
                 }
             }
             .padding(22)
+            .animation(.smooth(duration: 0.35), value: events.events.map(\.id))
         }
+        .onAppear { feed.seed(events.events.map(\.id)) }
+        .onChange(of: events.events.map(\.id)) { _, ids in feed.update(ids) }
     }
 }

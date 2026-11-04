@@ -54,6 +54,9 @@ struct ProjectMenuRow: View {
             ProjectContextMenu(onRemove: onRemove)
         }
         .onHover { isHovering = $0 }
+        .pointerStyle(.link)
+        .animation(.smooth(duration: 0.18), value: isHovering)
+        .animation(.smooth(duration: 0.25), value: isActive)
     }
 
 }
