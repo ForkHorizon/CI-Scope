@@ -209,33 +209,36 @@ private struct ToastCard: View {
 /// Status glyph: hollow dot for queued, spinning arc while running, filled circle with a mark when finished.
 private struct ToastGlyph: View {
     let kind: Toast.Kind
-    @State private var spin = false
-    @State private var pulse = false
 
     var body: some View {
         ZStack {
             switch kind {
             case .queued:
                 Circle().stroke(NothingTheme.amber, lineWidth: 1.5).frame(width: 14, height: 14)
-                Circle().stroke(NothingTheme.amber, lineWidth: 1).frame(width: 14, height: 14).scaleEffect(pulse ? 1.9 : 1).opacity(pulse ? 0 : 0.8)
+                ripple(NothingTheme.amber, period: 1.4)
             case .running:
                 Circle().stroke(NothingTheme.amber.opacity(0.25), lineWidth: 1.5).frame(width: 14, height: 14)
-                Circle().trim(from: 0, to: 0.3).stroke(NothingTheme.amber, style: StrokeStyle(lineWidth: 1.5, lineCap: .round)).frame(width: 14, height: 14).rotationEffect(.degrees(spin ? 360 : 0))
+                Loop(period: 0.9) { phase in
+                    Circle().trim(from: 0, to: 0.3).stroke(NothingTheme.amber, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                        .frame(width: 14, height: 14).rotationEffect(.degrees(phase * 360))
+                }
             case .passed:
                 Circle().fill(NothingTheme.green).frame(width: 14, height: 14)
                 Image(systemName: "checkmark").font(.system(size: 8, weight: .black)).foregroundStyle(.black)
             case .failed, .alert:
                 Circle().fill(NothingTheme.red).frame(width: 14, height: 14)
-                Circle().stroke(NothingTheme.red, lineWidth: 1).frame(width: 14, height: 14).scaleEffect(pulse ? 2.2 : 1).opacity(pulse ? 0 : 0.8)
+                ripple(NothingTheme.red, period: 1.2)
                 Image(systemName: kind == .alert ? "exclamationmark" : "xmark").font(.system(size: 8, weight: .black)).foregroundStyle(.white)
             case .info:
                 Circle().fill(NothingTheme.ink).frame(width: 14, height: 14)
             }
         }
         .frame(width: 18, height: 18)
-        .onAppear {
-            withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) { spin = true }
-            withAnimation(.easeOut(duration: 1.3).repeatForever(autoreverses: false)) { pulse = true }
+    }
+
+    private func ripple(_ color: Color, period: Double) -> some View {
+        Loop(period: period) { phase in
+            Circle().stroke(color, lineWidth: 1).frame(width: 14, height: 14).scaleEffect(1 + phase * 1.2).opacity(0.8 * (1 - phase))
         }
     }
 }

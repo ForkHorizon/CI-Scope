@@ -116,3 +116,15 @@ extension View {
     func nothingEntrance(_ index: Int = 0) -> some View { modifier(NothingEntrance(index: index)) }
     func nothingTile(alarm: Bool = false) -> some View { modifier(NothingTile(alarm: alarm)) }
 }
+
+/// Endless looping value 0..<1 driven by the clock. Unlike `repeatForever` animations it never leaks into the layout transactions around it.
+struct Loop<Content: View>: View {
+    let period: Double
+    @ViewBuilder var content: (Double) -> Content
+
+    var body: some View {
+        TimelineView(.animation) { context in
+            content(context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period)
+        }
+    }
+}

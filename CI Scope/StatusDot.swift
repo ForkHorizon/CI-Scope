@@ -4,7 +4,6 @@ import SwiftUI
 struct StatusDot: View {
     let state: ServiceState
     var onLight = false
-    @State private var pulse = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var pulses: Bool { (state == .warning || state == .offline) && !reduceMotion }
@@ -15,13 +14,11 @@ struct StatusDot: View {
             .frame(width: 8, height: 8)
             .overlay(Circle().stroke(stroke, lineWidth: 1))
             .overlay {
-                if pulses { Circle().stroke(stroke, lineWidth: 1).scaleEffect(pulse ? 2.6 : 1).opacity(pulse ? 0 : 0.8) }
-            }
-            .task(id: state) {
-                pulse = false
-                guard pulses else { return }
-                try? await Task.sleep(for: .milliseconds(30))
-                withAnimation(.easeOut(duration: state == .offline ? 1.0 : 1.7).repeatForever(autoreverses: false)) { pulse = true }
+                if pulses {
+                    Loop(period: state == .offline ? 1.0 : 1.7) { phase in
+                        Circle().stroke(stroke, lineWidth: 1).scaleEffect(1 + phase * 1.6).opacity(0.8 * (1 - phase))
+                    }
+                }
             }
             .help(state.rawValue)
     }
