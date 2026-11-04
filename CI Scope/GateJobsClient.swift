@@ -44,7 +44,9 @@ struct GateJobsClient {
         request.setValue(readToken, forHTTPHeaderField: "x-ci-scope-config-token")
         let (data, response) = try await session.data(for: request)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard code == 200 else { throw GateJobsError.http(code) }
+        // An older server has no such route and answers with its plain-text admin login challenge (401), not JSON.
+        let isJSON = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "content-type")?.contains("json") == true
+        guard code == 200 else { throw (code == 404 || (code == 401 && !isJSON)) ? GateJobsError.serverTooOld : GateJobsError.http(code) }
         struct Body: Decodable { var recent: [GateJob]? }
         return try JSONDecoder().decode(Body.self, from: data).recent ?? []
     }
@@ -52,10 +54,11 @@ struct GateJobsClient {
 
 enum GateJobsError: LocalizedError {
     case http(Int)
+    case serverTooOld
 
     var errorDescription: String? {
         switch self {
-        case .http(404): "The server has no task list yet (HTTP 404): it needs the newer CI-Scope-Web."
+        case .serverTooOld: "The server has no task list yet: deploy the newer CI-Scope-Web to the VPS."
         case .http(let code): "The server answered the task list with HTTP \(code)."
         }
     }
