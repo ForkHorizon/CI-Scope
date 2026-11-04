@@ -4,6 +4,8 @@ CI Scope keeps AI coding agents honest. Protection lives on the website (`https:
 repositories: one GitHub check, "CI Scope", is posted by the GitHub App for every pull request, and the checks run on
 this Mac. Nothing is installed into the protected repositories.
 
+![How CI Scope checks a pull request: GitHub App, control plane on a VPS, agent and app on the owner's Mac](docs/architecture.svg)
+
 ## The two halves
 
 - **Website** (`CI-Scope-Web`): add a project, choose its checks and limits, record the protected-file baseline,
