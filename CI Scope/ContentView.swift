@@ -27,10 +27,10 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 header
                 content
-                    .id(contentID)
-                    .transition(.opacity.combined(with: .offset(y: 8)))
+                    .id(workspaceTab)
+                    .transition(.opacity)
             }
-            .animation(.smooth(duration: 0.3), value: contentID)
+            .animation(.smooth(duration: 0.2), value: workspaceTab)
             .frame(minWidth: 520, maxWidth: .infinity)
         }
         .frame(minWidth: 760, idealWidth: 860, minHeight: 560, idealHeight: 620)
@@ -95,9 +95,6 @@ struct ContentView: View {
         workspaceTab = .projects
         projectStore.select(project)
     }
-
-    /// Changes when the visible screen does, so it cross-fades instead of snapping.
-    private var contentID: String { "\(workspaceTab.rawValue)-\(projectStore.selectedProjectID.map { "\($0)" } ?? "")" }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {

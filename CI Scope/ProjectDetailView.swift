@@ -6,6 +6,9 @@ struct ProjectDetailView: View {
     @ObservedObject var model: ProjectProtectionViewModel
     @ObservedObject var events: SecurityEventMonitor
 
+    /// False while the data on screen still belongs to the previously selected project.
+    private var ready: Bool { model.loadedRepository == project.repositorySlug }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -17,6 +20,8 @@ struct ProjectDetailView: View {
                 }
             }
             .padding(22)
+            .opacity(ready ? 1 : 0.35)
+            .animation(.smooth(duration: 0.3), value: ready)
         }
         .task(id: project.repositorySlug) {
             await model.load(repository: project.repositorySlug)

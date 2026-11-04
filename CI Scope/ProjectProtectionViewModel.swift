@@ -7,6 +7,8 @@ import Foundation
 final class ProjectProtectionViewModel: ObservableObject {
     @Published var config: ProjectConfig?
     @Published private(set) var isBusy = false
+    /// The repository the current `config` and `message` belong to; differs from the selected project while a switch is loading.
+    @Published private(set) var loadedRepository: String?
     @Published private(set) var hooks: GitHooksInstaller.State = .notInstalled
     @Published var message: String?
 
@@ -25,17 +27,24 @@ final class ProjectProtectionViewModel: ObservableObject {
     func load(repository: String) async {
         self.repository = repository
         isBusy = true
-        defer { isBusy = false }
+        let loaded: ProjectConfig?
+        let note: String?
         do {
-            config = try await client.read(repository: repository, readToken: try await readToken())
-            message = nil
+            loaded = try await client.read(repository: repository, readToken: try await readToken())
+            note = nil
         } catch ProjectConfigError.server(let status, _) where status == 404 {
-            config = nil
-            message = "\(repository) is not registered with CI Scope yet."
+            loaded = nil
+            note = "\(repository) is not registered with CI Scope yet."
         } catch {
-            config = nil
-            message = error.localizedDescription
+            loaded = nil
+            note = error.localizedDescription
         }
+        // A slower answer for a project the user already left must not overwrite the one now on screen.
+        guard self.repository == repository else { return }
+        config = loaded
+        message = note
+        loadedRepository = repository
+        isBusy = false
     }
 
     /// Registers the project that was last loaded.
