@@ -135,6 +135,8 @@ struct V2AgentLaunchManager {
         "CI_SCOPE_POOL_IDENTITY", "CI_SCOPE_SESSION_REQUEST_ID",
     ]
 
+    private static let gateKeys = ["CI_SCOPE_GATES_ROOT", "CI_SCOPE_GATES_SHA", "CI_SCOPE_GATE_WORKSPACE"]
+
     /// The identity in the LaunchAgent that is already installed, if it has a complete one.
     private func enrolledIdentity() -> [String: String] {
         guard let data = try? Data(contentsOf: launchAgentURL),
@@ -142,7 +144,9 @@ struct V2AgentLaunchManager {
             let env = plist["EnvironmentVariables"] as? [String: String]
         else { return [:] }
         let kept = env.filter { Self.identityKeys.contains($0.key) && !$0.value.isEmpty }
-        return kept.count == Self.identityKeys.count ? kept : [:]
+        guard kept.count == Self.identityKeys.count else { return [:] }
+        // The gate worker stays off without these three, so a reinstall must not drop them.
+        return kept.merging(env.filter { Self.gateKeys.contains($0.key) && !$0.value.isEmpty }) { identity, _ in identity }
     }
 
     private func renderAgentPlist(
@@ -215,7 +219,8 @@ struct V2AgentLaunchManager {
             ("CI_SCOPE_KEYCHAIN_SERVICE", "com.forkhorizon.ci-scope.agent"),
             ("CI_SCOPE_V2_SHADOW_TOKEN_KEYCHAIN_ACCOUNT", "shadow-token"),
         ]
-        return env.map { "        <key>\($0.0)</key>\n        <string>\(enrolled[$0.0] ?? $0.1)</string>" }.joined(
+        let extra = Self.gateKeys.compactMap { key in enrolled[key].map { (key, $0) } }
+        return (env + extra).map { "        <key>\($0.0)</key>\n        <string>\(enrolled[$0.0] ?? $0.1)</string>" }.joined(
             separator: "\n")
     }
 }
