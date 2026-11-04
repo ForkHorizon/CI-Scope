@@ -5,7 +5,6 @@ struct ProjectMenuRow: View {
     let state: ServiceState
     let isActive: Bool
     let onSelect: () -> Void
-    let onRemove: () -> Void
 
     @State var isHovering = false
 
@@ -32,43 +31,14 @@ struct ProjectMenuRow: View {
             }
             .buttonStyle(.plain)
 
-            Menu {
-                ProjectContextMenu(onRemove: onRemove)
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 12))
-                    .foregroundStyle(isActive ? Color.black : NothingTheme.inkDim)
-                    .frame(width: 24, height: 24)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .opacity(isActive || isHovering ? 1 : 0)
-            .help("Project actions")
-            .padding(.trailing, 6)
         }
         .frame(height: 44)
         .background(isActive ? NothingTheme.ink : (isHovering ? NothingTheme.panel : Color.clear), in: Capsule())
         .contentShape(Capsule())
-        .contextMenu {
-            ProjectContextMenu(onRemove: onRemove)
-        }
         .onHover { isHovering = $0 }
         .pointerStyle(.link)
         .animation(.smooth(duration: 0.18), value: isHovering)
         .animation(.smooth(duration: 0.25), value: isActive)
     }
 
-}
-
-struct ProjectContextMenu: View {
-    let onRemove: () -> Void
-
-    var body: some View {
-        Button(role: .destructive) {
-            onRemove()
-        } label: {
-            Label("Remove Project", systemImage: "trash")
-        }
-    }
 }

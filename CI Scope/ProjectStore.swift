@@ -75,23 +75,26 @@ final class ProjectStore: ObservableObject {
         return project
     }
 
-    func removeProject(_ project: CIProject) {
-        guard let index = projects.firstIndex(where: { $0.id == project.id }) else { return }
-
-        let wasSelected = selectedProjectID == project.id
-        projects.remove(at: index)
-
-        if wasSelected {
-            if projects.isEmpty {
-                selectedProjectID = nil
-            } else {
-                selectedProjectID = projects[min(index, projects.count - 1)].id
-            }
-        } else if let selectedProjectID, !projects.contains(where: { $0.id == selectedProjectID }) {
-            self.selectedProjectID = projects.first?.id
+    /// Makes the list exactly the repositories registered on the server. The server is the source of truth, so a
+    /// repository that was never registered (or was removed) disappears here instead of lingering in local storage.
+    func sync(with slugs: [String]) {
+        let known = Dictionary(projects.map { ($0.normalizedSlug, $0) }, uniquingKeysWith: { first, _ in first })
+        let synced = slugs.compactMap { slug in known[slug.lowercased()] ?? (try? Self.project(from: slug)) }
+        let list = Self.normalizedProjects(synced)
+        guard list != projects else { return }
+        projects = list
+        if let selectedProjectID, list.contains(where: { $0.id == selectedProjectID }) {
+            persist()
+            return
         }
-
+        selectedProjectID = list.first?.id
         persist()
+    }
+
+    private static func project(from slug: String) throws -> CIProject {
+        let parsed = try parseRepository(from: slug)
+        let full = "\(parsed.owner)/\(parsed.name)"
+        return CIProject(id: full.lowercased(), title: parsed.name, repositoryOwner: parsed.owner, repositoryName: parsed.name, repositorySlug: full, remoteURL: parsed.remoteURL)
     }
 
     private func persist() {

@@ -46,6 +46,14 @@ struct ProjectConfigClient {
         return try decodeConfig(try await send(request))
     }
 
+    /// The repositories registered on the server (read token); the app shows exactly these.
+    func listRepositories(readToken: String) async throws -> [String] {
+        var request = URLRequest(url: baseURL.appendingPathComponent("list"))
+        request.setValue(readToken, forHTTPHeaderField: "x-ci-scope-config-token")
+        guard let repositories = try await send(request)["repositories"] as? [String] else { throw ProjectConfigError.malformedResponse }
+        return repositories
+    }
+
     func register(repository: String, admin: (user: String, password: String)) async throws -> ProjectConfig {
         var request = jsonRequest(url: baseURL.appendingPathComponent("config/register"), method: "POST", admin: admin)
         request.httpBody = try JSONSerialization.data(withJSONObject: ["repository": repository])
