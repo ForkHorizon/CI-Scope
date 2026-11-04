@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
@@ -10,11 +11,8 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
-                runnerSection
-                v2Section
-                githubIntakeSection
-                gateInstallSection
-                aiReviewSection
+                websiteSection
+                agentSection
                 if let message {
                     Text(message)
                         .font(NothingTheme.small.monospaced())
@@ -27,49 +25,23 @@ struct SettingsView: View {
         }
     }
 
-    private var runnerSection: some View {
-        SettingsSection(title: "This Mac") {
-            SettingsRow(title: "Server queue mode", hint: "Take jobs from the shared queue") {
-                Toggle("", isOn: $store.serverModeEnabled).labelsHidden()
-            }
-            SettingsRow(title: "Server URL") {
-                TextField("https://", text: $store.serverURL).nothingField()
-            }
-            SettingsRow(title: "Local token") {
-                SecureField("Bearer token", text: $store.localToken).nothingField()
-            }
-            SettingsRow(title: "Machine ID") {
-                TextField("", text: $store.machineID).nothingField()
-            }
-            SettingsRow(title: "Machine name") {
-                TextField("", text: $store.machineName).nothingField()
-            }
-            SettingsRow(title: "Labels") {
-                TextField("comma separated", text: $store.labelsText).nothingField()
-            }
-            SettingsRow(title: "Capacity", hint: "Parallel jobs on this Mac") {
-                Stepper("\(store.capacity)", value: $store.capacity, in: 1...8)
-                    .font(NothingTheme.body.monospacedDigit())
-            }
-            SettingsRow(title: "Agent") {
-                HStack(spacing: 8) {
-                    Button("Test", action: runTest).buttonStyle(.pill)
-                    Button("Install / Restart", action: restartAgent).buttonStyle(.pillPrimary)
-                }
-                .disabled(isWorking)
+    private var websiteSection: some View {
+        SettingsSection(title: "Website") {
+            SettingsRow(title: "CI Scope", hint: "Add projects and change protection here; Touch ID approves weakening") {
+                Button("Open website") { NSWorkspace.shared.open(ServerLinks.site) }.buttonStyle(.pillPrimary)
             }
         }
     }
 
-    private var v2Section: some View {
-        SettingsSection(title: "V2 control") {
-            SettingsRow(title: "Agent status", hint: "Read-only view of the V2 Agent") {
+    private var agentSection: some View {
+        SettingsSection(title: "Agent") {
+            SettingsRow(title: "This Mac", hint: "Runs the checks for pull requests") {
+                Button("Install / Restart", action: restartAgent).buttonStyle(.pillPrimary).disabled(isWorking)
+            }
+            SettingsRow(title: "Agent status", hint: "Read-only view of the agent on this Mac") {
                 Toggle("", isOn: $store.v2StatusAdapterEnabled).labelsHidden()
             }
-            SettingsRow(
-                title: "V2 authority",
-                hint: "Legacy broker stays authoritative until a control lease is acquired"
-            ) {
+            SettingsRow(title: "Agent control", hint: "Take a control lease to drain, resume or stop the agent") {
                 Toggle(
                     "",
                     isOn: Binding(
@@ -126,7 +98,7 @@ struct SettingsView: View {
 
     @ViewBuilder private var v2Notes: some View {
         if v2Control.isDisablingAuthority {
-            Text("Waiting for the Agent to finish draining before returning to the legacy broker.")
+            Text("Waiting for the agent to finish draining before the control lease is released.")
                 .font(NothingTheme.small).foregroundStyle(NothingTheme.amber).padding(.vertical, 8)
         } else if !v2Control.hasLiveAgentSession {
             Text(
@@ -142,63 +114,14 @@ struct SettingsView: View {
         }
     }
 
-    private var githubIntakeSection: some View {
-        SettingsSection(title: "GitHub intake") {
-            SettingsRow(title: "Webhook endpoint", hint: "Events: workflow_job") {
-                Text(store.snapshot.webhookURL.isEmpty ? "Set a server URL first" : store.snapshot.webhookURL)
-                    .font(NothingTheme.small.monospaced()).textSelection(.enabled)
-                    .foregroundStyle(NothingTheme.ink).multilineTextAlignment(.trailing)
-            }
-            SettingsRow(title: "Webhook secret", hint: "Attaching a project creates its repo webhook with this secret") {
-                SecureField("CI_SCOPE_GITHUB_WEBHOOK_SECRET", text: $store.webhookSecret)
-                    .nothingField()
-            }
-        }
-    }
-
-    private var gateInstallSection: some View {
-        SettingsSection(title: "Gate installs") {
-            SettingsRow(
-                title: "Auto-merge gate PRs",
-                hint: "Best effort: needs auto-merge allowed on the repo, otherwise the PR stays open"
-            ) {
-                Toggle("", isOn: $store.autoMergeGatePRs).labelsHidden()
-            }
-        }
-    }
-
-    private var aiReviewSection: some View {
-        SettingsSection(title: "AI slop review") {
-            SettingsRow(
-                title: "DeepSeek key",
-                hint: "Passed to the agent as DEEPSEEK_API_KEY. Empty skips the advisory step. Restart the agent after changing."
-            ) {
-                SecureField("sk-...", text: $store.deepSeekAPIKey).nothingField()
-            }
-        }
-    }
-
-    private func runTest() {
-        isWorking = true
-        message = "Testing..."
-        Task {
-            do {
-                message = try await store.testConnection()
-            } catch {
-                message = error.localizedDescription
-            }
-            isWorking = false
-        }
-    }
-
     private func restartAgent() {
         isWorking = true
-        message = "Restarting V2 agent..."
+        message = "Restarting the agent..."
         Task {
             do {
                 let path = try await V2AgentLaunchManager(config: DashboardConfig())
                     .installOrUpdateLaunchAgent()
-                message = "V2 Agent installed at \(path)."
+                message = "Agent installed at \(path)."
             } catch {
                 message = error.localizedDescription
             }

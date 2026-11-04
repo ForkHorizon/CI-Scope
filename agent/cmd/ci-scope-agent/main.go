@@ -170,7 +170,14 @@ func initScheduler(ctx context.Context, config agent.BootstrapConfig, runtime *a
 		return nil, nil, err
 	}
 	scheduler.Start(ctx)
+	stopGates, err := startLocalGateWorker(ctx, schedulerServer)
+	if err != nil {
+		scheduler.Close()
+		_ = store.Close()
+		return nil, nil, err
+	}
 	cleanup := func() {
+		stopGates()
 		scheduler.Close()
 		_ = store.Close()
 	}

@@ -1,95 +1,105 @@
+// Root of the app: the project list on the left, and the project, alerts or settings on the right.
 import AppKit
-import Combine
 import SwiftUI
 
 @MainActor
 struct ContentView: View {
     @StateObject var projectStore = ProjectStore()
-    @StateObject var projectCIViewModel = ProjectCIViewModel()
-    @StateObject var scriptStore = AutomationScriptStore()
-    @StateObject var scriptInstallViewModel = AutomationScriptInstallViewModel()
-    @StateObject var runnerFleetViewModel = RunnerFleetViewModel()
     @StateObject var settingsStore = CIQueueSettingsStore()
-    @StateObject var policyAdmin = PolicyAdminViewModel()
-    @StateObject var testProtection = TestProtectionViewModel()
-    @StateObject var policyChecks = PolicyChecksViewModel()
-    @StateObject var notificationManager = NotificationManager.shared
+    @StateObject var protection = ProjectProtectionViewModel()
+    @StateObject var securityEvents = SecurityEventMonitor()
+    @StateObject var gateJobs = GateJobsMonitor()
     @State var workspaceTab: WorkspaceTab = .projects
-    @State var isProjectMenuOpen = true
     @State var isAddingProject = false
 
     var body: some View {
         HStack(spacing: 0) {
-            if isProjectMenuOpen {
-                ProjectMenuPanel(
-                    workspaceTab: $workspaceTab,
-                    projects: projectStore.projects,
-                    selectedProjectID: projectStore.selectedProjectID,
-                    stateForProject: state(for:),
-                    runnerState: runnerFleetViewModel.snapshot.state,
-                    runnerCount: runnerFleetViewModel.snapshot.runners.count,
-                    scriptState: scriptStore.scripts.isEmpty ? .unknown : .online,
-                    scriptCount: scriptStore.scripts.count,
-                    policyPendingCount: policyAdmin.pendingCount,
-                    testAlertCount: testProtection.openCount,
-                    onSelect: selectProject,
-                    onRemove: removeProject,
-                    onAddProject: {
-                        isAddingProject = true
-                    }
-                )
-                .transition(.move(edge: .leading).combined(with: .opacity))
+            ProjectMenuPanel(
+                workspaceTab: $workspaceTab,
+                projects: projectStore.projects,
+                selectedProjectID: projectStore.selectedProjectID,
+                alertCount: securityEvents.events.count,
+                activeTaskCount: gateJobs.activeCount,
+                stateForProject: state(for:),
+                onSelect: selectProject,
+                onRemove: { projectStore.removeProject($0) },
+                onAddProject: { isAddingProject = true }
+            )
+            VStack(spacing: 0) {
+                header
+                content
             }
-            dashboardSurface
+            .frame(minWidth: 520, maxWidth: .infinity)
         }
-        .frame(
-            minWidth: isProjectMenuOpen ? 792 : 587,
-            idealWidth: isProjectMenuOpen ? 792 : 587,
-            minHeight: 624,
-            idealHeight: 624
-        )
+        .frame(minWidth: 760, idealWidth: 860, minHeight: 560, idealHeight: 620)
         .background(NothingTheme.canvas)
-        .overlay(alignment: .topTrailing) {
-            JobNotificationOverlay(manager: notificationManager)
-                .allowsHitTesting(notificationManager.activeJobNotification != nil)
-        }
-        .animation(.easeInOut(duration: 0.18), value: isProjectMenuOpen)
-        .animation(
-            .spring(response: 0.28, dampingFraction: 0.86),
-            value: notificationManager.activeJobNotification?.id
-        )
-        .task(id: selectedProject?.id) {
-            guard let selectedProject else { return }
-            await projectCIViewModel.load(selectedProject)
-        }
-        .task(id: workspaceTab) {
-            if workspaceTab == .runners {
-                await runnerFleetViewModel.load(projects: projectStore.projects)
-            }
-        }
         .task {
             settingsStore.startV2Lifecycle()
-            runnerFleetViewModel.startLiveUpdates {
-                await runnerFleetViewModel.load(projects: projectStore.projects)
-                await refreshSelectedProjectRunnerStatus()
+            while !Task.isCancelled {
+                await securityEvents.refresh()
+                await gateJobs.refresh()
+                try? await Task.sleep(for: .seconds(30))
             }
         }
-        .onDisappear {
-            runnerFleetViewModel.stopLiveUpdates()
-            settingsStore.stopV2Lifecycle()
-        }
+        .onDisappear { settingsStore.stopV2Lifecycle() }
         .sheet(isPresented: $isAddingProject) {
             AddProjectSheet { input in
-                try projectStore.addProject(from: input)
+                let project = try projectStore.addProject(from: input)
+                workspaceTab = .projects
+                Task { await protection.register(repository: project.repositorySlug) }
             }
         }
-        .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in
-            Task { @MainActor in
-                // Fallback poll only: skip entirely while GitHub is rate-limited
-                // so we never pile requests onto an exhausted quota.
-                if await GitHubRateLimitGate.shared.isPaused() { return }
-                refreshCurrentTab()
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch workspaceTab {
+        case .projects:
+            if let project = projectStore.selectedProject {
+                ProjectDetailView(project: project, model: protection, events: securityEvents)
+            } else {
+                EmptyProjectDashboard { isAddingProject = true }
             }
+        case .activity:
+            ActivityView(monitor: gateJobs)
+        case .alerts:
+            AlertsView(events: securityEvents)
+        case .settings:
+            SettingsView(store: settingsStore, v2Control: settingsStore.v2Control)
+        }
+    }
+
+    private func state(for project: CIProject) -> ServiceState {
+        securityEvents.events.contains { $0.repository.caseInsensitiveCompare(project.repositorySlug) == .orderedSame }
+            ? .warning : .unknown
+    }
+
+    private func selectProject(_ project: CIProject) {
+        workspaceTab = .projects
+        projectStore.select(project)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(headerTitle).nothingDisplay(26).foregroundStyle(NothingTheme.ink).lineLimit(1)
+            Text(headerSubtitle).nothingCaption().lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .overlay(alignment: .bottom) { Rectangle().fill(NothingTheme.line).frame(height: 1) }
+    }
+
+    private var headerTitle: String {
+        workspaceTab == .projects ? (projectStore.selectedProject?.title ?? "Projects") : workspaceTab.title
+    }
+
+    private var headerSubtitle: String {
+        switch workspaceTab {
+        case .projects: projectStore.selectedProject?.repositorySlug ?? "No project selected"
+        case .activity: gateJobs.activeCount == 0 ? "Idle" : "\(gateJobs.activeCount) in progress or waiting"
+        case .alerts: securityEvents.events.isEmpty ? "Nothing needs your attention" : "\(securityEvents.events.count) open"
+        case .settings: "This Mac and the website"
         }
     }
 }

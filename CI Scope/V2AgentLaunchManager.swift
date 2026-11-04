@@ -38,12 +38,16 @@ struct V2AgentLaunchManager {
         let machineID =
             settings.machineID.isEmpty ? (Host.current().localizedName ?? "macbook") : settings.machineID
         let credentialID = "machine-credential"
+        // An enrolled agent keeps the identity it was enrolled with; a fresh one would not match its Keychain
+        // credential and the agent would crash-loop (and every Install/Restart would also restart a healthy one).
+        let enrolled = enrolledIdentity()
 
         let plistContent = renderAgentPlist(
             agentPath: agentExecutableURL.path,
             controlPlaneURL: controlPlaneURL,
             machineID: machineID,
-            credentialID: credentialID
+            credentialID: credentialID,
+            enrolled: enrolled
         )
 
         let existing = try? String(contentsOf: launchAgentURL, encoding: .utf8)
@@ -83,32 +87,6 @@ struct V2AgentLaunchManager {
             config: config)
     }
 
-    func launchStatus() async -> RunnerLaunchStatus {
-        let uid = geteuid()
-        let result = await ShellClient.run(
-            "launchctl print gui/\(uid)/\(Self.serviceLabel)",
-            timeout: 5,
-            config: config
-        )
-        guard result.exitCode == 0 else {
-            return RunnerLaunchStatus(
-                state: .offline,
-                launchctlState: "not running",
-                pid: nil,
-                uptime: "-"
-            )
-        }
-
-        let launchState = firstMatch(in: result.output, pattern: #"state = ([a-zA-Z]+)"#) ?? "running"
-        let pid = intMatch(in: result.output, pattern: #"pid = ([0-9]+)"#)
-        return RunnerLaunchStatus(
-            state: launchState == "running" ? .online : .warning,
-            launchctlState: launchState,
-            pid: pid,
-            uptime: await processUptime(pid: pid)
-        )
-    }
-
     private func launchAgentIsLoaded() async -> Bool {
         let result = await ShellClient.run(
             "launchctl print gui/\(geteuid())/\(Self.serviceLabel)",
@@ -134,6 +112,7 @@ struct V2AgentLaunchManager {
 
         let standardLocations = [
             Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("ci-scope-agent"),
+            fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/ci-scope-agent"),
             URL(fileURLWithPath: "/usr/local/bin/ci-scope-agent"),
             URL(fileURLWithPath: "/opt/homebrew/bin/ci-scope-agent"),
             stateRootURL.appendingPathComponent("bin/ci-scope-agent"),
@@ -151,18 +130,39 @@ struct V2AgentLaunchManager {
         throw V2AgentLaunchError.missingExecutable
     }
 
+    private static let identityKeys = [
+        "CI_SCOPE_MACHINE_ID", "CI_SCOPE_BOOT_ID", "CI_SCOPE_AGENT_INSTANCE_ID", "CI_SCOPE_CREDENTIAL_ID",
+        "CI_SCOPE_POOL_IDENTITY", "CI_SCOPE_SESSION_REQUEST_ID",
+    ]
+
+    private static let gateKeys = ["CI_SCOPE_GATES_ROOT", "CI_SCOPE_GATES_SHA", "CI_SCOPE_GATE_WORKSPACE"]
+
+    /// The identity in the LaunchAgent that is already installed, if it has a complete one.
+    private func enrolledIdentity() -> [String: String] {
+        guard let data = try? Data(contentsOf: launchAgentURL),
+            let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+            let env = plist["EnvironmentVariables"] as? [String: String]
+        else { return [:] }
+        let kept = env.filter { Self.identityKeys.contains($0.key) && !$0.value.isEmpty }
+        guard kept.count == Self.identityKeys.count else { return [:] }
+        // The gate worker stays off without these three, so a reinstall must not drop them.
+        return kept.merging(env.filter { Self.gateKeys.contains($0.key) && !$0.value.isEmpty }) { identity, _ in identity }
+    }
+
     private func renderAgentPlist(
         agentPath: String,
         controlPlaneURL: String,
         machineID: String,
-        credentialID: String
+        credentialID: String,
+        enrolled: [String: String]
     ) -> String {
         let stdoutPath = logDirURL.appendingPathComponent("agent.log").path
         let stderrPath = logDirURL.appendingPathComponent("agent.err.log").path
         let envXml = agentEnvironmentXML(
             controlPlaneURL: controlPlaneURL,
             machineID: machineID,
-            credentialID: credentialID
+            credentialID: credentialID,
+            enrolled: enrolled
         )
 
         return """
@@ -200,7 +200,8 @@ struct V2AgentLaunchManager {
     private func agentEnvironmentXML(
         controlPlaneURL: String,
         machineID: String,
-        credentialID: String
+        credentialID: String,
+        enrolled: [String: String]
     ) -> String {
         let socketPath = stateRootURL.appendingPathComponent("agent.sock").path
         let bootID = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
@@ -218,29 +219,9 @@ struct V2AgentLaunchManager {
             ("CI_SCOPE_KEYCHAIN_SERVICE", "com.forkhorizon.ci-scope.agent"),
             ("CI_SCOPE_V2_SHADOW_TOKEN_KEYCHAIN_ACCOUNT", "shadow-token"),
         ]
-        return env.map { "        <key>\($0.0)</key>\n        <string>\($0.1)</string>" }.joined(
+        let extra = Self.gateKeys.compactMap { key in enrolled[key].map { (key, $0) } }
+        return (env + extra).map { "        <key>\($0.0)</key>\n        <string>\(enrolled[$0.0] ?? $0.1)</string>" }.joined(
             separator: "\n")
-    }
-
-    private func processUptime(pid: Int?) async -> String {
-        guard let pid else { return "-" }
-        let result = await ShellClient.run("ps -p \(pid) -o etime= | xargs", timeout: 3, config: config)
-        let uptime = result.output.trimmed
-        return uptime.isEmpty ? "-" : uptime
-    }
-
-    private func firstMatch(in text: String, pattern: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        guard let match = regex.firstMatch(in: text, range: range), match.numberOfRanges > 1 else {
-            return nil
-        }
-        guard let valueRange = Range(match.range(at: 1), in: text) else { return nil }
-        return String(text[valueRange])
-    }
-
-    private func intMatch(in text: String, pattern: String) -> Int? {
-        firstMatch(in: text, pattern: pattern).flatMap(Int.init)
     }
 }
 
@@ -255,5 +236,11 @@ enum V2AgentLaunchError: LocalizedError {
         case .launchAgent(let message):
             return "LaunchAgent error: \(message)"
         }
+    }
+}
+
+extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
