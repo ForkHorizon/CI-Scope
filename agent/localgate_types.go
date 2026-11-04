@@ -30,4 +30,6 @@ type LocalGateReport struct {
 	CompletedAt int64            `json:"completedAt"`
 	// ConfigVersion is the server config version the run used; zero when unknown.
 	ConfigVersion int `json:"configVersion,omitempty"`
+	// Environment marks a failure of the agent's machine, not of the pull request: the code was never checked.
+	Environment bool `json:"environment,omitempty"`
 }
