@@ -46,6 +46,7 @@ func (s *SessionLifecycle) openRequest() (ServerRequestEnvelope, bool, error) {
 		"type": "session.open", "machineId": s.config.MachineID, "bootId": s.config.BootID,
 		"agentInstanceId": s.config.AgentInstanceID, "credentialId": s.config.CredentialID,
 		"sessionRequestId": s.config.SessionRequestID, "sessionId": s.config.SessionID,
+		"hardware": readHardware(),
 	}
 	request, err := NewServerRequestEnvelope(
 		s.config.SessionRequestID, identity,
