@@ -12,6 +12,7 @@ import (
 
 const (
 	localGateHeartbeatEvery = 20 * time.Second
+	localGateActivityGap    = 3 * time.Second
 	localGateIdleWait       = 10 * time.Second
 	localGateRetryWait      = 30 * time.Second
 	localGateCompleteWait   = 30 * time.Second
@@ -19,7 +20,7 @@ const (
 
 type localGateServer interface {
 	Claim(ctx context.Context, leaseID string) (*LocalGateJob, error)
-	Heartbeat(ctx context.Context, requestID, jobID, leaseID string) (bool, error)
+	Heartbeat(ctx context.Context, requestID, jobID, leaseID, activity string) (bool, error)
 	Complete(ctx context.Context, jobID, leaseID string, report LocalGateReport) error
 }
 
@@ -57,11 +58,12 @@ func (w *LocalGateWorker) RunOnce(ctx context.Context) (bool, error) {
 	defer stop()
 	var cancelled atomic.Bool
 	heartbeatDone := make(chan struct{})
+	activity := &currentActivity{changed: make(chan struct{}, 1)}
 	go func() {
 		defer close(heartbeatDone)
-		w.heartbeat(runCtx, stop, job.ID, leaseID, &cancelled)
+		w.heartbeat(runCtx, stop, job.ID, leaseID, &cancelled, activity)
 	}()
-	report, runErr := w.Runner.Run(runCtx, *job)
+	report, runErr := w.Runner.Run(withActivity(runCtx, activity.set), *job)
 	stop()
 	<-heartbeatDone
 	if ctx.Err() != nil && !cancelled.Load() {
@@ -82,24 +84,57 @@ func (w *LocalGateWorker) claim(ctx context.Context, leaseID string) (*LocalGate
 	return w.Server.Claim(ctx, leaseID)
 }
 
-func (w *LocalGateWorker) heartbeat(ctx context.Context, stop context.CancelFunc, jobID, leaseID string, cancelled *atomic.Bool) {
+// currentActivity holds the latest text and wakes the heartbeat when it changes.
+type currentActivity struct {
+	text    atomic.Value
+	changed chan struct{}
+}
+
+func (a *currentActivity) set(text string) {
+	if a.get() == text {
+		return
+	}
+	a.text.Store(text)
+	select {
+	case a.changed <- struct{}{}:
+	default:
+	}
+}
+
+func (a *currentActivity) get() string {
+	text, _ := a.text.Load().(string)
+	return text
+}
+
+func (w *LocalGateWorker) heartbeat(ctx context.Context, stop context.CancelFunc, jobID, leaseID string, cancelled *atomic.Bool, activity *currentActivity) {
 	ticker := time.NewTicker(w.HeartbeatEvery)
 	defer ticker.Stop()
+	var last time.Time
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-activity.changed:
+			// A new text is sent at once, but at most every localGateActivityGap: a burst of quick steps is one update.
+			if wait := localGateActivityGap - w.now().Sub(last); wait > 0 {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(wait):
+				}
+			}
 		case <-ticker.C:
-			requestID, err := w.newID("local-gate-heartbeat")
-			if err != nil {
-				continue
-			}
-			cancel, err := w.Server.Heartbeat(ctx, requestID, jobID, leaseID)
-			if err == nil && cancel {
-				cancelled.Store(true)
-				stop()
-				return
-			}
+		}
+		last = w.now()
+		requestID, err := w.newID("local-gate-heartbeat")
+		if err != nil {
+			continue
+		}
+		cancel, err := w.Server.Heartbeat(ctx, requestID, jobID, leaseID, activity.get())
+		if err == nil && cancel {
+			cancelled.Store(true)
+			stop()
+			return
 		}
 	}
 }

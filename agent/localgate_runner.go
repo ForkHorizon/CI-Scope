@@ -2,7 +2,6 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -36,6 +35,8 @@ func gateEnvironment() []string {
 		"HOME=" + home,
 		"LANG=en_US.UTF-8",
 		"GIT_TERMINAL_PROMPT=0",
+		// Asks the ci-gates CLI to say which check it starts, so the app can show what is happening.
+		"CI_SCOPE_ACTIVITY=1",
 		// A checked-out pull request must not get to run its own git hooks inside the agent.
 		"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=core.hooksPath", "GIT_CONFIG_VALUE_0=/dev/null",
 	}
@@ -77,8 +78,8 @@ func execCommand(ctx context.Context, dir, name string, args ...string) ([]byte,
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error { return syscall.Kill(-command.Process.Pid, syscall.SIGKILL) }
 	command.WaitDelay = gateKillGrace
-	var output bytes.Buffer
-	command.Stdout, command.Stderr = &output, &output
+	output := &activityWriter{report: func(text string) { reportActivity(ctx, text) }}
+	command.Stdout, command.Stderr = output, output
 	err := command.Run()
 	return output.Bytes(), err
 }
@@ -97,9 +98,11 @@ func NewGateScriptRunner(workspaceRoot, gatesRoot, gatesSHA string) *GateScriptR
 }
 
 func (r *GateScriptRunner) Run(ctx context.Context, job LocalGateJob) (LocalGateReport, error) {
+	reportActivity(ctx, "Verifying the pinned ci-gates checkout")
 	if err := r.verifyGates(ctx); err != nil {
 		return LocalGateReport{}, err
 	}
+	reportActivity(ctx, "Checking out "+shortSHA(job.HeadSHA)+" of "+job.Repository)
 	dir, err := r.checkout(ctx, job)
 	if err != nil {
 		return LocalGateReport{}, err
@@ -111,6 +114,7 @@ func (r *GateScriptRunner) Run(ctx context.Context, job LocalGateJob) (LocalGate
 		// Judge the pull request by the config version fixed when it was queued, not by whatever it is now.
 		arguments = append(arguments, "--config-version", strconv.Itoa(job.ConfigVersion))
 	}
+	reportActivity(ctx, "Starting the checks")
 	output, runErr := r.run(ctx, dir, "python3", arguments...)
 	return r.report(output, runErr), nil
 }

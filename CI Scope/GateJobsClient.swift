@@ -17,6 +17,8 @@ struct GateJob: Decodable, Equatable, Identifiable {
     var createdAt: Int
     var updatedAt: Int
     var report: Report?
+    /// What the agent says it is doing right now (the check it just started); absent when idle or finished.
+    var activity: String?
 
     /// Queued, leased or running: the agent still owes this one an answer.
     var isActive: Bool { ["queued", "leased", "running"].contains(status) }

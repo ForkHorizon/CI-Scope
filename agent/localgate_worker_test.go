@@ -22,7 +22,7 @@ func (f *fakeGateServer) Claim(context.Context, string) (*LocalGateJob, error) {
 	return f.job, f.claimErr
 }
 
-func (f *fakeGateServer) Heartbeat(context.Context, string, string, string) (bool, error) {
+func (f *fakeGateServer) Heartbeat(context.Context, string, string, string, string) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.heartbeat++

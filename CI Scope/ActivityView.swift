@@ -72,6 +72,10 @@ struct ActivityView: View {
             let attempt = job.attempts > 1 ? " · attempt \(job.attempts)" : ""
             Text("\(job.headSha.prefix(7))\(attempt) · \(Date(timeIntervalSince1970: Double(job.updatedAt) / 1000).formatted(.relative(presentation: .named)))")
                 .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
+            if job.report == nil, let activity = job.activity, job.isActive {
+                Text("Now: \(activity)").font(NothingTheme.small).foregroundStyle(NothingTheme.green).textSelection(.enabled)
+                    .contentTransition(.opacity).animation(.smooth(duration: 0.3), value: activity)
+            }
             if let summary = job.report?.summary, !summary.isEmpty {
                 Text(summary).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).textSelection(.enabled)
             }
