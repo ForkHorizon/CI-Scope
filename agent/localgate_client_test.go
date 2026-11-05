@@ -53,7 +53,7 @@ func TestLocalGateClaimOfAnEmptyQueueReturnsNil(t *testing.T) {
 
 func TestLocalGateHeartbeatReportsCancel(t *testing.T) {
 	plane := &schedulerEnvelopeTestPlane{response: ServerResponseEnvelope{Outcome: "completed", Payload: mustJSON(map[string]any{"type": "local-gates.heartbeat", "cancel": true})}}
-	cancel, err := newLocalGateTestClient(t, plane).Heartbeat(context.Background(), "hb-1", "job-1", "lease-1", "Linting")
+	cancel, err := newLocalGateTestClient(t, plane).Heartbeat(context.Background(), "hb-1", "job-1", "lease-1", "Linting", nil)
 	if err != nil || !cancel {
 		t.Fatalf("cancel = %v, err = %v", cancel, err)
 	}

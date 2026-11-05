@@ -8,6 +8,23 @@ struct GateJob: Decodable, Equatable, Identifiable {
         var completedAt: Int?
     }
 
+    /// One gate: waiting, running (with its live step), passed or failed.
+    struct Gate: Decodable, Equatable, Identifiable {
+        var id: String
+        var state: String
+        var step: String?
+        var current: Int?
+        var total: Int?
+        var detail: String?
+
+        /// What the gate is doing right now, for example "lint · Sources/App.swift · 12/340".
+        var live: String {
+            guard state == "running" else { return "" }
+            let count = (total ?? 0) > 0 ? "\(current ?? 0)/\(total ?? 0)" : nil
+            return [step, detail, count].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        }
+    }
+
     var id: String
     var repository: String
     var pullRequest: Int
@@ -17,6 +34,8 @@ struct GateJob: Decodable, Equatable, Identifiable {
     var createdAt: Int
     var updatedAt: Int
     var report: Report?
+    /// Every gate of a running job and what it is doing now; absent before the gates start and once the job is done.
+    var progress: [Gate]?
     /// What the agent says it is doing right now (the check it just started); absent when idle or finished.
     var activity: String?
 

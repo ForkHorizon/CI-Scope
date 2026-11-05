@@ -36,7 +36,8 @@ struct ActivityView: View {
             // Only while this tab is on screen: the server is ours, but there is no reason to ask when nobody looks.
             while !Task.isCancelled {
                 await monitor.refresh()
-                try? await Task.sleep(for: .seconds(5))
+                // Faster while a task is running: its gates change by the second.
+                try? await Task.sleep(for: .seconds(monitor.activeCount > 0 ? 2 : 5))
             }
         }
     }
@@ -72,9 +73,13 @@ struct ActivityView: View {
             let attempt = job.attempts > 1 ? " · attempt \(job.attempts)" : ""
             Text("\(job.headSha.prefix(7))\(attempt) · \(Date(timeIntervalSince1970: Double(job.updatedAt) / 1000).formatted(.relative(presentation: .named)))")
                 .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
-            if job.report == nil, let activity = job.activity, job.isActive {
-                Text("Now: \(activity)").font(NothingTheme.small).foregroundStyle(NothingTheme.green).textSelection(.enabled)
-                    .contentTransition(.opacity).animation(.smooth(duration: 0.3), value: activity)
+            if job.report == nil, job.isActive {
+                if let gates = job.progress, !gates.isEmpty {
+                    VStack(alignment: .leading, spacing: 3) { ForEach(gates) { gateRow($0) } }.padding(.top, 4)
+                } else if let activity = job.activity {
+                    Text("Now: \(activity)").font(NothingTheme.small).foregroundStyle(NothingTheme.green).textSelection(.enabled)
+                        .contentTransition(.opacity).animation(.smooth(duration: 0.3), value: activity)
+                }
             }
             if let summary = job.report?.summary, !summary.isEmpty {
                 Text(summary).font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).textSelection(.enabled)
@@ -82,6 +87,32 @@ struct ActivityView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .nothingRow(fresh: feed.fresh.contains(job.id), tint: color(job), changeToken: job.status)
+    }
+
+    /// One gate of a running task: a mark for its state, its name, and while it runs what it is doing right now.
+    private func gateRow(_ gate: GateJob.Gate) -> some View {
+        let tint: Color = switch gate.state {
+        case "passed": NothingTheme.green
+        case "failed": NothingTheme.red
+        case "running": NothingTheme.amber
+        default: NothingTheme.inkDim
+        }
+        let mark = switch gate.state {
+        case "passed": "✓"
+        case "failed": "✗"
+        case "running": "▸"
+        default: "·"
+        }
+        return HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(mark).foregroundStyle(tint).frame(width: 12)
+            Text(gate.id).foregroundStyle(gate.state == "pending" ? NothingTheme.inkDim : NothingTheme.ink)
+            if !gate.live.isEmpty {
+                Text(gate.live).foregroundStyle(NothingTheme.inkDim).lineLimit(1).truncationMode(.middle)
+                    .contentTransition(.opacity).animation(.smooth(duration: 0.25), value: gate.live)
+            }
+        }
+        .font(NothingTheme.small)
+        .animation(.smooth(duration: 0.3), value: gate.state)
     }
 
     private func color(_ job: GateJob) -> Color {

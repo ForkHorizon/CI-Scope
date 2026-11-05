@@ -50,11 +50,14 @@ func (c *LocalGateClient) ClaimWith(ctx context.Context, leaseID string, capabil
 	return result.Job, nil
 }
 
-// Heartbeat extends the lease, tells the server what the run is doing now, and reports whether the run should stop.
-func (c *LocalGateClient) Heartbeat(ctx context.Context, requestID, jobID, leaseID, activity string) (bool, error) {
+// Heartbeat extends the lease, tells the server what each gate is doing now, and reports whether the run should stop.
+func (c *LocalGateClient) Heartbeat(ctx context.Context, requestID, jobID, leaseID, activity string, checks []CheckProgress) (bool, error) {
 	payload := map[string]any{"type": "local-gates.heartbeat", "jobId": jobID, "leaseId": leaseID}
 	if activity != "" {
 		payload["activity"] = activity
+	}
+	if len(checks) > 0 {
+		payload["progress"] = checks
 	}
 	response, err := c.server.request(ctx, requestID, LocalGateHeartbeatPath, payload)
 	if err != nil {
