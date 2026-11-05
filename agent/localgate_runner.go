@@ -78,7 +78,11 @@ func execCommand(ctx context.Context, dir, name string, args ...string) ([]byte,
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error { return syscall.Kill(-command.Process.Pid, syscall.SIGKILL) }
 	command.WaitDelay = gateKillGrace
-	output := &activityWriter{report: func(text string) { reportActivity(ctx, text) }}
+	output := &activityWriter{report: func(raw string) {
+		if p := progressFrom(ctx); p != nil {
+			p.Event(raw)
+		}
+	}}
 	command.Stdout, command.Stderr = output, output
 	err := command.Run()
 	return output.Bytes(), err
