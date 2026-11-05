@@ -16,7 +16,10 @@ struct ActivityView: View {
                 }
                 Text(summary).font(NothingTheme.body).foregroundStyle(NothingTheme.inkDim).nothingEntrance(4)
                 ForEach(Array(monitor.jobs.enumerated()), id: \.element.id) { index, job in
-                    row(job).nothingEntrance(index + 5)
+                    let arrived = feed.fresh.contains(job.id)
+                    row(job)
+                        .nothingEntrance(index + 5, enabled: !arrived)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 if let message = monitor.message {
                     Text(message).font(NothingTheme.small).foregroundStyle(NothingTheme.amber).textSelection(.enabled)
@@ -25,8 +28,10 @@ struct ActivityView: View {
             .padding(22)
             .animation(.smooth(duration: 0.35), value: monitor.jobs.map(\.id))
         }
-        .onAppear { feed.seed(monitor.jobs.map(\.id)) }
+        .onAppear { if monitor.lastUpdated != nil { feed.seed(monitor.jobs.map(\.id)) } }
         .onChange(of: monitor.jobs.map(\.id)) { _, ids in feed.update(ids) }
+        // The first answer only records what is already there, so rows loaded at launch enter normally and only later arrivals count as live.
+        .onChange(of: monitor.lastUpdated) { if !feed.isSeeded { feed.seed(monitor.jobs.map(\.id)) } }
         .task {
             // Only while this tab is on screen: the server is ours, but there is no reason to ask when nobody looks.
             while !Task.isCancelled {
@@ -58,7 +63,11 @@ struct ActivityView: View {
             HStack {
                 Text("\(job.repository) #\(job.pullRequest)").font(NothingTheme.body.weight(.semibold)).foregroundStyle(NothingTheme.ink)
                 Spacer()
+                JobDot(status: job.status)
                 Text(job.label).font(NothingTheme.small.weight(.semibold)).foregroundStyle(color(job))
+                    .contentTransition(.opacity)
+                    .resultPulse(["succeeded", "failed"].contains(job.status) ? job.status : "")
+                    .animation(.smooth(duration: 0.3), value: job.status)
             }
             let attempt = job.attempts > 1 ? " · attempt \(job.attempts)" : ""
             Text("\(job.headSha.prefix(7))\(attempt) · \(Date(timeIntervalSince1970: Double(job.updatedAt) / 1000).formatted(.relative(presentation: .named)))")
@@ -68,7 +77,7 @@ struct ActivityView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .nothingRow(fresh: feed.fresh.contains(job.id), tint: color(job))
+        .nothingRow(fresh: feed.fresh.contains(job.id), tint: color(job), changeToken: job.status)
     }
 
     private func color(_ job: GateJob) -> Color {
