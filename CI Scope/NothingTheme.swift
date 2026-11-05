@@ -135,7 +135,7 @@ extension ButtonStyle where Self == NothingPillStyle {
 
 /// Flat list row: hairline below, hover wash and bar; `fresh` flashes it once when it arrives live.
 extension View {
-    func nothingRow(fresh: Bool = false, tint: Color = NothingTheme.ink) -> some View {
-        modifier(NothingRow(fresh: fresh, tint: tint))
+    func nothingRow(fresh: Bool = false, tint: Color = NothingTheme.ink, changeToken: String = "") -> some View {
+        modifier(NothingRow(fresh: fresh, tint: tint, changeToken: changeToken))
     }
 }
