@@ -66,11 +66,11 @@ is intentionally used.
   credentialId values because the Durable Object keeps one-time records.
   Do not treat the shadow token as a device credential.
 
-Read `CI_SCOPE_V2_FULL_LAUNCH_REPORT.md` and the Web handoff before changing
+Read `docs/history/CI_SCOPE_V2_FULL_LAUNCH_REPORT.md` and the Web handoff before changing
 cross-repository ownership or deployment behavior.
 
 The active migration plan for replacing Cloudflare with the purchased VPS is
-`CI_SCOPE_V2_VPS_MIGRATION_PLAN.md`. Cloudflare is decommissioned; the
+`docs/history/CI_SCOPE_V2_VPS_MIGRATION_PLAN.md`. Cloudflare is decommissioned; the
 plan is kept as history.
 
 The first VPS control-plane slice is now deployed at `https://ci.forkhorizon.com`:
