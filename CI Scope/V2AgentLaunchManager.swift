@@ -122,9 +122,11 @@ struct V2AgentLaunchManager {
             return url
         }
 
-        let devPath = URL(fileURLWithPath: "/Users/daliys/Daliys/Swift/CI Scope/agent/ci-scope-agent")
-        if fileManager.isExecutableFile(atPath: devPath.path) {
-            return devPath
+        // Development builds: point CI_SCOPE_AGENT_PATH at a locally built agent.
+        if let devPath = ProcessInfo.processInfo.environment["CI_SCOPE_AGENT_PATH"],
+            fileManager.isExecutableFile(atPath: devPath)
+        {
+            return URL(fileURLWithPath: devPath)
         }
 
         throw V2AgentLaunchError.missingExecutable
