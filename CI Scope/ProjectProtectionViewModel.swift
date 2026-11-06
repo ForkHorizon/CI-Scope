@@ -23,28 +23,60 @@ final class ProjectProtectionViewModel: ObservableObject {
 
     private var repository = ""
 
-    /// Loads the project's config; a project the server does not know yet shows as unregistered.
+    /// Last known config per repository (nil = server said "not registered"), so switching projects shows data at once.
+    private var cache: [String: ProjectConfig?] = [:]
+
+    /// Shows the cached config immediately (if any), then revalidates against the server in the background.
     func load(repository: String) async {
         self.repository = repository
-        isBusy = true
+        if let hit = cache[repository] {
+            config = hit
+            message = nil
+            loadedRepository = repository
+        } else {
+            isBusy = true
+        }
+        await fetch(repository, selected: true)
+    }
+
+    /// Warms the cache for every registered project, in parallel, so a click never waits on the network.
+    func prefetch(_ repositories: [String]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for repository in repositories { group.addTask { await self.fetch(repository, selected: false) } }
+        }
+    }
+
+    private func fetch(_ repository: String, selected: Bool) async {
         let loaded: ProjectConfig?
         let note: String?
         do {
             loaded = try await client.read(repository: repository, readToken: try await readToken())
             note = nil
+            cache[repository] = .some(loaded)
         } catch ProjectConfigError.server(let status, _) where status == 404 {
             loaded = nil
             note = "\(repository) is not registered with CI Scope yet."
+            cache[repository] = .some(nil)
         } catch {
-            loaded = nil
-            note = error.localizedDescription
+            // A failed refresh keeps what is already shown; only an empty screen gets the error.
+            guard selected, self.repository == repository, loadedRepository != repository else {
+                if selected, self.repository == repository { isBusy = false }
+                return
+            }
+            config = nil
+            message = error.localizedDescription
+            loadedRepository = repository
+            isBusy = false
+            return
         }
         // A slower answer for a project the user already left must not overwrite the one now on screen.
         guard self.repository == repository else { return }
-        config = loaded
-        message = note
-        loadedRepository = repository
-        isBusy = false
+        if selected || !isBusy {
+            config = loaded
+            message = note
+            loadedRepository = repository
+        }
+        if selected { isBusy = false }
     }
 
     /// Registers the project that was last loaded.
@@ -54,7 +86,9 @@ final class ProjectProtectionViewModel: ObservableObject {
     func register(repository: String) async {
         self.repository = repository
         await guarded("register \(repository) with CI Scope") { admin in
-            self.config = try await self.client.register(repository: repository, admin: admin)
+            let registered = try await self.client.register(repository: repository, admin: admin)
+            self.config = registered
+            self.cache[repository] = .some(registered)
         }
     }
 
@@ -67,7 +101,9 @@ final class ProjectProtectionViewModel: ObservableObject {
             NSWorkspace.shared.open(page)
         }
         await guarded("change the CI protection of \(repository)") { admin in
-            self.config = try await client.update(edited, admin: admin)
+            let saved = try await client.update(edited, admin: admin)
+            self.config = saved
+            self.cache[self.repository] = .some(saved)
         }
     }
 

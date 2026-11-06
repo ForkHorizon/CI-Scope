@@ -42,9 +42,10 @@ struct ContentView: View {
             }
             settingsStore.startV2Lifecycle()
             while !Task.isCancelled {
-                await refreshProjects()
-                await securityEvents.refresh()
-                await gateJobs.refresh()
+                async let projects: Void = refreshProjects()
+                async let events: Void = securityEvents.refresh()
+                async let jobs: Void = gateJobs.refresh()
+                _ = await (projects, events, jobs)
                 try? await Task.sleep(for: .seconds(10))
             }
         }
@@ -84,6 +85,7 @@ struct ContentView: View {
         guard let token = try? await ServerAuthorizer.configReadToken(),
               let slugs = try? await ProjectConfigClient().listRepositories(readToken: token) else { return }
         projectStore.sync(with: slugs)
+        await protection.prefetch(slugs)
     }
 
     private func state(for project: CIProject) -> ServiceState {

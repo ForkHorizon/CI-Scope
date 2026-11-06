@@ -24,8 +24,9 @@ struct ProjectDetailView: View {
             .animation(.smooth(duration: 0.3), value: ready)
         }
         .task(id: project.repositorySlug) {
+            async let hooks: Void = model.refreshHooks()
             await model.load(repository: project.repositorySlug)
-            await model.refreshHooks()
+            await hooks
         }
     }
 
