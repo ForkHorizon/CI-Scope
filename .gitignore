@@ -69,3 +69,7 @@ secrets/
 .codex/
 graphify-out/
 .claude/
+
+# Compiled agent binary (build with: cd agent && go build -o ci-scope-agent ./cmd/ci-scope-agent)
+agent/ci-scope-agent
+.DS_Store

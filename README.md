@@ -4,11 +4,19 @@ CI Scope keeps AI coding agents honest. Protection lives on the website (`https:
 repositories: one GitHub check, "CI Scope", is posted by the GitHub App for every pull request, and the checks run on
 this Mac. Nothing is installed into the protected repositories.
 
+> **Status: working prototype, macOS only.** CI Scope currently runs for its author on a single Mac, with the
+> control plane on a VPS. Other platforms are planned but not built. This repository is public so the app, the agent
+> and the checks can be read; it is not a packaged product yet and has no installer. A license has not been chosen
+> yet, so all rights are reserved until one is added.
+>
+> Interested in the idea, or in developing or collaborating on it? Get in touch via
+> [forkhorizon.com/ci-scope](https://forkhorizon.com/ci-scope).
+
 ![CI Scope in one minute: a change is proposed, the owner's rules are loaded, the checks run on the owner's Mac, a verdict comes back to GitHub](docs/overview.svg)
 
 ## The two halves
 
-- **Website** (`CI-Scope-Web`): add a project, choose its checks and limits, record the protected-file baseline,
+- **Website** (`CI-Scope-Web`, private for now): add a project, choose its checks and limits, record the protected-file baseline,
   read the history. Weakening any protection needs the owner's Touch ID on the website.
 - **macOS app** (this repository): shows each project's protection and open alerts, raises a notification when
   someone tampers with the checks, opens the website for changes, installs the git hooks on this Mac and runs the
@@ -25,6 +33,11 @@ this Mac. Nothing is installed into the protected repositories.
 The current path, for engineers:
 
 ![How CI Scope checks a pull request: GitHub App, control plane on a VPS, agent and app on the owner's Mac](docs/architecture.svg)
+
+## Related repositories
+
+- [`ForkHorizon/ci-gates`](https://github.com/ForkHorizon/ci-gates) (public): the pinned checks the agent runs.
+- `ForkHorizon/CI-Scope-Web` (private for now): the control plane and website. Ask if you would like to see it.
 
 ## Layout
 
