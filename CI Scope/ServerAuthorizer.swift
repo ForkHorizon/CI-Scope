@@ -6,13 +6,16 @@ enum ServerAuthorizerError: LocalizedError {
     case cancelled
     case serverUnreachable(String)
     case loginUnavailable
+    case hostNotConfigured
 
     var errorDescription: String? {
         switch self {
         case .cancelled: "Touch ID was cancelled. Nothing was changed."
         case .serverUnreachable(let key):
-            "Couldn't read \(key) from \(ServerAuthorizer.host) over SSH. Check the VPS is up and this Mac's SSH key is authorized."
+            "Couldn't read \(key) from \(ServerAuthorizer.host ?? "the website server") over SSH. Check the VPS is up and this Mac's SSH key is authorized."
         case .loginUnavailable: "Couldn't read the GitHub login from the gh CLI. Run `gh auth login`."
+        case .hostNotConfigured:
+            "The website's SSH address isn't set. Run: defaults write com.ForkHorizon.CI-Scope serverSSHHost user@host"
         }
     }
 }
@@ -22,7 +25,14 @@ enum ServerAuthorizerError: LocalizedError {
 /// Touch ID (or the Mac password) succeeds; the app-enforced gate is needed because the ad-hoc-signed app
 /// cannot use biometry-bound keychain items (-34018).
 enum ServerAuthorizer {
-    static let host = "daliys@143.14.22.61"
+    /// SSH address of the website server (`user@host`). Not stored in source: set the `CI_SCOPE_WEB_SSH_HOST`
+    /// environment variable or `defaults write com.ForkHorizon.CI-Scope serverSSHHost user@host`.
+    static var host: String? {
+        let configured = ProcessInfo.processInfo.environment["CI_SCOPE_WEB_SSH_HOST"]
+            ?? UserDefaults.standard.string(forKey: "serverSSHHost")
+        guard let value = configured?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        return value
+    }
     static let envFile = "/etc/ci-scope-web/env"
 
     /// Read-only token for the project config and security event routes; needs no Touch ID.
@@ -57,6 +67,7 @@ enum ServerAuthorizer {
     }
 
     private static func serverValue(_ key: String) async throws -> String {
+        guard let host else { throw ServerAuthorizerError.hostNotConfigured }
         let remote = "sudo -n grep '^\(key)=' \(envFile) | cut -d= -f2-"
         // stderr dropped: ShellClient merges it into output, and an ssh warning would corrupt the value.
         let command = "ssh -o BatchMode=yes -o ConnectTimeout=10 \(quoted(host)) \(quoted(remote)) 2>/dev/null"

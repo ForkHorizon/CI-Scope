@@ -13,7 +13,7 @@ struct DashboardConfig {
             "/sbin",
             "/Library/Apple/usr/bin",
             "/opt/homebrew/opt/openjdk@17/bin",
-            "/Users/daliys/.local/bin",
+            "\(NSHomeDirectory())/.local/bin",
         ].joined(separator: ":")
     }
 }

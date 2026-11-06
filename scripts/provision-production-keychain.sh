@@ -4,7 +4,7 @@ umask 077
 
 production_service="${CI_SCOPE_PRODUCTION_KEYCHAIN_SERVICE:-com.forkhorizon.ci-scope.production}"
 agent_service="${CI_SCOPE_AGENT_KEYCHAIN_SERVICE:-com.forkhorizon.ci-scope.agent}"
-web_ssh_host="${CI_SCOPE_WEB_SSH_HOST:-daliys@143.14.22.61}"
+web_ssh_host="${CI_SCOPE_WEB_SSH_HOST:?set CI_SCOPE_WEB_SSH_HOST to user@host of the website server}"
 web_env_file="${CI_SCOPE_WEB_ENV_FILE:-/etc/ci-scope-web/env}"
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/ci-scope-keychain.XXXXXX")
