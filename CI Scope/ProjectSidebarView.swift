@@ -6,6 +6,7 @@ struct ProjectMenuPanel: View {
 
     let projects: [CIProject]
     let selectedProjectID: CIProject.ID?
+    let inboxCount: Int
     let alertCount: Int
     let activeTaskCount: Int
     let stateForProject: (CIProject) -> ServiceState
@@ -23,6 +24,7 @@ struct ProjectMenuPanel: View {
 
             VStack(spacing: 3) {
                 navRow(.activity, state: activeTaskCount > 0 ? .warning : .unknown, count: activeTaskCount)
+                navRow(.inbox, state: inboxCount > 0 ? .warning : .unknown, count: inboxCount)
                 navRow(.alerts, state: alertCount > 0 ? .warning : .unknown, count: alertCount)
                 navRow(.settings, state: .unknown, count: 0)
             }

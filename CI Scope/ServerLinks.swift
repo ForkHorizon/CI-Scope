@@ -8,5 +8,7 @@ enum ServerLinks {
         URL(string: "#/project/\(repository)", relativeTo: site)!.absoluteURL
     }
 
+    static let inbox = URL(string: "#/inbox", relativeTo: site)!.absoluteURL
+
     static let alerts = URL(string: "#/alerts", relativeTo: site)!.absoluteURL
 }
