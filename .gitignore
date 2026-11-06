@@ -73,3 +73,7 @@ graphify-out/
 # Compiled agent binary (build with: cd agent && go build -o ci-scope-agent ./cmd/ci-scope-agent)
 agent/ci-scope-agent
 .DS_Store
+
+# Local-only agent instructions (contain machine-specific paths)
+AGENTS.md
+CLAUDE.md

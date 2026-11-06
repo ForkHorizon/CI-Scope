@@ -1,7 +1,7 @@
 # CI Scope v2 — Client Handoff Report
 
 Дата: 2026-08-13  
-Репозиторий: `/Users/daliys/Daliys/Swift/CI Scope`
+Репозиторий: `<client-checkout>`
 
 Этот документ предназначен для агента, который объединяет CI Scope client, CI-Scope-Web и ci-gates.
 

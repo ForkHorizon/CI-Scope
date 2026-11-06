@@ -5,7 +5,7 @@
 Этот файл является планом только для репозитория ForkHorizon/CI-Scope-Web:
 
 ~~~
-/Users/daliys/Daliys/Web/CI-Scope-Web
+<web-checkout>
 ~~~
 
 Он предназначен для агента, который будет строить Cloudflare Worker, RunnerPool Durable Object, D1 projection, GitHub App integration, webhook ingress, reconciliation и admin API. Клиентский work находится в [CI_SCOPE_V2_CLIENT_PLAN.md](CI_SCOPE_V2_CLIENT_PLAN.md), workflow/gates — в [CI_SCOPE_V2_GATES_PLAN.md](CI_SCOPE_V2_GATES_PLAN.md), общая миграция — в [CI_SCOPE_V2_CROSS_REPOSITORY_PLAN.md](CI_SCOPE_V2_CROSS_REPOSITORY_PLAN.md).
