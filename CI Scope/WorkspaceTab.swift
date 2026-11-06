@@ -4,6 +4,7 @@ import Foundation
 enum WorkspaceTab: String, CaseIterable, Identifiable {
     case projects
     case activity
+    case inbox
     case alerts
     case settings
 
@@ -13,6 +14,7 @@ enum WorkspaceTab: String, CaseIterable, Identifiable {
         switch self {
         case .projects: "Projects"
         case .activity: "Activity"
+        case .inbox: "Inbox"
         case .alerts: "Alerts"
         case .settings: "Settings"
         }

@@ -8,6 +8,7 @@ struct ContentView: View {
     @StateObject var settingsStore = CIQueueSettingsStore()
     @StateObject var protection = ProjectProtectionViewModel()
     @StateObject var securityEvents = SecurityEventMonitor()
+    @StateObject var inbox = ChangeRequestMonitor()
     @StateObject var gateJobs = GateJobsMonitor()
     @State var workspaceTab: WorkspaceTab = .projects
     @State var isAddingProject = false
@@ -18,6 +19,7 @@ struct ContentView: View {
                 workspaceTab: $workspaceTab,
                 projects: projectStore.projects,
                 selectedProjectID: projectStore.selectedProjectID,
+                inboxCount: inbox.pending.count,
                 alertCount: securityEvents.events.count,
                 activeTaskCount: gateJobs.activeCount,
                 stateForProject: state(for:),
@@ -73,6 +75,8 @@ struct ContentView: View {
             }
         case .activity:
             ActivityView(monitor: gateJobs)
+        case .inbox:
+            InboxView(inbox: inbox)
         case .alerts:
             AlertsView(events: securityEvents)
         case .settings:
@@ -119,6 +123,7 @@ struct ContentView: View {
         switch workspaceTab {
         case .projects: projectStore.selectedProject?.repositorySlug ?? "No project selected"
         case .activity: gateJobs.activeCount == 0 ? "Idle" : "\(gateJobs.activeCount) in progress or waiting"
+        case .inbox: inbox.pending.isEmpty ? "No pending requests" : "\(inbox.pending.count) waiting for your decision"
         case .alerts: securityEvents.events.isEmpty ? "Nothing needs your attention" : "\(securityEvents.events.count) open"
         case .settings: "This Mac and the website"
         }
