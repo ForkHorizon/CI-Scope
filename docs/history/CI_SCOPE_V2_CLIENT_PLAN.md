@@ -5,7 +5,7 @@
 Этот файл является планом только для репозитория ForkHorizon/CI-Scope:
 
 ~~~
-/Users/daliys/Daliys/Swift/CI Scope
+<client-checkout>
 ~~~
 
 Он декомпозирует общий план CI Scope v2 и предназначен для агента, который будет менять macOS-клиент, локальный Agent/Watchdog и packaging. Общие правила ownership, routing generation, migration barrier и rollback находятся в [CI_SCOPE_V2_ARCHITECTURE_PLAN.md](CI_SCOPE_V2_ARCHITECTURE_PLAN.md) и [CI_SCOPE_V2_CROSS_REPOSITORY_PLAN.md](CI_SCOPE_V2_CROSS_REPOSITORY_PLAN.md).

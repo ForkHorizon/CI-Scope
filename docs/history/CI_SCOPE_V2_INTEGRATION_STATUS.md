@@ -45,7 +45,7 @@
 - Disposable remote V2 deployment выполнен под `forkhorizon` с generated test
   secrets; D1 migrations применены, `GET /api/ci/v2/health` и admin auth
   проверены remotely. Последний deployment ID:
-  `3c4b0ea4-b4e5-4704-bc08-15448bbf6fb7`.
+  `<redacted-id>`.
 - Полный disposable Agent smoke пройден remotely: issuer-authenticated
   enrollment/credential persistence, session open/activate, heartbeat, close;
   operation-status route также проверен как downstream route (`401` при
@@ -55,9 +55,9 @@
   configuration и прошёл `plutil -lint`.
 - Production Cloudflare topology provisioned separately from staging: Worker
   `ci-scope-web-production`, D1
-  `ci-scope-web-production-db` (`9196960f-1021-4938-a5e6-1785219ebe0b`), all
+  `ci-scope-web-production-db` (`<redacted-id>`), all
   five remote migrations, seven required secrets, and deployment
-  `ca01f8d6-aae6-442f-ad67-1fbbdcd08357`; production health returned `200`.
+  `<redacted-id>`; production health returned `200`.
 - Web now contains an injectable Web Crypto RS256 GitHub App/JIT client that
   is disabled unless `CI_SCOPE_V2_GITHUB_APP_ENABLED` is exactly `true`; raw
   JIT config crosses only the authenticated one-time reservation.prepare

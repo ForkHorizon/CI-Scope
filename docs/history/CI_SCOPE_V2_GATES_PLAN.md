@@ -5,7 +5,7 @@
 Этот файл является планом для отдельного репозитория ForkHorizon/ci-gates:
 
 ~~~
-/Users/daliys/ci-gates
+~/ci-gates
 ~~~
 
 Он определяет только workflow-facing contract: как workflows выбирают runner group/labels, как gates запускаются в ephemeral workspace, как сохраняется progress marker и как проверяется trust policy. Server control plane описан в [CI_SCOPE_V2_SERVER_PLAN.md](CI_SCOPE_V2_SERVER_PLAN.md), macOS Agent — в [CI_SCOPE_V2_CLIENT_PLAN.md](CI_SCOPE_V2_CLIENT_PLAN.md), общая миграция — в [CI_SCOPE_V2_CROSS_REPOSITORY_PLAN.md](CI_SCOPE_V2_CROSS_REPOSITORY_PLAN.md).

@@ -210,10 +210,10 @@ output.
 Владелец: release/operations owner.
 
 1. Deploy server в disposable staging namespace с generated test secrets —
-   выполнено: `forkhorizon`, deployment `3c4b0ea4-b4e5-4704-bc08-15448bbf6fb7`.
+   выполнено: `forkhorizon`, deployment `<redacted-id>`.
    Production namespace также provisioned: Worker `ci-scope-web-production`,
    D1 `ci-scope-web-production-db`, deployment
-   `ca01f8d6-aae6-442f-ad67-1fbbdcd08357`; health check passed after the
+   `<redacted-id>`; health check passed after the
    fail-closed GitHub App/JIT client and Agent process-controller seam landed.
 2. Установить dormant Agent на одну canary machine.
 3. Запустить один pinned v2 workflow с двумя same-label jobs.
@@ -259,7 +259,7 @@ legacy broker.
 - Remote Worker `https://forkhorizon.ci-scope-web.workers.dev`: admin auth и
   `/api/ci/v2/health` — `200`; DO reports one available slot.
 - Production Worker `https://ci-scope-web-production.ci-scope-web.workers.dev`:
-  deployment `fb6f6c28-a8f5-46ed-8bd2-2e4337e42960`; `/api/ci/v2/health` —
+  deployment `<redacted-id>`; `/api/ci/v2/health` —
   `200`; one available slot, zero active sessions.
 
 Это подтверждает качество подготовленного слоя, но не закрывает P1–P6.
