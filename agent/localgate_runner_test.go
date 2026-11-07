@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -206,5 +207,19 @@ func TestGateSearchPathCoversHomebrew(t *testing.T) {
 func TestLookGatePathFindsHomebrewTools(t *testing.T) {
 	if path, err := LookGatePath("python3"); err != nil || !strings.HasPrefix(path, "/opt/homebrew/bin/") {
 		t.Skipf("python3 not under Homebrew on this machine: %q %v", path, err)
+	}
+}
+
+func TestClipEndsKeepsTheFailingTail(t *testing.T) {
+	long := strings.Repeat("test ok ", 80) + "panicked at main.rs:219: timed out reading a daemon frame"
+	got := clipEnds(long, 240)
+	if len(got) > 240 || !strings.HasSuffix(got, "timed out reading a daemon frame") || !strings.HasPrefix(got, "test ok") {
+		t.Fatalf("clipEnds = %q (%d bytes)", got, len(got))
+	}
+	if short := clipEnds("  a   b ", 240); short != "a b" {
+		t.Fatalf("short text changed: %q", short)
+	}
+	if !utf8.ValidString(clipEnds(strings.Repeat("é", 400), 240)) {
+		t.Fatal("clipEnds split a multi-byte rune")
 	}
 }

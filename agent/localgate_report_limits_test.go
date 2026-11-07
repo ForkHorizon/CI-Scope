@@ -48,8 +48,8 @@ func TestReportTextsStayWithinTheServerStringLimit(t *testing.T) {
 	if longest := longestString(generic); longest > serverMaxString {
 		t.Fatalf("a report text has %d characters, the server accepts at most %d", longest, serverMaxString)
 	}
-	if !strings.HasSuffix(report.Checks[0].Detail, "...") {
-		t.Fatalf("a clipped detail should say so, got %q", report.Checks[0].Detail[len(report.Checks[0].Detail)-10:])
+	if !strings.Contains(report.Checks[0].Detail, "...") {
+		t.Fatalf("a clipped detail should say so, got %q", report.Checks[0].Detail)
 	}
 }
 

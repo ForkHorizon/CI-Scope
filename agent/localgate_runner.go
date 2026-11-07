@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -198,7 +199,7 @@ func (r *GateScriptRunner) report(output []byte, runErr error) LocalGateReport {
 	report.ConfigVersion = parsed.ConfigVersion
 	allPassed := true
 	for _, item := range parsed.Results {
-		report.Checks = append(report.Checks, LocalGateCheck{ID: item.ID, Status: item.Status, Required: true, Detail: clip(item.Detail, localGateMaxDetail)})
+		report.Checks = append(report.Checks, LocalGateCheck{ID: item.ID, Status: item.Status, Required: true, Detail: clipEnds(item.Detail, localGateMaxDetail)})
 		allPassed = allPassed && item.Status == "passed"
 	}
 	if allPassed && runErr == nil {
@@ -239,6 +240,24 @@ func clip(text string, limit int) string {
 		return text
 	}
 	return text[:limit-3] + "..."
+}
+
+// clipEnds shortens text to limit bytes keeping its start and, mostly, its end: a failed command's cause (the panic,
+// the failing test) is at the end of its output, and a plain head clip would show only the passing lines before it.
+func clipEnds(text string, limit int) string {
+	text = strings.Join(strings.Fields(text), " ")
+	if len(text) <= limit {
+		return text
+	}
+	head := limit / 4
+	for head > 0 && !utf8.RuneStart(text[head]) {
+		head--
+	}
+	tail := len(text) - (limit - head - 3)
+	for tail < len(text) && !utf8.RuneStart(text[tail]) {
+		tail++
+	}
+	return text[:head] + "..." + text[tail:]
 }
 
 func validRepository(value string) bool {
