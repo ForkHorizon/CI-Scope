@@ -1,4 +1,4 @@
-// Protected-file change requests across all projects: reject here, approve on the website (passkey).
+// Protected-file and test-edit change requests across all projects: reject here, approve on the website (passkey).
 import SwiftUI
 
 struct InboxView: View {
@@ -14,8 +14,11 @@ struct InboxView: View {
                     Text(group.repository).nothingCaption()
                     ForEach(group.requests) { request in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(request.pullRequest.map { "PR #\($0)" } ?? "Commit \(request.headSha.prefix(7))")
+                            Text(request.title)
                                 .font(NothingTheme.body.weight(.semibold)).foregroundStyle(NothingTheme.amber)
+                            if request.isTestEdit, let reason = request.reason {
+                                Text("Why: \(reason)").font(NothingTheme.small).foregroundStyle(NothingTheme.ink)
+                            }
                             ForEach(request.items, id: \.path) { item in
                                 Text("\(item.kind) · \(item.path)").font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
                             }
