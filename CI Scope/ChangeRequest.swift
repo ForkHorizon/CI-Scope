@@ -14,11 +14,22 @@ struct ChangeRequest: Codable, Equatable, Identifiable {
     var repository: String
     var pullRequest: Int?
     var headSha: String
+    /// "tests": an agent asks to edit existing tests (no pull request); nil or "protected": a pull request's protected files.
+    var kind: String?
+    /// Why the tests change, in the requester's words; only for kind "tests".
+    var reason: String?
     var items: [Item]
     var status: String
     var createdAt: Int
 
     var isPending: Bool { status == "pending" }
+    var isTestEdit: Bool { kind == "tests" }
+
+    /// What the card is about: the pull request, or the test edit that has none.
+    var title: String {
+        if isTestEdit { return "Test edit" }
+        return pullRequest.map { "PR #\($0)" } ?? "Commit \(headSha.prefix(7))"
+    }
 }
 
 /// Talks to ci.forkhorizon.com's /api/ci/v2/site/changes and /api/ci/v2/changes/decide (admin Basic auth).
