@@ -77,6 +77,8 @@ struct ChangeRequestsClient {
 final class ChangeRequestMonitor: ObservableObject {
     @Published private(set) var requests: [ChangeRequest] = []
     @Published var message: String?
+    /// True while the last refresh failed: `requests` is then what the app last saw, which the website may have moved on from.
+    @Published private(set) var isStale = false
 
     var client = ChangeRequestsClient()
     var adminLogin: (String) async throws -> (user: String, password: String) = { reason in
@@ -95,8 +97,10 @@ final class ChangeRequestMonitor: ObservableObject {
         do {
             requests = try await client.list(admin: try await adminLogin("show protected-file change requests"))
             message = nil
+            isStale = false
         } catch {
             message = error.localizedDescription
+            isStale = true
         }
     }
 

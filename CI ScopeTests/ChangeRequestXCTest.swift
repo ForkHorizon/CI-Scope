@@ -31,4 +31,22 @@ final class ChangeRequestXCTest: XCTestCase {
         XCTAssertNil(monitor.requests[2].items[0].previous)
         XCTAssertNil(monitor.requests[1].pullRequest)
     }
+
+    func testAFailedRefreshKeepsTheListButMarksItOutOfDate() async {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        StubURLProtocol.handler = { _ in (200, self.reply) }
+        let monitor = ChangeRequestMonitor()
+        monitor.client = ChangeRequestsClient(session: URLSession(configuration: configuration))
+        monitor.adminLogin = { _ in (user: "owner", password: "pw") }
+        await monitor.refresh()
+        XCTAssertFalse(monitor.isStale)
+        monitor.adminLogin = { _ in throw ServerAuthorizerError.sshBlocked("host:22") }
+        await monitor.refresh()
+        XCTAssertTrue(monitor.isStale, "the website may have decided the requests since")
+        XCTAssertEqual(monitor.pending.count, 2)
+        monitor.adminLogin = { _ in (user: "owner", password: "pw") }
+        await monitor.refresh()
+        XCTAssertFalse(monitor.isStale)
+    }
 }

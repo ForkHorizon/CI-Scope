@@ -7,7 +7,10 @@ struct InboxView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                if inbox.pending.isEmpty {
+                if inbox.isStale {
+                    Text("Out of date: couldn't refresh, so this list may not match the website. Requests shown as waiting may already be decided there.")
+                        .font(NothingTheme.small).foregroundStyle(NothingTheme.amber)
+                } else if inbox.pending.isEmpty {
                     Text("No pending requests.").font(NothingTheme.body).foregroundStyle(NothingTheme.inkDim)
                 }
                 ForEach(inbox.pendingByRepository, id: \.repository) { group in
