@@ -123,13 +123,13 @@ func (r *GateScriptRunner) Run(ctx context.Context, job LocalGateJob) (LocalGate
 	reportActivity(ctx, "Starting the checks")
 	output, runErr := r.run(ctx, dir, "python3", arguments...)
 	report := r.report(output, runErr)
-	r.enrich(ctx, output, &report)
+	r.enrich(ctx, job.Repository, output, &report)
 	return report, nil
 }
 
 // enrich replaces the detail of checks the rules could not read with a model's grounded one. The raw excerpt is used
 // here only and never put into the report.
-func (r *GateScriptRunner) enrich(ctx context.Context, output []byte, report *LocalGateReport) {
+func (r *GateScriptRunner) enrich(ctx context.Context, repository string, output []byte, report *LocalGateReport) {
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	var parsed struct {
 		Results []struct {
@@ -145,7 +145,7 @@ func (r *GateScriptRunner) enrich(ctx context.Context, output []byte, report *Lo
 		if !item.Unstructured {
 			continue
 		}
-		text := r.Enrich.Explain(ctx, item.ID, item.Excerpt)
+		text := r.Enrich.Explain(ctx, repository, item.ID, item.Excerpt)
 		for i := range report.Checks {
 			if text != "" && report.Checks[i].ID == item.ID {
 				report.Checks[i].Detail = clip(text, localGateMaxDetail)

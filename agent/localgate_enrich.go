@@ -32,8 +32,9 @@ type askModel func(ctx context.Context, prompt string) (string, error)
 
 // Enricher asks Codex first, then a local model. The zero value (and nil) does nothing.
 type Enricher struct {
-	Codex askModel
-	Local askModel
+	Codex      askModel
+	Local      askModel
+	CodexRepos map[string]bool // repositories whose logs may go to Codex; "*" = all. Empty: Codex is never used.
 }
 
 // NewEnricherFromEnv is off unless CI_SCOPE_DIGEST_CODEX=1 and/or CI_SCOPE_DIGEST_LOCAL=1 is set.
@@ -45,6 +46,10 @@ func NewEnricherFromEnv() *Enricher {
 			binary = "codex"
 		}
 		e.Codex = func(ctx context.Context, prompt string) (string, error) { return askCodex(ctx, binary, prompt) }
+		e.CodexRepos = map[string]bool{}
+		for _, repo := range strings.Split(os.Getenv("CI_SCOPE_DIGEST_CODEX_REPOS"), ",") {
+			e.CodexRepos[strings.ToLower(strings.TrimSpace(repo))] = true
+		}
 	}
 	if os.Getenv("CI_SCOPE_DIGEST_LOCAL") == "1" {
 		e.Local = askOllama
@@ -64,18 +69,25 @@ type modelAnswer struct {
 }
 
 // Explain returns "file:line rule | cause | fix: ..." grounded in the excerpt, or "" when no tier gave a usable answer.
-func (e *Enricher) Explain(ctx context.Context, check, excerpt string) string {
+func (e *Enricher) Explain(ctx context.Context, repository, check, excerpt string) string {
 	if e == nil || strings.TrimSpace(excerpt) == "" {
 		return ""
 	}
 	ctx, cancel := context.WithTimeout(ctx, enrichBudget)
 	defer cancel()
 	prompt := enrichInstructions + "\n\nCheck: " + check + "\n--- LOG START ---\n" + excerpt + "\n--- LOG END ---"
-	for _, ask := range []askModel{e.Codex, e.Local} {
-		if ask == nil {
+	// The log leaves the machine only for Codex, only for allowed repositories, and only with secrets removed.
+	codexPrompt := enrichInstructions + "\n\nCheck: " + check + "\n--- LOG START ---\n" + scrubSecrets(excerpt) + "\n--- LOG END ---"
+	allowed := e.CodexRepos["*"] || e.CodexRepos[strings.ToLower(repository)]
+	for i, ask := range []askModel{e.Codex, e.Local} {
+		if ask == nil || (i == 0 && !allowed) {
 			continue
 		}
-		raw, err := ask(ctx, prompt)
+		sent := prompt
+		if i == 0 {
+			sent = codexPrompt
+		}
+		raw, err := ask(ctx, sent)
 		if err != nil {
 			continue
 		}
@@ -84,6 +96,31 @@ func (e *Enricher) Explain(ctx context.Context, check, excerpt string) string {
 		}
 	}
 	return ""
+}
+
+var secretPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)`),
+	regexp.MustCompile(`\b(ghp|gho|ghs|ghu|ghr|github_pat|sk|pk|xox[abprs]|AKIA|AIza)[A-Za-z0-9_\-]{16,}`),
+	regexp.MustCompile(`(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=\-]{12,}`),
+	regexp.MustCompile(`(?i)([A-Za-z0-9_.\-]*(secret|token|passw(or)?d|api[_-]?key|credential|private[_-]?key)[A-Za-z0-9_.\-]*["']?\s*[:=]\s*)("[^"]*"|'[^']*'|\S+)`),
+	regexp.MustCompile(`://[^/\s:@]+:[^/\s@]+@`),
+	regexp.MustCompile(`\b[A-Fa-f0-9]{40,}\b|\b[A-Za-z0-9+/]{48,}={0,2}`),
+}
+
+// scrubSecrets replaces anything that looks like a credential before a log is sent off the machine. Over-matching is fine:
+// a redacted word costs a little context, a leaked key costs much more.
+func scrubSecrets(text string) string {
+	for i, pattern := range secretPatterns {
+		switch i {
+		case 3:
+			text = pattern.ReplaceAllString(text, "${1}[REDACTED]")
+		case 4:
+			text = pattern.ReplaceAllString(text, "://[REDACTED]@")
+		default:
+			text = pattern.ReplaceAllString(text, "[REDACTED]")
+		}
+	}
+	return text
 }
 
 var objectInText = regexp.MustCompile(`(?s)\{.*\}`)
