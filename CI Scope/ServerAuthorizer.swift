@@ -5,6 +5,7 @@ import LocalAuthentication
 enum ServerAuthorizerError: LocalizedError {
     case cancelled
     case serverUnreachable(String)
+    case sshBlocked(String)
     case loginUnavailable
     case hostNotConfigured
 
@@ -13,6 +14,8 @@ enum ServerAuthorizerError: LocalizedError {
         case .cancelled: "Touch ID was cancelled. Nothing was changed."
         case .serverUnreachable(let key):
             "Couldn't read \(key) from \(ServerAuthorizer.host ?? "the website server") over SSH. Check the VPS is up and this Mac's SSH key is authorized."
+        case .sshBlocked(let address):
+            "Can't reach the website server's SSH port (\(address)) from this network; many Wi-Fi networks block SSH. Switch network or turn on a VPN, then Refresh."
         case .loginUnavailable: "Couldn't read the GitHub login from the gh CLI. Run `gh auth login`."
         case .hostNotConfigured:
             "The website's SSH address isn't set. Run: defaults write com.ForkHorizon.CI-Scope serverSSHHost user@host"
@@ -66,6 +69,14 @@ enum ServerAuthorizer {
         return try await serverValue("CI_SCOPE_ADMIN_PASSWORD")
     }
 
+    /// `host:port` when the server's SSH port doesn't answer at all (a network that blocks SSH), nil when it does.
+    private static func blockedSSHAddress(_ host: String) async -> String? {
+        let probe = "set -- $(ssh -G \(quoted(host)) 2>/dev/null | awk '/^hostname /{h=$2} /^port /{p=$2} END{print h, p}'); nc -z -G 4 \"$1\" \"$2\" >/dev/null 2>&1 || echo \"$1:$2\""
+        let result = await ShellClient.run(probe, timeout: 10, config: DashboardConfig())
+        let address = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        return address.isEmpty || address == ":" ? nil : address
+    }
+
     private static func serverValue(_ key: String) async throws -> String {
         guard let host else { throw ServerAuthorizerError.hostNotConfigured }
         let remote = "sudo -n grep '^\(key)=' \(envFile) | cut -d= -f2-"
@@ -79,6 +90,7 @@ enum ServerAuthorizer {
         // Only the one trailing newline from `cut`; the value itself may contain spaces or symbols.
         let value = result.output.hasSuffix("\n") ? String(result.output.dropLast()) : result.output
         guard result.exitCode == 0, !value.isEmpty, !value.contains("\n") else {
+            if let blocked = await blockedSSHAddress(host) { throw ServerAuthorizerError.sshBlocked(blocked) }
             throw ServerAuthorizerError.serverUnreachable(key)
         }
         return value
