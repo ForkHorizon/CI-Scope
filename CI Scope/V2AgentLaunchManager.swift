@@ -137,7 +137,7 @@ struct V2AgentLaunchManager {
         "CI_SCOPE_POOL_IDENTITY", "CI_SCOPE_SESSION_REQUEST_ID",
     ]
 
-    private static let gateKeys = ["CI_SCOPE_GATES_ROOT", "CI_SCOPE_GATES_SHA", "CI_SCOPE_GATE_WORKSPACE"]
+    private static let gateKeys = ["CI_SCOPE_GATES_ROOT", "CI_SCOPE_GATES_SHA", "CI_SCOPE_GATE_WORKSPACE", "CI_SCOPE_DIGEST_CODEX", "CI_SCOPE_DIGEST_CODEX_BIN", "CI_SCOPE_DIGEST_LOCAL"]
 
     /// The identity in the LaunchAgent that is already installed, if it has a complete one.
     private func enrolledIdentity() -> [String: String] {
