@@ -123,7 +123,7 @@ struct ContentView: View {
         switch workspaceTab {
         case .projects: projectStore.selectedProject?.repositorySlug ?? "No project selected"
         case .activity: gateJobs.activeCount == 0 ? "Idle" : "\(gateJobs.activeCount) in progress or waiting"
-        case .inbox: inbox.pending.isEmpty ? "No pending requests" : "\(inbox.pending.count) waiting for your decision"
+        case .inbox: inbox.isStale ? "Out of date, couldn't refresh" : inbox.pending.isEmpty ? "No pending requests" : "\(inbox.pending.count) waiting for your decision"
         case .alerts: securityEvents.events.isEmpty ? "Nothing needs your attention" : "\(securityEvents.events.count) open"
         case .settings: "This Mac and the website"
         }
