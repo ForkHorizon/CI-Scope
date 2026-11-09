@@ -91,15 +91,16 @@ func execCommand(ctx context.Context, dir, name string, args ...string) ([]byte,
 
 // GateScriptRunner checks a pull request in a clean checkout with the pinned ci-gates `ci-scope check`.
 type GateScriptRunner struct {
-	WorkspaceRoot string // where per-repository checkouts live
-	GatesRoot     string // pinned ci-gates checkout
-	GatesSHA      string // commit GatesRoot must be at
+	WorkspaceRoot string    // where per-repository checkouts live
+	GatesRoot     string    // pinned ci-gates checkout
+	GatesSHA      string    // commit GatesRoot must be at
+	Enrich        *Enricher // optional model step for failures no rule could read; nil = off
 	run           commandRunner
 	now           func() time.Time
 }
 
 func NewGateScriptRunner(workspaceRoot, gatesRoot, gatesSHA string) *GateScriptRunner {
-	return &GateScriptRunner{WorkspaceRoot: workspaceRoot, GatesRoot: gatesRoot, GatesSHA: gatesSHA, run: execCommand, now: time.Now}
+	return &GateScriptRunner{WorkspaceRoot: workspaceRoot, GatesRoot: gatesRoot, GatesSHA: gatesSHA, Enrich: NewEnricherFromEnv(), run: execCommand, now: time.Now}
 }
 
 func (r *GateScriptRunner) Run(ctx context.Context, job LocalGateJob) (LocalGateReport, error) {
@@ -121,7 +122,36 @@ func (r *GateScriptRunner) Run(ctx context.Context, job LocalGateJob) (LocalGate
 	}
 	reportActivity(ctx, "Starting the checks")
 	output, runErr := r.run(ctx, dir, "python3", arguments...)
-	return r.report(output, runErr), nil
+	report := r.report(output, runErr)
+	r.enrich(ctx, job.Repository, output, &report)
+	return report, nil
+}
+
+// enrich replaces the detail of checks the rules could not read with a model's grounded one. The raw excerpt is used
+// here only and never put into the report.
+func (r *GateScriptRunner) enrich(ctx context.Context, repository string, output []byte, report *LocalGateReport) {
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var parsed struct {
+		Results []struct {
+			ID           string `json:"id"`
+			Unstructured bool   `json:"unstructured"`
+			Excerpt      string `json:"excerpt"`
+		} `json:"results"`
+	}
+	if r.Enrich == nil || json.Unmarshal([]byte(lines[len(lines)-1]), &parsed) != nil {
+		return
+	}
+	for _, item := range parsed.Results {
+		if !item.Unstructured {
+			continue
+		}
+		text := r.Enrich.Explain(ctx, repository, item.ID, item.Excerpt)
+		for i := range report.Checks {
+			if text != "" && report.Checks[i].ID == item.ID {
+				report.Checks[i].Detail = clip(text, localGateMaxDetail)
+			}
+		}
+	}
 }
 
 func (r *GateScriptRunner) verifyGates(ctx context.Context) error {
@@ -188,6 +218,8 @@ func (r *GateScriptRunner) report(output []byte, runErr error) LocalGateReport {
 			ID     string `json:"id"`
 			Status string `json:"status"`
 			Detail string `json:"detail"`
+			// Set by ci-gates when no rule could read the output; its detail is then a raw tail.
+			Unstructured bool `json:"unstructured"`
 		} `json:"results"`
 	}
 	if len(lines) < 2 || json.Unmarshal([]byte(lines[len(lines)-1]), &parsed) != nil || len(parsed.Results) == 0 {
@@ -199,7 +231,12 @@ func (r *GateScriptRunner) report(output []byte, runErr error) LocalGateReport {
 	report.ConfigVersion = parsed.ConfigVersion
 	allPassed := true
 	for _, item := range parsed.Results {
-		report.Checks = append(report.Checks, LocalGateCheck{ID: item.ID, Status: item.Status, Required: true, Detail: clipEnds(item.Detail, localGateMaxDetail)})
+		// A digest line starts with the file and rule, so keep its head; a raw tail keeps its end, where the cause is.
+		detail := clip(item.Detail, localGateMaxDetail)
+		if item.Unstructured {
+			detail = clipEnds(item.Detail, localGateMaxDetail)
+		}
+		report.Checks = append(report.Checks, LocalGateCheck{ID: item.ID, Status: item.Status, Required: true, Detail: detail})
 		allPassed = allPassed && item.Status == "passed"
 	}
 	if allPassed && runErr == nil {
