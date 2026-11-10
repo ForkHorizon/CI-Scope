@@ -23,8 +23,10 @@ final class ChangeRequestXCTest: XCTestCase {
         StubURLProtocol.handler = { _ in (200, self.reply) }
         let monitor = ChangeRequestMonitor()
         monitor.client = ChangeRequestsClient(session: URLSession(configuration: configuration))
-        monitor.adminLogin = { _ in (user: "owner", password: "pw") }
+        monitor.readToken = { "read-token" }
         await monitor.refresh()
+        XCTAssertEqual(StubURLProtocol.lastRequest?.value(forHTTPHeaderField: "x-ci-scope-config-token"), "read-token")
+        XCTAssertNil(StubURLProtocol.lastRequest?.value(forHTTPHeaderField: "authorization"), "listing sends no admin login")
         XCTAssertEqual(monitor.requests.count, 3)
         XCTAssertEqual(monitor.pending.count, 2)
         XCTAssertEqual(monitor.pendingByRepository.map(\.repository), ["A/one", "B/two"])
@@ -38,14 +40,14 @@ final class ChangeRequestXCTest: XCTestCase {
         StubURLProtocol.handler = { _ in (200, self.reply) }
         let monitor = ChangeRequestMonitor()
         monitor.client = ChangeRequestsClient(session: URLSession(configuration: configuration))
-        monitor.adminLogin = { _ in (user: "owner", password: "pw") }
+        monitor.readToken = { "read-token" }
         await monitor.refresh()
         XCTAssertFalse(monitor.isStale)
-        monitor.adminLogin = { _ in throw ServerAuthorizerError.sshBlocked("host:22") }
+        monitor.readToken = { throw ServerAuthorizerError.sshBlocked("host:22") }
         await monitor.refresh()
         XCTAssertTrue(monitor.isStale, "the website may have decided the requests since")
         XCTAssertEqual(monitor.pending.count, 2)
-        monitor.adminLogin = { _ in (user: "owner", password: "pw") }
+        monitor.readToken = { "read-token" }
         await monitor.refresh()
         XCTAssertFalse(monitor.isStale)
     }
