@@ -32,14 +32,14 @@ struct ChangeRequest: Codable, Equatable, Identifiable {
     }
 }
 
-/// Talks to ci.forkhorizon.com's /api/ci/v2/site/changes and /api/ci/v2/changes/decide (admin Basic auth).
+/// Lists with the read token (changes/open, no Touch ID); rejects through changes/decide (admin Basic auth).
 struct ChangeRequestsClient {
     var baseURL = URL(string: "https://ci.forkhorizon.com/api/ci/v2")!
     var session: URLSession = .shared
 
-    func list(admin: (user: String, password: String)) async throws -> [ChangeRequest] {
-        var request = URLRequest(url: baseURL.appendingPathComponent("site/changes"))
-        authorize(&request, admin)
+    func list(readToken: String) async throws -> [ChangeRequest] {
+        var request = URLRequest(url: baseURL.appendingPathComponent("changes/open"))
+        request.setValue(readToken, forHTTPHeaderField: "x-ci-scope-config-token")
         let data = try await send(request)
         struct Reply: Decodable { var changes: [ChangeRequest] }
         do { return try JSONDecoder().decode(Reply.self, from: data).changes } catch { throw ProjectConfigError.malformedResponse }
@@ -72,7 +72,7 @@ struct ChangeRequestsClient {
     }
 }
 
-// ponytail: loads on demand (tab open, Refresh, after Reject) because every call needs the admin login; polling would prompt Touch ID.
+// ponytail: loads on demand (tab open, Refresh, after Reject); listing needs no Touch ID, so polling could be added if wanted.
 @MainActor
 final class ChangeRequestMonitor: ObservableObject {
     @Published private(set) var requests: [ChangeRequest] = []
@@ -85,6 +85,9 @@ final class ChangeRequestMonitor: ObservableObject {
         try await ServerAuthorizer.adminLogin(reason: reason)
     }
 
+    /// Listing only reads, so it needs no Touch ID; only reject asks for the admin login.
+    var readToken: () async throws -> String = { try await ServerAuthorizer.configReadToken() }
+
     var pending: [ChangeRequest] { requests.filter(\.isPending) }
 
     /// Pending requests grouped by repository, repositories in alphabetical order.
@@ -95,7 +98,7 @@ final class ChangeRequestMonitor: ObservableObject {
 
     func refresh() async {
         do {
-            requests = try await client.list(admin: try await adminLogin("show protected-file change requests"))
+            requests = try await client.list(readToken: try await readToken())
             message = nil
             isStale = false
         } catch {
