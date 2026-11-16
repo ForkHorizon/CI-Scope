@@ -11,7 +11,7 @@ func TestSQLiteStoreUsesWALAndPersistsIntents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	ctx := context.Background()
 	if err := store.PutMetadata(ctx, "machineId", "machine-1"); err != nil {
 		t.Fatal(err)

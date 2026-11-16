@@ -28,7 +28,7 @@ func TestOwnerLeaseFencesContentionAndRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer two.Release()
+	defer func() { _ = two.Release() }()
 	if two.Token().LocalEpoch <= token.LocalEpoch {
 		t.Fatalf("epoch did not advance: old=%d new=%d", token.LocalEpoch, two.Token().LocalEpoch)
 	}

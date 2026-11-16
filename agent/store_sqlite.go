@@ -92,7 +92,7 @@ func (s *SQLiteStore) PendingIntents(ctx context.Context) ([]Intent, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var result []Intent
 	for rows.Next() {
 		var intent Intent

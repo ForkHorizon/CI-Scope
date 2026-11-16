@@ -69,7 +69,7 @@ func (c *HTTPControlPlane) DoWithHeaders(ctx context.Context, path string, reque
 	if err != nil {
 		return ServerResponseEnvelope{}, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	responseBody, err := io.ReadAll(io.LimitReader(response.Body, maxServerResponseBytes+1))
 	if err != nil {
 		return ServerResponseEnvelope{}, err

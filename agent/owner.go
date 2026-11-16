@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -146,7 +147,11 @@ func writeAtomic(path string, data []byte, mode os.FileMode) error {
 		return err
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
+	defer func() {
+		if err := os.Remove(tmpName); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Printf("remove %s: %v", tmpName, err)
+		}
+	}()
 	if err := tmp.Chmod(mode); err != nil {
 		_ = tmp.Close()
 		return err
@@ -169,6 +174,6 @@ func writeAtomic(path string, data []byte, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer directory.Close()
+	defer func() { _ = directory.Close() }()
 	return directory.Sync()
 }

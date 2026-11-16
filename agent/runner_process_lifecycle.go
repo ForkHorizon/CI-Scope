@@ -66,6 +66,9 @@ func (c *MacOSRunnerProcessController) observeLocked(process *startedRunnerProce
 	return alive, nil
 }
 
+// exited reports that the process ended; how it ended (the exit status) does not matter to the caller.
+func exited(error) bool { return true }
+
 func waitRunner(ctx context.Context, process *startedRunnerProcess, duration time.Duration) bool {
 	if process == nil {
 		return true
@@ -73,8 +76,8 @@ func waitRunner(ctx context.Context, process *startedRunnerProcess, duration tim
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
 	select {
-	case <-process.done:
-		return true
+	case status := <-process.done:
+		return exited(status)
 	case <-timer.C:
 		return false
 	case <-func() <-chan struct{} {

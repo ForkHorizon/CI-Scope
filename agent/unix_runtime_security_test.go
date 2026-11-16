@@ -27,7 +27,11 @@ func TestUnixSocketRuntimeRejectsWrongPeerAndOversizedFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(directory)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(directory); err != nil {
+			t.Logf("remove %s: %v", directory, err)
+		}
+	})
 	path := filepath.Join(directory, "agent.sock")
 	runtime, err := NewUnixSocketRuntime(UnixSocketConfig{
 		Path: path, LocalEpoch: 1, ServerSessionEpoch: 1,
@@ -42,12 +46,12 @@ func TestUnixSocketRuntimeRejectsWrongPeerAndOversizedFrame(t *testing.T) {
 	if err := runtime.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer runtime.Close()
+	defer func() { _ = runtime.Close() }()
 	conn, err := net.Dial("unix", path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 	_, _ = conn.Write([]byte(strings.Repeat("x", 1025) + "\n"))
 	var response [1]byte
