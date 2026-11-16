@@ -27,7 +27,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer ownerLease.Release()
+	defer func() {
+		if err := ownerLease.Release(); err != nil {
+			log.Printf("release owner lease: %v", err)
+		}
+	}()
 
 	rootContext, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
