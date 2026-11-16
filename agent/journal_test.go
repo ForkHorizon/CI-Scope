@@ -11,7 +11,7 @@ func TestIntentJournalReturnsUnacknowledgedIntents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer j.Close()
+	defer func() { _ = j.Close() }()
 	intent := Intent{ID: "intent-1", OperationID: "op-1", Kind: IntentSpawnProcess, Status: IntentPending, LocalEpoch: 3, CreatedAt: time.Now().UTC()}
 	if err := j.Append(intent); err != nil {
 		t.Fatal(err)

@@ -90,7 +90,7 @@ func TestListenUnixSocketRecoversOwnedStaleSocket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	if info, err := os.Lstat(path); err != nil || info.Mode()&os.ModeSocket == 0 {
 		t.Fatalf("recovered path is not a Unix socket: %v", err)
 	}
@@ -173,7 +173,7 @@ func socketRequestWithContext(t *testing.T, runtime *UnixSocketRuntime, requestI
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if _, err := conn.Write(frame); err != nil {
 		t.Fatal(err)
 	}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -166,7 +167,11 @@ func askCodex(ctx context.Context, binary, prompt string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer os.RemoveAll(dir)
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			log.Printf("remove %s: %v", dir, err)
+		}
+	}()
 	schema := dir + "/schema.json"
 	if err := os.WriteFile(schema, []byte(enrichSchema), 0o600); err != nil {
 		return "", err
@@ -213,7 +218,7 @@ func askOllama(ctx context.Context, prompt string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var reply struct {
 		Message struct {
 			Content string `json:"content"`

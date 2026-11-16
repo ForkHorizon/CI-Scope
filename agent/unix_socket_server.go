@@ -10,7 +10,7 @@ import (
 )
 
 func (r *UnixSocketRuntime) handleConnection(raw net.Conn) {
-	defer raw.Close()
+	defer func() { _ = raw.Close() }()
 	_ = raw.SetDeadline(time.Now().Add(r.config.IOTimeout))
 	conn, ok := raw.(*net.UnixConn)
 	if !ok {
