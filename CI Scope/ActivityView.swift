@@ -70,7 +70,7 @@ struct ActivityView: View {
                     .resultPulse(["succeeded", "failed"].contains(job.status) ? job.status : "")
                     .animation(.smooth(duration: 0.3), value: job.status)
             }
-            let attempt = job.attempts > 1 ? " · attempt \(job.attempts)" : ""
+            let attempt = (job.attempts > 1 ? " · attempt \(job.attempts)" : "") + (job.position.map { " · \($0)" } ?? "")
             if job.report == nil, job.isActive {
                 // A ticking timer since the task was queued, so a run that has gone on for ten minutes stands out.
                 Text("\(job.headSha.prefix(7))\(attempt) · \(Date(timeIntervalSince1970: Double(job.createdAt) / 1000), style: .timer)")
