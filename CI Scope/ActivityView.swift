@@ -76,8 +76,10 @@ struct ActivityView: View {
                 Text("\(job.headSha.prefix(7))\(attempt) · \(Date(timeIntervalSince1970: Double(job.createdAt) / 1000), style: .timer)")
                     .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).monospacedDigit()
             } else {
-                Text("\(job.headSha.prefix(7))\(attempt) · \(Date(timeIntervalSince1970: Double(job.updatedAt) / 1000).formatted(.relative(presentation: .named)))")
-                    .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
+                Text(
+                    "\(job.headSha.prefix(7))\(attempt) · \(Date(timeIntervalSince1970: Double(job.updatedAt) / 1000).formatted(.relative(presentation: .named)))"
+                )
+                .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
             }
             if job.report == nil, job.isActive {
                 if let gates = job.progress, !gates.isEmpty {
@@ -97,18 +99,20 @@ struct ActivityView: View {
 
     /// One gate of a running task: a mark for its state, its name, and while it runs what it is doing right now.
     private func gateRow(_ gate: GateJob.Gate) -> some View {
-        let tint: Color = switch gate.state {
-        case "passed": NothingTheme.green
-        case "failed": NothingTheme.red
-        case "running": NothingTheme.amber
-        default: NothingTheme.inkDim
-        }
-        let mark = switch gate.state {
-        case "passed": "✓"
-        case "failed": "✗"
-        case "running": "▸"
-        default: "·"
-        }
+        let tint: Color =
+            switch gate.state {
+            case "passed": NothingTheme.green
+            case "failed": NothingTheme.red
+            case "running": NothingTheme.amber
+            default: NothingTheme.inkDim
+            }
+        let mark =
+            switch gate.state {
+            case "passed": "✓"
+            case "failed": "✗"
+            case "running": "▸"
+            default: "·"
+            }
         return HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(mark).foregroundStyle(tint).frame(width: 12)
             Text(gate.id).foregroundStyle(gate.state == "pending" ? NothingTheme.inkDim : NothingTheme.ink)
