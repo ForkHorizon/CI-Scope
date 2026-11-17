@@ -71,8 +71,14 @@ struct ActivityView: View {
                     .animation(.smooth(duration: 0.3), value: job.status)
             }
             let attempt = job.attempts > 1 ? " · attempt \(job.attempts)" : ""
-            Text("\(job.headSha.prefix(7))\(attempt) · \(Date(timeIntervalSince1970: Double(job.updatedAt) / 1000).formatted(.relative(presentation: .named)))")
-                .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
+            if job.report == nil, job.isActive {
+                // A ticking timer since the task was queued, so a run that has gone on for ten minutes stands out.
+                Text("\(job.headSha.prefix(7))\(attempt) · \(Date(timeIntervalSince1970: Double(job.createdAt) / 1000), style: .timer)")
+                    .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim).monospacedDigit()
+            } else {
+                Text("\(job.headSha.prefix(7))\(attempt) · \(Date(timeIntervalSince1970: Double(job.updatedAt) / 1000).formatted(.relative(presentation: .named)))")
+                    .font(NothingTheme.small).foregroundStyle(NothingTheme.inkDim)
+            }
             if job.report == nil, job.isActive {
                 if let gates = job.progress, !gates.isEmpty {
                     VStack(alignment: .leading, spacing: 3) { ForEach(gates) { gateRow($0) } }.padding(.top, 4)
