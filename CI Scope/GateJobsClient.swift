@@ -20,7 +20,7 @@ struct GateJob: Decodable, Equatable, Identifiable {
         /// What the gate is doing right now, count first so a long name cannot hide it: "[3/40] pytest · tests/test_a.py::test_b".
         var live: String {
             guard state == "running" else { return "" }
-            let count = (total ?? 0) > 0 ? "[\(current ?? 0)/\(total ?? 0)]" : nil
+            let count: String? = (total ?? 0) > 0 ? "[\(current ?? 0)/\(total ?? 0)]" : (current ?? 0) > 0 ? "[\(current ?? 0)]" : nil
             return [count, step, detail].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         }
     }
@@ -38,6 +38,12 @@ struct GateJob: Decodable, Equatable, Identifiable {
     var progress: [Gate]?
     /// What the agent says it is doing right now (the check it just started); absent when idle or finished.
     var activity: String?
+
+    /// "check 3 of 12": where the running check sits in the project's list, for gates that report no test count.
+    var position: String? {
+        guard let gates = progress, let at = gates.firstIndex(where: { $0.state == "running" }) else { return nil }
+        return "check \(at + 1) of \(gates.count)"
+    }
 
     /// Queued, leased or running: the agent still owes this one an answer.
     var isActive: Bool { ["queued", "leased", "running"].contains(status) }
