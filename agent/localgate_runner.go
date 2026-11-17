@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode/utf8"
@@ -95,8 +96,12 @@ type GateScriptRunner struct {
 	GatesRoot     string    // pinned ci-gates checkout
 	GatesSHA      string    // commit GatesRoot must be at
 	Enrich        *Enricher // optional model step for failures no rule could read; nil = off
-	run           commandRunner
-	now           func() time.Time
+	// Several jobs may run at once: gatesMu keeps them from syncing the one ci-gates checkout together, and
+	// repoLocks keep two jobs of one repository out of its one checkout (the server already avoids handing those out).
+	gatesMu   sync.Mutex
+	repoLocks sync.Map // repository -> *sync.Mutex
+	run       commandRunner
+	now       func() time.Time
 }
 
 func NewGateScriptRunner(workspaceRoot, gatesRoot, gatesSHA string) *GateScriptRunner {
@@ -105,9 +110,15 @@ func NewGateScriptRunner(workspaceRoot, gatesRoot, gatesSHA string) *GateScriptR
 
 func (r *GateScriptRunner) Run(ctx context.Context, job LocalGateJob) (LocalGateReport, error) {
 	reportActivity(ctx, "Verifying the pinned ci-gates checkout")
-	if err := r.verifyGates(ctx); err != nil {
+	r.gatesMu.Lock()
+	err := r.verifyGates(ctx)
+	r.gatesMu.Unlock()
+	if err != nil {
 		return LocalGateReport{}, err
 	}
+	lock, _ := r.repoLocks.LoadOrStore(job.Repository, &sync.Mutex{})
+	lock.(*sync.Mutex).Lock()
+	defer lock.(*sync.Mutex).Unlock()
 	reportActivity(ctx, "Checking out "+shortSHA(job.HeadSHA)+" of "+job.Repository)
 	dir, err := r.checkout(ctx, job)
 	if err != nil {
