@@ -17,11 +17,11 @@ struct GateJob: Decodable, Equatable, Identifiable {
         var total: Int?
         var detail: String?
 
-        /// What the gate is doing right now, for example "lint · Sources/App.swift · 12/340".
+        /// What the gate is doing right now, count first so a long name cannot hide it: "[3/40] pytest · tests/test_a.py::test_b".
         var live: String {
             guard state == "running" else { return "" }
-            let count = (total ?? 0) > 0 ? "\(current ?? 0)/\(total ?? 0)" : nil
-            return [step, detail, count].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+            let count = (total ?? 0) > 0 ? "[\(current ?? 0)/\(total ?? 0)]" : nil
+            return [count, step, detail].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         }
     }
 
