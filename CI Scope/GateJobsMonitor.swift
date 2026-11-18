@@ -20,7 +20,7 @@ final class GateJobsMonitor: ObservableObject {
 
     func refresh() async {
         do {
-            jobs = try await client.fetch(readToken: try await readToken()).sorted { $0.updatedAt > $1.updatedAt }
+            jobs = try await client.fetch(readToken: try await readToken()).sorted(by: GateJob.listOrder)
             // The first successful poll only records what is already there, so launching the app is quiet.
             if let last = lastStatus {
                 for job in jobs.reversed() where last[job.id] != job.status { notify(job, last[job.id]) }

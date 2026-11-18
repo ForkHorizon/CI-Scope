@@ -45,6 +45,13 @@ struct GateJob: Decodable, Equatable, Identifiable {
         return "check \(at + 1) of \(gates.count)"
     }
 
+    /// Unfinished tasks first, the one queued earliest on top, so a row never jumps when its progress changes;
+    /// finished ones follow, newest result first.
+    static func listOrder(_ a: GateJob, _ b: GateJob) -> Bool {
+        if a.isActive != b.isActive { return a.isActive }
+        return a.isActive ? a.createdAt < b.createdAt : a.updatedAt > b.updatedAt
+    }
+
     /// Queued, leased or running: the agent still owes this one an answer.
     var isActive: Bool { ["queued", "leased", "running"].contains(status) }
 
