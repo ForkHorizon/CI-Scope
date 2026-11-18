@@ -86,8 +86,27 @@ func execCommand(ctx context.Context, dir, name string, args ...string) ([]byte,
 		}
 	}}
 	command.Stdout, command.Stderr = output, output
-	err := command.Run()
+	if err := command.Start(); err != nil {
+		return output.Bytes(), err
+	}
+	stop := make(chan struct{})
+	overrun := guardDisk(dir, command, stop)
+	err := command.Wait()
+	close(stop)
+	if reason := <-overrun; reason != "" {
+		cleanCheckout(dir)
+		return output.Bytes(), &environmentError{"stopped: " + reason}
+	}
 	return output.Bytes(), err
+}
+
+// cleanCheckout drops everything untracked, so what a runaway command wrote does not outlive it.
+func cleanCheckout(dir string) {
+	if name, err := LookGatePath("git"); err == nil {
+		clean := exec.Command(name, "clean", "-ffdxq")
+		clean.Dir, clean.Env = dir, gateEnvironment()
+		_ = clean.Run()
+	}
 }
 
 // GateScriptRunner checks a pull request in a clean checkout with the pinned ci-gates `ci-scope check`.
