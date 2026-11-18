@@ -4,6 +4,8 @@ package agent
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -27,5 +29,20 @@ func TestDiskGuardLeavesAQuietCommandAlone(t *testing.T) {
 	out, err := execCommand(context.Background(), t.TempDir(), "sh", "-c", "echo fine")
 	if err != nil || string(out) != "fine\n" {
 		t.Fatalf("got %q, %v", out, err)
+	}
+}
+
+func TestDiskGuardCountsAllocatedSpaceNotFileLength(t *testing.T) {
+	dir := t.TempDir()
+	sparse, err := os.Create(filepath.Join(dir, "sparse.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sparse.Truncate(40 << 30); err != nil { // 40 GB long, nothing written
+		t.Fatal(err)
+	}
+	_ = sparse.Close()
+	if used, _ := directoryBytes(dir); used > 1<<20 {
+		t.Fatalf("a sparse file counted as %d bytes", used)
 	}
 }
